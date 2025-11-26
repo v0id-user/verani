@@ -7,11 +7,12 @@ import { notificationsRoom } from "../examples/notifications-room";
  * Verani Examples Worker
  *
  * Routes WebSocket connections to different example rooms based on path:
- * - /chat -> Chat room example
- * - /presence -> Presence tracking example
- * - /notifications -> Personal notifications feed
+ * - /ws/chat -> Chat room example
+ * - /ws/presence -> Presence tracking example
+ * - /ws/notifications -> Personal notifications feed
  *
- * Also serves HTML clients for each example
+ * TypeScript CLI clients available in examples/clients/
+ * Run with: bun run examples/clients/<client-name>.ts user:yourname
  */
 
 // Environment bindings interface
@@ -57,27 +58,9 @@ export default {
 			return stub.fetch(request);
 		}
 
-		// Serve HTML clients
-		if (path === "/") {
-			return new Response(await getIndexHTML(), {
-				headers: { "Content-Type": "text/html" }
-			});
-		}
-
-		if (path === "/chat.html") {
-			return new Response(await getChatHTML(), {
-				headers: { "Content-Type": "text/html" }
-			});
-		}
-
-		if (path === "/presence.html") {
-			return new Response(await getPresenceHTML(), {
-				headers: { "Content-Type": "text/html" }
-			});
-		}
-
-		if (path === "/notifications.html") {
-			return new Response(await getNotificationsHTML(), {
+		// Info page for root path
+		if (path === "/" || path === "/index.html") {
+			return new Response(getInfoPage(), {
 				headers: { "Content-Type": "text/html" }
 			});
 		}
@@ -88,113 +71,96 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 /**
- * Landing page HTML
+ * Simple info page explaining how to use the examples
  */
-async function getIndexHTML(): Promise<string> {
+function getInfoPage(): string {
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Verani Examples</title>
-	<script src="https://cdn.tailwindcss.com"></script>
+	<style>
+		body {
+			font-family: system-ui, -apple-system, sans-serif;
+			max-width: 800px;
+			margin: 40px auto;
+			padding: 0 20px;
+			line-height: 1.6;
+			color: #333;
+		}
+		h1 { color: #2563eb; }
+		h2 { color: #1e40af; margin-top: 30px; }
+		code {
+			background: #f3f4f6;
+			padding: 2px 6px;
+			border-radius: 3px;
+			font-family: 'Courier New', monospace;
+		}
+		pre {
+			background: #1f2937;
+			color: #f9fafb;
+			padding: 15px;
+			border-radius: 6px;
+			overflow-x: auto;
+		}
+		pre code {
+			background: none;
+			color: inherit;
+			padding: 0;
+		}
+		.example {
+			background: #f9fafb;
+			border-left: 4px solid #2563eb;
+			padding: 15px;
+			margin: 15px 0;
+		}
+		a { color: #2563eb; text-decoration: none; }
+		a:hover { text-decoration: underline; }
+	</style>
 </head>
-<body class="bg-gray-50">
-	<div class="min-h-screen flex items-center justify-center p-4">
-		<div class="max-w-4xl w-full">
-			<div class="text-center mb-12">
-				<h1 class="text-6xl font-bold text-gray-900 mb-4">Verani</h1>
-				<p class="text-xl text-gray-600">Realtime SDK for Cloudflare Actors</p>
-				<p class="text-gray-500 mt-2">Socket.io-like semantics with proper hibernation support</p>
-			</div>
+<body>
+	<h1>🚀 Verani Examples</h1>
+	<p>Real-time SDK for Cloudflare Actors with Socket.io-like semantics and proper hibernation support.</p>
 
-			<div class="grid md:grid-cols-3 gap-6">
-				<!-- Chat Example -->
-				<div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
-					<div class="text-4xl mb-4">💬</div>
-					<h2 class="text-2xl font-bold mb-2">Chat Room</h2>
-					<p class="text-gray-600 mb-4">Real-time chat with typing indicators and online users</p>
-					<ul class="text-sm text-gray-500 mb-4 space-y-1">
-						<li>• Message broadcasting</li>
-						<li>• Typing indicators</li>
-						<li>• Online user list</li>
-						<li>• Join/leave notifications</li>
-					</ul>
-					<a href="/chat.html" class="block w-full bg-blue-500 text-white text-center py-2 rounded hover:bg-blue-600 transition">
-						Try Demo
-					</a>
-				</div>
+	<h2>📦 Running Examples</h2>
+	<p>This worker provides WebSocket endpoints for the example rooms. To interact with them, use the TypeScript CLI clients.</p>
 
-				<!-- Presence Example -->
-				<div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
-					<div class="text-4xl mb-4">👥</div>
-					<h2 class="text-2xl font-bold mb-2">Presence</h2>
-					<p class="text-gray-600 mb-4">Track who's online with multi-device support</p>
-					<ul class="text-sm text-gray-500 mb-4 space-y-1">
-						<li>• Real-time presence</li>
-						<li>• Multi-device tracking</li>
-						<li>• Status updates</li>
-						<li>• Device count</li>
-					</ul>
-					<a href="/presence.html" class="block w-full bg-green-500 text-white text-center py-2 rounded hover:bg-green-600 transition">
-						Try Demo
-					</a>
-				</div>
-
-				<!-- Notifications Example -->
-				<div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
-					<div class="text-4xl mb-4">🔔</div>
-					<h2 class="text-2xl font-bold mb-2">Notifications</h2>
-					<p class="text-gray-600 mb-4">Personal notification feed per user</p>
-					<ul class="text-sm text-gray-500 mb-4 space-y-1">
-						<li>• Personal feed</li>
-						<li>• Push notifications</li>
-						<li>• Read tracking</li>
-						<li>• Multi-device sync</li>
-					</ul>
-					<a href="/notifications.html" class="block w-full bg-purple-500 text-white text-center py-2 rounded hover:bg-purple-600 transition">
-						Try Demo
-					</a>
-				</div>
-			</div>
-
-			<div class="mt-12 text-center">
-				<h3 class="text-lg font-semibold mb-4">Getting Started</h3>
-				<div class="bg-white rounded-lg shadow p-6 text-left max-w-2xl mx-auto">
-					<ol class="space-y-3 text-gray-700">
-						<li><strong>1.</strong> Click on any example above</li>
-						<li><strong>2.</strong> Enter a username (format: <code class="bg-gray-100 px-2 py-1 rounded">user:yourname</code>)</li>
-						<li><strong>3.</strong> Open multiple tabs to see real-time sync</li>
-					</ol>
-				</div>
-				<div class="mt-6">
-					<a href="https://github.com/your-org/verani" class="text-blue-500 hover:underline">View Documentation →</a>
-				</div>
-			</div>
-		</div>
+	<div class="example">
+		<h3>💬 Chat Room</h3>
+		<pre><code>bun run examples/clients/chat-client.ts user:alice</code></pre>
+		<p>Real-time chat with typing indicators, online users, and message broadcasting.</p>
 	</div>
+
+	<div class="example">
+		<h3>👥 Presence Tracking</h3>
+		<pre><code>bun run examples/clients/presence-client.ts user:bob</code></pre>
+		<p>Track who's online with multi-device support and status indicators.</p>
+	</div>
+
+	<div class="example">
+		<h3>🔔 Notifications Feed</h3>
+		<pre><code>bun run examples/clients/notifications-client.ts user:charlie</code></pre>
+		<p>Personal notification stream with read/unread tracking and multi-device sync.</p>
+	</div>
+
+	<h2>🔗 WebSocket Endpoints</h2>
+	<ul>
+		<li><code>/ws/chat</code> - Chat room endpoint</li>
+		<li><code>/ws/presence</code> - Presence tracking endpoint</li>
+		<li><code>/ws/notifications</code> - Notifications feed endpoint (requires userId param)</li>
+	</ul>
+
+	<h2>📚 Documentation</h2>
+	<ul>
+		<li><a href="https://github.com/your-org/verani">GitHub Repository</a></li>
+		<li>Examples README: <code>examples/README.md</code></li>
+		<li>API Documentation: <code>docs/API.md</code></li>
+	</ul>
+
+	<h2>🛠️ Development</h2>
+	<p>Make sure to run <code>wrangler dev</code> to start the server before running clients.</p>
+	<p>Default development URL: <strong>http://localhost:8787</strong></p>
 </body>
 </html>`;
-}
-
-/**
- * Chat client HTML (embedded - in production, serve from separate files)
- */
-async function getChatHTML(): Promise<string> {
-	// We'll create this in the next step
-	return "Chat client will be created in examples/clients/chat.html";
-}
-
-/**
- * Presence client HTML
- */
-async function getPresenceHTML(): Promise<string> {
-	return "Presence client will be created in examples/clients/presence.html";
-}
-
-/**
- * Notifications client HTML
- */
-async function getNotificationsHTML(): Promise<string> {
-	return "Notifications client will be created in examples/clients/notifications.html";
 }

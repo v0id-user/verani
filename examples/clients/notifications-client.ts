@@ -1,0 +1,399 @@
+#!/usr/bin/env bun
+/**
+ * Notifications Client Example
+ * 
+ * Demonstrates personal notification feed using VeraniClient SDK
+ * 
+ * Usage:
+ *   bun run examples/clients/notifications-client.ts user:alice
+ * 
+ * Features:
+ * - Personal notification feed
+ * - Real-time push notifications
+ * - Read/unread tracking
+ * - Multi-device synchronization
+ * - Interactive command menu
+ */
+
+import { VeraniClient } from "../../src/client/client";
+import * as readline from "readline";
+
+// ANSI color codes
+const colors = {
+  reset: "\x1b[0m",
+  bright: "\x1b[1m",
+  dim: "\x1b[2m",
+  red: "\x1b[31m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  magenta: "\x1b[35m",
+  cyan: "\x1b[36m",
+  gray: "\x1b[90m",
+};
+
+interface Notification {
+  id: string;
+  type: "info" | "success" | "warning" | "error";
+  title: string;
+  message: string;
+  timestamp: number;
+  read: boolean;
+}
+
+interface NotificationState {
+  userId: string;
+  notifications: Map<string, Notification>;
+  deviceCount: number;
+}
+
+const state: NotificationState = {
+  userId: "",
+  notifications: new Map(),
+  deviceCount: 0,
+};
+
+let notificationIdCounter = 0;
+
+/**
+ * Clears the screen
+ */
+function clearScreen() {
+  console.clear();
+}
+
+/**
+ * Gets notification icon and color
+ */
+function getNotificationDisplay(type: string): { icon: string; color: string } {
+  switch (type) {
+    case "info":
+      return { icon: "ℹ️ ", color: colors.blue };
+    case "success":
+      return { icon: "✅", color: colors.green };
+    case "warning":
+      return { icon: "⚠️ ", color: colors.yellow };
+    case "error":
+      return { icon: "❌", color: colors.red };
+    default:
+      return { icon: "📬", color: colors.gray };
+  }
+}
+
+/**
+ * Formats a timestamp for display
+ */
+function formatTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+
+  if (diff < 60000) return "Just now";
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return date.toLocaleDateString();
+}
+
+/**
+ * Renders the notifications UI
+ */
+function render() {
+  clearScreen();
+  
+  console.log(`${colors.bright}${colors.magenta}🔔 Notifications Feed${colors.reset}`);
+  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}\n`);
+  
+  // Header
+  const unreadCount = Array.from(state.notifications.values()).filter(n => !n.read).length;
+  const deviceText = state.deviceCount === 1 ? "1 device" : `${state.deviceCount} devices`;
+  
+  console.log(`${colors.bright}User:${colors.reset} ${state.userId} ${colors.gray}(${deviceText})${colors.reset}`);
+  console.log(`${colors.bright}Notifications:${colors.reset} ${state.notifications.size} total, ${colors.magenta}${unreadCount} unread${colors.reset}\n`);
+  
+  // Notifications list
+  if (state.notifications.size === 0) {
+    console.log(`  ${colors.gray}📭 No notifications yet${colors.reset}`);
+    console.log(`  ${colors.dim}Use 'simulate' to create a test notification${colors.reset}\n`);
+  } else {
+    const sorted = Array.from(state.notifications.values())
+      .sort((a, b) => b.timestamp - a.timestamp);
+    
+    for (const notif of sorted) {
+      const { icon, color } = getNotificationDisplay(notif.type);
+      const readIndicator = notif.read ? "" : ` ${colors.magenta}●${colors.reset}`;
+      
+      console.log(`  ${icon} ${color}${notif.title}${colors.reset}${readIndicator}`);
+      console.log(`     ${notif.message}`);
+      console.log(`     ${colors.gray}${formatTime(notif.timestamp)} • ID: ${notif.id}${colors.reset}`);
+      console.log();
+    }
+  }
+  
+  // Commands
+  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  console.log(`${colors.bright}Commands:${colors.reset}`);
+  console.log(`  ${colors.cyan}read <id>${colors.reset}      - Mark notification as read`);
+  console.log(`  ${colors.cyan}read-all${colors.reset}       - Mark all notifications as read`);
+  console.log(`  ${colors.cyan}delete <id>${colors.reset}    - Delete a notification`);
+  console.log(`  ${colors.cyan}simulate${colors.reset}       - Simulate a new notification`);
+  console.log(`  ${colors.cyan}refresh${colors.reset}        - Refresh the display`);
+  console.log(`  ${colors.cyan}quit${colors.reset}           - Exit`);
+  console.log();
+}
+
+/**
+ * Shows a toast notification
+ */
+function showToast(notification: Notification) {
+  const { icon, color } = getNotificationDisplay(notification.type);
+  console.log();
+  console.log(`${colors.bright}${color}╔════════════════════════════════════════════════╗${colors.reset}`);
+  console.log(`${colors.bright}${color}║${colors.reset} ${icon} ${colors.bright}${notification.title}${colors.reset}`);
+  console.log(`${colors.bright}${color}║${colors.reset} ${notification.message}`);
+  console.log(`${colors.bright}${color}╚════════════════════════════════════════════════╝${colors.reset}`);
+  console.log();
+}
+
+/**
+ * Shows the input prompt
+ */
+function showPrompt() {
+  process.stdout.write(`${colors.cyan}>${colors.reset} `);
+}
+
+/**
+ * Main function
+ */
+async function main() {
+  const args = process.argv.slice(2);
+  const token = args[0];
+
+  if (!token || !token.startsWith("user:")) {
+    console.error(`${colors.red}Error: Please provide a token in format 'user:username'${colors.reset}`);
+    console.error(`Usage: bun run examples/clients/notifications-client.ts user:alice`);
+    process.exit(1);
+  }
+
+  const username = token.split(":")[1] || token;
+  state.userId = username;
+
+  clearScreen();
+  console.log(`${colors.bright}🔔 Notifications Client${colors.reset}`);
+  console.log(`${colors.gray}Connecting as ${username}...${colors.reset}\n`);
+
+  // Build WebSocket URL
+  const wsUrl = `ws://localhost:8787/ws/notifications?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(username)}`;
+
+  // Create Verani client
+  const client = new VeraniClient(wsUrl, {
+    reconnection: {
+      enabled: true,
+      maxAttempts: 5,
+      initialDelay: 1000,
+      maxDelay: 10000,
+    },
+  });
+
+  // Setup lifecycle callbacks
+  client.onOpen(() => {
+    render();
+    showPrompt();
+  });
+
+  client.onClose((event) => {
+    clearScreen();
+    console.log(`${colors.red}✗ Disconnected: ${event.reason || "Unknown reason"}${colors.reset}`);
+  });
+
+  client.onError((error) => {
+    console.error(`${colors.red}✗ Error:${colors.reset}`, error);
+  });
+
+  client.onStateChange((connectionState) => {
+    if (connectionState === "connecting") {
+      clearScreen();
+      console.log(`${colors.yellow}⟳ Reconnecting...${colors.reset}`);
+    } else if (connectionState === "connected") {
+      render();
+      showPrompt();
+    }
+  });
+
+  // Handle notifications sync
+  client.on("notifications.sync", (data: { notifications: Notification[] }) => {
+    for (const notif of data.notifications) {
+      state.notifications.set(notif.id, notif);
+    }
+    render();
+    showPrompt();
+  });
+
+  // Handle new notification
+  client.on("notification.new", (data: Notification) => {
+    state.notifications.set(data.id, data);
+    showToast(data);
+    render();
+    showPrompt();
+  });
+
+  // Handle notification read
+  client.on("notification.read", (data: { notificationId: string }) => {
+    const notif = state.notifications.get(data.notificationId);
+    if (notif) {
+      notif.read = true;
+      render();
+      showPrompt();
+    }
+  });
+
+  // Handle all notifications read
+  client.on("notification.readAll", () => {
+    for (const notif of state.notifications.values()) {
+      notif.read = true;
+    }
+    render();
+    console.log(`${colors.green}✓ All notifications marked as read${colors.reset}`);
+    showPrompt();
+  });
+
+  // Handle notification deleted
+  client.on("notification.deleted", (data: { notificationId: string }) => {
+    state.notifications.delete(data.notificationId);
+    render();
+    console.log(`${colors.green}✓ Notification deleted${colors.reset}`);
+    showPrompt();
+  });
+
+  // Handle device connected/disconnected
+  client.on("device.connected", (data: { deviceCount: number }) => {
+    state.deviceCount = data.deviceCount;
+    render();
+    showPrompt();
+  });
+
+  client.on("device.disconnected", (data: { deviceCount: number }) => {
+    state.deviceCount = data.deviceCount;
+    render();
+    showPrompt();
+  });
+
+  // Setup readline for interactive input
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: "",
+  });
+
+  rl.on("line", (line) => {
+    const input = line.trim();
+    
+    if (!input) {
+      showPrompt();
+      return;
+    }
+
+    const parts = input.split(" ");
+    const command = parts[0].toLowerCase();
+    const arg = parts.slice(1).join(" ");
+
+    switch (command) {
+      case "quit":
+      case "exit":
+        console.log(`\n${colors.gray}Goodbye!${colors.reset}`);
+        client.close();
+        process.exit(0);
+        break;
+
+      case "read":
+        if (!arg) {
+          console.log(`${colors.red}✗ Please provide notification ID${colors.reset}`);
+          showPrompt();
+          return;
+        }
+        if (client.isConnected()) {
+          client.emit("notification.read", { notificationId: arg });
+        } else {
+          console.log(`${colors.red}✗ Not connected${colors.reset}`);
+          showPrompt();
+        }
+        break;
+
+      case "read-all":
+      case "readall":
+        if (client.isConnected()) {
+          client.emit("notification.readAll", {});
+        } else {
+          console.log(`${colors.red}✗ Not connected${colors.reset}`);
+          showPrompt();
+        }
+        break;
+
+      case "delete":
+        if (!arg) {
+          console.log(`${colors.red}✗ Please provide notification ID${colors.reset}`);
+          showPrompt();
+          return;
+        }
+        if (client.isConnected()) {
+          client.emit("notification.delete", { notificationId: arg });
+        } else {
+          console.log(`${colors.red}✗ Not connected${colors.reset}`);
+          showPrompt();
+        }
+        break;
+
+      case "simulate": {
+        const types = ["info", "success", "warning", "error"];
+        const titles = ["New Message", "Update Available", "Warning", "Error Occurred"];
+        const messages = [
+          "You have a new message",
+          "Version 2.0 is available",
+          "Your session will expire soon",
+          "Failed to save changes"
+        ];
+        
+        const index = Math.floor(Math.random() * types.length);
+        const notification: Notification = {
+          id: `notif-${notificationIdCounter++}`,
+          type: types[index] as "info" | "success" | "warning" | "error",
+          title: titles[index],
+          message: messages[index],
+          timestamp: Date.now(),
+          read: false
+        };
+
+        state.notifications.set(notification.id, notification);
+        showToast(notification);
+        render();
+        showPrompt();
+        break;
+      }
+
+      case "refresh":
+        render();
+        showPrompt();
+        break;
+
+      case "help":
+        render();
+        showPrompt();
+        break;
+
+      default:
+        console.log(`${colors.red}✗ Unknown command: ${command}${colors.reset}`);
+        console.log(`${colors.gray}Type 'help' to see available commands${colors.reset}`);
+        showPrompt();
+    }
+  });
+
+  // Handle graceful shutdown
+  process.on("SIGINT", () => {
+    clearScreen();
+    console.log(`${colors.gray}Disconnecting...${colors.reset}`);
+    client.close();
+    process.exit(0);
+  });
+}
+
+main().catch(console.error);
+
