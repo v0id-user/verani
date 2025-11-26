@@ -119,6 +119,8 @@ Verani handles Cloudflare's hibernation automatically:
 - **[Mental Model](./docs/MENTAL_MODEL.md)** - Understanding Verani's architecture
 - **[API Reference](./docs/API.md)** - Complete API documentation
 - **[Examples](./docs/EXAMPLES.md)** - Common usage patterns
+- **[Security Guide](./docs/SECURITY.md)** - Authentication, authorization, and best practices
+- **[Deployment](./docs/DEPLOYMENT.md)** - Deploy to Cloudflare Workers
 
 ## Features
 

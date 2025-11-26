@@ -402,17 +402,22 @@ Cloudflare Workers pricing (as of 2024):
 
 Before going to production:
 
-- [ ] Implement authentication (JWT tokens)
+- [ ] Implement authentication (JWT tokens) - **See [SECURITY.md](./SECURITY.md)**
 - [ ] Validate all client input
 - [ ] Rate limit messages per user
 - [ ] Sanitize user-generated content
-- [ ] Use HTTPS/WSS only
+- [ ] Use HTTPS/WSS only (never HTTP/WS)
 - [ ] Don't expose error details to clients
 - [ ] Log security events
 - [ ] Set up monitoring and alerts
+- [ ] Verify Origin header to prevent CSWSH attacks
+- [ ] Use environment variables for secrets (never commit secrets)
+
+**📖 Read the complete [Security Guide](./SECURITY.md) for implementation details.**
 
 ## Next Steps
 
+- **[Security Guide](./SECURITY.md)** - Authentication and security best practices
 - **[API Reference](./API.md)** - Complete API documentation
 - **[Examples](./EXAMPLES.md)** - Common patterns
 - **[Mental Model](./MENTAL_MODEL.md)** - Architecture deep dive

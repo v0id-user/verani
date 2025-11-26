@@ -2,23 +2,36 @@
 
 Common usage patterns and recipes for Verani.
 
+## Authentication Note
+
+Examples marked with:
+- 🔓 **Public** - No authentication required (anyone can connect)
+- 🔒 **Authenticated** - Requires token verification
+- 🔐 **Authorized** - Requires authentication + role/permission checks
+
+**For production apps**, always use authenticated examples. See [SECURITY.md](./SECURITY.md) for implementation details.
+
 ## Table of Contents
 
-- [Basic Chat Room](#basic-chat-room)
-- [User Presence](#user-presence)
-- [Private Messages](#private-messages)
-- [Multiple Channels](#multiple-channels)
-- [Authentication](#authentication)
-- [Rate Limiting](#rate-limiting)
-- [Notifications Feed](#notifications-feed)
-- [Collaborative Editing](#collaborative-editing)
-- [Game Session](#game-session)
+- [Basic Chat Room](#basic-chat-room) 🔓
+- [User Presence](#user-presence) 🔓
+- [Private Messages](#private-messages) 🔓
+- [Multiple Channels](#multiple-channels) 🔓
+- [Authentication (JWT)](#authentication) 🔒
+- [Rate Limiting](#rate-limiting) 🔓
+- [Notifications Feed](#notifications-feed) 🔒
+- [Collaborative Editing](#collaborative-editing) 🔒
+- [Game Session](#game-session) 🔓
 
 ---
 
 ## Basic Chat Room
 
+🔓 **Public** - No authentication (for demo purposes)
+
 A simple chat room where all messages are broadcast to everyone.
+
+**⚠️ Security Warning**: This example has no authentication. Users can set any `userId` they want. Use only for demos and prototypes. For production, see the [Authentication](#authentication) example.
 
 ```typescript
 import { defineRoom } from "verani";
@@ -289,12 +302,16 @@ client.on("chat.message", ({ channel, from, text }) => {
 
 ---
 
-## Authentication
+## Authentication (JWT)
 
-Verify JWT tokens and extract user info.
+🔒 **Authenticated** - JWT token verification required
+
+This example shows how to properly verify user identity using JWT tokens.
 
 ```typescript
-import { defineRoom, parseJWT } from "verani";
+import { defineRoom } from "verani";
+// npm install @tsndr/cloudflare-worker-jwt
+import jwt from "@tsndr/cloudflare-worker-jwt";
 
 interface AuthMeta extends ConnectionMeta {
   username: string;
@@ -302,25 +319,32 @@ interface AuthMeta extends ConnectionMeta {
 }
 
 export const secureRoom = defineRoom<AuthMeta>({
-  extractMeta(req) {
-    // Get token from Authorization header
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
+  async extractMeta(req) {
+    // Get token from query parameter (or Authorization header)
+    const url = new URL(req.url);
+    const token = url.searchParams.get("token");
+
+    if (!token) {
       throw new Error("Unauthorized: No token provided");
     }
 
-    const token = authHeader.substring(7);
-    const payload = parseJWT(token);
+    // Verify JWT signature and expiration
+    // Replace SECRET_KEY with your actual secret from environment
+    const isValid = await jwt.verify(token, SECRET_KEY);
 
-    if (!payload || !payload.sub) {
+    if (!isValid) {
       throw new Error("Unauthorized: Invalid token");
     }
 
-    // Verify token expiration
-    if (payload.exp && payload.exp < Date.now() / 1000) {
-      throw new Error("Unauthorized: Token expired");
+    // Decode verified token
+    const payload = jwt.decode(token);
+
+    // Validate required claims
+    if (!payload.sub) {
+      throw new Error("Unauthorized: Missing user ID");
     }
 
+    // Extract verified user data
     return {
       userId: payload.sub,
       clientId: crypto.randomUUID(),
@@ -330,8 +354,13 @@ export const secureRoom = defineRoom<AuthMeta>({
     };
   },
 
+  onConnect(ctx) {
+    // ctx.meta.userId is now VERIFIED and TRUSTED
+    console.log(`Verified user ${ctx.meta.username} connected`);
+  },
+
   onMessage(ctx, frame) {
-    // Moderator-only actions
+    // Authorization check: Moderator-only actions
     if (frame.type === "mod.kick") {
       if (ctx.meta.role !== "moderator" && ctx.meta.role !== "admin") {
         ctx.ws.send(JSON.stringify({
@@ -343,8 +372,26 @@ export const secureRoom = defineRoom<AuthMeta>({
 
       // Perform kick action
       const { targetUserId } = frame.data;
-      // ... implementation
+      // Close target user's connections
+      const sessions = ctx.actor.getUserSessions(targetUserId);
+      sessions.forEach(ws => ws.close(1008, "Kicked by moderator"));
+
+      // Notify room
+      ctx.actor.broadcast("default", {
+        type: "user.kicked",
+        userId: targetUserId,
+        by: ctx.meta.userId
+      });
     }
+  },
+
+  onError(error, ctx) {
+    console.error(`Auth error for ${ctx.meta.userId}:`, error);
+    // Don't expose error details to client
+    ctx.ws.send(JSON.stringify({
+      type: "error",
+      data: { message: "An error occurred" }
+    }));
   }
 });
 ```
@@ -352,21 +399,47 @@ export const secureRoom = defineRoom<AuthMeta>({
 **Client:**
 
 ```typescript
-const token = await getAuthToken(); // Your auth system
+// Step 1: Get JWT token from your auth service
+async function login(username, password) {
+  const response = await fetch("https://your-api.com/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
+  });
 
-const client = new VeraniClient("wss://app.example.com/ws", {
-  // Can't set headers in WebSocket constructor
-  // So we'll send token as query param or in first message
-});
+  const { token } = await response.json();
+  return token;
+}
 
-// Alternative: Send in query param
+// Step 2: Connect with verified token
+const token = await login("alice", "password123");
+
 const client = new VeraniClient(
   `wss://app.example.com/ws?token=${token}`
 );
 
-// Then extract in server:
-// const token = url.searchParams.get("token");
+// Step 3: Handle auth errors
+client.onClose((event) => {
+  if (event.reason === "Unauthorized") {
+    // Token invalid or expired - redirect to login
+    window.location.href = "/login";
+  }
+});
+
+client.on("error", (error) => {
+  console.error("Connection error:", error);
+});
 ```
+
+**Important Notes:**
+
+1. **Never** put tokens in localStorage if they contain sensitive data
+2. Use short-lived tokens (15-60 minutes)
+3. Implement token refresh mechanism
+4. Always use WSS (not WS) in production
+5. Consider using HttpOnly cookies instead of query params for better security
+
+**See [SECURITY.md](./SECURITY.md) for comprehensive authentication guide.**
 
 ---
 
@@ -435,7 +508,9 @@ export const rateLimitedRoom = defineRoom<RateLimitMeta>({
 
 ## Notifications Feed
 
-Personal notification feed for each user.
+🔒 **Authenticated** - Requires user verification
+
+Personal notification feed for each user. Each user gets their own Actor instance.
 
 ```typescript
 import { defineRoom } from "verani";
@@ -489,7 +564,9 @@ export async function pushNotification(
 
 ## Collaborative Editing
 
-Real-time collaborative document editing.
+🔒 **Authenticated** - Requires user verification + document access check
+
+Real-time collaborative document editing with authorization.
 
 ```typescript
 import { defineRoom } from "verani";

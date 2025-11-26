@@ -15,17 +15,15 @@ If you're familiar with Socket.io, you already understand 80% of Verani. The key
 Think of each Actor instance as a **self-contained realtime room**.
 
 ```
-┌─────────────────────────────────────┐
-│ Actor Instance (Durable Object)     │
-│                                      │
-│  ┌────────┐  ┌────────┐  ┌────────┐│
-│  │WebSocket│ │WebSocket│ │WebSocket││
-│  │  User A │ │  User B │ │  User C ││
-│  └────────┘  └────────┘  └────────┘│
-│                                      │
-│  Memory: Sessions Map               │
-│  Hibernation: Attachments           │
-└─────────────────────────────────────┘
++---------------------------------------+
+| Actor Instance (Durable Object)       |
+|                                       |
+|   [WebSocket]  [WebSocket]  [WebSocket]
+|    User A       User B       User C  |
+|                                       |
+|   Memory: Sessions Map                |
+|   Hibernation: Attachments            |
++---------------------------------------+
 ```
 
 **Key insight**: You control isolation by how you route requests to Actors.
@@ -40,15 +38,18 @@ Inside a single Actor, connections can subscribe to different **channels** for s
 
 ```
 Actor: "game-room-123"
-├── Channel: "default"
-│   ├── User A
-│   ├── User B
-│   └── User C
-├── Channel: "game-state"
-│   ├── User A
-│   └── User B
-└── Channel: "chat"
-    └── User C
+|
++-- Channel: "default"
+|   +-- User A
+|   +-- User B
+|   +-- User C
+|
++-- Channel: "game-state"
+|   +-- User A
+|   +-- User B
+|
++-- Channel: "chat"
+    +-- User C
 ```
 
 When you broadcast to a channel, only connections subscribed to that channel receive the message:
@@ -83,40 +84,40 @@ restoreSessions(actor);
 ## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Cloudflare Worker                        │
-│                                                               │
-│  Request → nameFromRequest() → Actor Instance                │
-│                                      │                        │
-│                                      ▼                        │
-│                          ┌───────────────────────┐          │
-│                          │ Verani Actor Runtime  │          │
-│                          │                       │          │
-│                          │ onWebSocketConnect    │          │
-│                          │ onWebSocketMessage    │          │
-│                          │ onWebSocketDisconnect │          │
-│                          │ onInit (restore)      │          │
-│                          └───────────────────────┘          │
-│                                      │                        │
-│                                      ▼                        │
-│                          ┌───────────────────────┐          │
-│                          │   Your Room Hooks     │          │
-│                          │                       │          │
-│                          │   onConnect()         │          │
-│                          │   onMessage()         │          │
-│                          │   onDisconnect()      │          │
-│                          └───────────────────────┘          │
-└─────────────────────────────────────────────────────────────┘
-                                   ▲
-                                   │ WebSocket
-                                   │
-                          ┌────────┴─────────┐
-                          │  VeraniClient    │
-                          │                  │
-                          │  emit()          │
-                          │  on()            │
-                          │  reconnect()     │
-                          └──────────────────┘
++-------------------------------------------------------------+
+|                   Cloudflare Worker                         |
+|                                                             |
+|  Request --> nameFromRequest() --> Actor Instance           |
+|                                         |                   |
+|                                         v                   |
+|                      +----------------------+               |
+|                      | Verani Actor Runtime |               |
+|                      |                      |               |
+|                      | onWebSocketConnect   |               |
+|                      | onWebSocketMessage   |               |
+|                      | onWebSocketDisconnect|               |
+|                      | onInit (restore)     |               |
+|                      +----------------------+               |
+|                                         |                   |
+|                                         v                   |
+|                      +----------------------+               |
+|                      |   Your Room Hooks    |               |
+|                      |                      |               |
+|                      |   onConnect()        |               |
+|                      |   onMessage()        |               |
+|                      |   onDisconnect()     |               |
+|                      +----------------------+               |
++-------------------------------------------------------------+
+                              ^
+                              | WebSocket
+                              |
+                      +----------------+
+                      | VeraniClient   |
+                      |                |
+                      | emit()         |
+                      | on()           |
+                      | reconnect()    |
+                      +----------------+
 ```
 
 ## State Management
@@ -326,6 +327,97 @@ These constraints keep Verani simple, predictable, and maintainable.
 - ❌ You need complex presence (wait for Verani 0.2 or build custom)
 - ❌ You need guaranteed message ordering (use queues)
 - ❌ You're not on Cloudflare (use Socket.io, Ably, Pusher, etc.)
+
+## Authentication Strategy
+
+Verani supports both **public (unauthenticated)** and **authenticated** rooms.
+
+### Public Rooms (No Authentication)
+
+Perfect for:
+- Public chat rooms
+- Anonymous real-time feeds
+- Demo applications
+- MVP/prototypes
+
+```typescript
+export const publicRoom = defineRoom({
+  // Default extractMeta uses userId from query params
+  // No verification needed
+
+  onConnect(ctx) {
+    // ctx.meta.userId could be anything the client sends
+    console.log(`${ctx.meta.userId} joined`);
+  }
+});
+```
+
+**Security note**: Never trust `userId` in public rooms. Clients can impersonate anyone.
+
+### Authenticated Rooms (Token-Based)
+
+Production applications should verify user identity:
+
+```typescript
+import { parseJWT } from "verani";
+
+export const secureRoom = defineRoom({
+  extractMeta(req) {
+    // Get auth token
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      throw new Error("Unauthorized");
+    }
+
+    const token = authHeader.substring(7);
+
+    // Verify token (use proper JWT library in production)
+    const payload = verifyJWT(token, SECRET_KEY);
+
+    if (!payload) {
+      throw new Error("Invalid token");
+    }
+
+    // Now you can trust the userId
+    return {
+      userId: payload.sub,
+      clientId: crypto.randomUUID(),
+      channels: ["default"],
+      // Add verified user data
+      email: payload.email,
+      role: payload.role
+    };
+  }
+});
+```
+
+### Authentication Patterns
+
+**1. JWT Token (Recommended)**
+- Client includes `Authorization: Bearer <token>` header
+- Server verifies signature
+- Extract user info from verified payload
+
+**2. Query Parameter Token**
+- Client connects with `?token=<jwt>`
+- Server extracts and verifies
+- Less secure (tokens in URLs can be logged)
+
+**3. Session-Based**
+- Client connects with session cookie
+- Server validates session
+- Look up user info from session store
+
+### When to Use Each
+
+| Pattern | Use Case | Security Level |
+|---------|----------|----------------|
+| No Auth | Public demos, anonymous chat | Low |
+| Query Token | Quick prototypes, mobile apps | Medium |
+| JWT Header | Production web apps | High |
+| Session Cookie | Traditional web apps | High |
+
+See **[SECURITY.md](./SECURITY.md)** for detailed authentication implementation guide.
 
 ## Summary
 

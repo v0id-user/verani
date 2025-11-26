@@ -261,6 +261,80 @@ Create an HTML file with your client code:
 2. Type messages in one tab
 3. See them appear in all tabs in real-time!
 
+**Note**: This example uses anonymous/unauthenticated connections where `userId` comes from the query parameter. For production apps, see the authentication section below.
+
+## Authentication Setup (Production)
+
+The example above uses **unauthenticated connections** where anyone can set any `userId`. For production, you should verify user identity.
+
+### Quick Auth Example
+
+Update your room to verify JWT tokens:
+
+```typescript
+// npm install @tsndr/cloudflare-worker-jwt
+import jwt from "@tsndr/cloudflare-worker-jwt";
+import { defineRoom } from "verani";
+
+export const authenticatedRoom = defineRoom({
+  // Verify token in extractMeta
+  async extractMeta(req) {
+    const url = new URL(req.url);
+    const token = url.searchParams.get("token");
+
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    // Verify JWT (you'll need your secret key)
+    const isValid = await jwt.verify(token, env.JWT_SECRET);
+
+    if (!isValid) {
+      throw new Error("Invalid token");
+    }
+
+    const payload = jwt.decode(token);
+
+    return {
+      userId: payload.sub,  // Now verified!
+      clientId: crypto.randomUUID(),
+      channels: ["default"],
+      username: payload.name
+    };
+  },
+
+  onConnect(ctx) {
+    // ctx.meta.userId is now verified and trusted
+    console.log(`Verified user ${ctx.meta.userId} connected`);
+  },
+
+  onMessage(ctx, frame) {
+    // You can trust ctx.meta.userId here
+    if (frame.type === "chat.message") {
+      ctx.actor.broadcast("default", {
+        type: "chat.message",
+        from: ctx.meta.userId,
+        text: frame.data.text
+      });
+    }
+  }
+});
+```
+
+### Client with Auth Token
+
+```javascript
+// Get token from your auth service
+const token = await getAuthToken();
+
+// Connect with verified token
+const client = new VeraniClient(
+  `wss://my-verani-app.workers.dev/ws?token=${token}`
+);
+```
+
+**See [SECURITY.md](./SECURITY.md) for comprehensive authentication guide.**
+
 ## Next Steps
 
 ### Add Custom Metadata
