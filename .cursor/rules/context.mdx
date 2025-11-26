@@ -1,0 +1,444 @@
+## 0. Context
+
+Project name: **Verani**
+
+Goal:
+A small, focused realtime SDK that feels like “Socket.io for Cloudflare Durable Objects / Actors”:
+
+* Simple room semantics
+* WebSockets under the hood
+* Cloudflare **Actors** abstraction as the backend runtime
+* Handles **hibernation** correctly
+* Gives isolation between users, rooms, and channels
+* No massive infra, no Rivet/Partykit clone
+
+This is a **library**, not an app.
+
+---
+
+## 1. High level architecture
+
+Core idea:
+
+* Each **Actor** instance represents a logical realtime container
+
+  * This can be a “room”, or a “user feed”, or a “notification stream”
+* Inside that Actor, multiple WebSocket connections are attached
+* Each connection has metadata:
+
+  * `userId`
+  * `clientId` (per browser tab/device)
+  * `channels: string[]` (logical subrooms inside the same Actor)
+
+We keep:
+
+* A `Map<WebSocket, { ws, meta }>` in memory for fast routing
+* A **serialized attachment** per WebSocket, so when the Actor hibernates and wakes, we can reconstruct `sessions` from the attachments
+
+The SDK has two halves:
+
+1. **Backend**
+
+   * `defineRoom`
+   * `createActorHandler(room)`
+   * Actor subclass that wires Cloudflare events into our room definition
+
+2. **Client**
+
+   * `VeraniClient`
+   * Simple `on(event, handler)` / `emit(event, payload)` API over WebSocket
+
+Protocol: JSON frames, very simple:
+
+```ts
+type MessageFrame = {
+  type: string
+  channel?: string
+  data?: any
+}
+```
+
+We can evolve this later.
+
+---
+
+## 2. State model and hibernation
+
+Key constraint: Durable Objects / Actors **hibernate** when idle. That means:
+
+* Any **in memory** state (like `this.sessions` Map) is wiped when the process is evicted
+* Existing WebSockets are still logically attached and can wake the Actor again via new messages
+* When the Actor wakes, we must rebuild our in memory state from the WebSockets and their attachments
+
+So Verani distinguishes three kinds of state:
+
+1. **Per connection metadata (must survive hibernation)**
+
+   * Stored both:
+
+     * in memory (`sessions` map) and
+     * in WebSocket attachments (`ws.serializeAttachment(meta)`)
+
+2. **Per actor / per room transient state**
+
+   * In memory only, fine to lose on hibernation in MVP
+   * Example: presence counters, ephemeral flags
+
+3. **Durable state (optional, later)**
+
+   * Stored in DO storage / external DB (Postgres, D1 etc)
+   * Example: last message id, configuration, chat history
+
+MVP decision:
+Verani **does not** implement persistence yet. Only connection metadata is treated as “needs to survive hibernation” via attachments.
+
+On wake:
+
+* Actor constructor + `onInit` runs
+* `ctx.getWebSockets()` gives all live sockets
+* For each socket we call `deserializeAttachment()`
+* Rebuild `this.sessions`
+
+After that, it behaves as if it never died.
+
+---
+
+## 3. Isolation strategy
+
+Isolation has three levels.
+
+### 3.1 Actor level isolation
+
+We can choose how to map requests to Actor instances.
+
+* For **per user notifications**, we map `userId -> actor id`:
+
+  * Example: `nameFromRequest` returns `user:${userId}`
+  * That guarantees user A and user B are in completely separate Actors
+
+* For **chat rooms**, we map `roomName -> actor id`:
+
+  * Example: `nameFromRequest` returns `room:${roomSlug}`
+  * Everyone in that room shares state in the same Actor
+
+Future AI needs to wire this through Cloudflare’s `Actor` routing / DO bindings and Worker fetch logic. The important design is: **we use Actor identity for coarse isolation**, not try to shove everyone in one global Actor.
+
+### 3.2 Channel level isolation
+
+Inside an Actor, connections have `meta.channels: string[]`.
+
+Verani SDK uses that for **selective fanout**:
+
+* `join(channel)` adds to `meta.channels`
+* `leave(channel)` removes it
+* `broadcast(channel, data, { except })` only sends to sockets whose `meta.channels` includes that channel
+
+For MVP we can default every connection to `["default"]` and later expose join/leave semantics.
+
+### 3.3 User level addressing
+
+Selective targeting of a single user or subset is done by scanning `sessions` and matching `meta.userId`. That is good enough for a few thousand connections per Actor.
+
+No cluster, no shards, no global registry in v0.
+
+---
+
+## 4. Public API design (MVP)
+
+From a user’s perspective on the backend:
+
+```ts
+import { defineRoom, createActorHandler } from "verani";
+
+export const chat = defineRoom({
+  onConnect(ctx) {
+    // ctx.meta.userId, ctx.meta.clientId, ctx.meta.channels
+  },
+
+  onMessage(ctx, frame) {
+    if (frame.type === "chat.message") {
+      ctx.actor.broadcast("default", {
+        from: ctx.meta.userId,
+        text: frame.data.text
+      }, { except: ctx.ws });
+    }
+  },
+
+  onDisconnect(ctx) {
+    // optional clean up
+  }
+});
+
+export default createActorHandler(chat);
+```
+
+Verani will provide:
+
+* `defineRoom(def)`
+* `createActorHandler(roomDef)`
+
+And internally:
+
+* Creates the Actor subclass
+* Wires Cloudflare WebSocket events into `onConnect`, `onMessage`, `onDisconnect`
+* Rebuilds `sessions` on wake
+* Adds a `broadcast(channel, data, opts)` method on the Actor instance
+
+Client side:
+
+```ts
+import { VeraniClient } from "verani";
+
+const client = new VeraniClient("wss://example.com/ws?userId=123");
+
+client.on("event", (data) => {
+  console.log("Event from server:", data);
+});
+
+client.emit("chat.message", { text: "hello" });
+```
+
+This is intentionally bare. It is meant to be as easy as socket.io, but Cloudflare-native.
+
+---
+
+## 5. Folder structure and responsibilities
+
+Current skeleton:
+
+```text
+src/
+  index.ts
+  backend/
+    actor-runtime.ts
+    attachment.ts
+    router.ts
+    protocol.ts
+    types.ts
+  client/
+    client.ts
+    protocol.ts
+  shared/
+    encode.ts
+    decode.ts
+    types.ts
+```
+
+What each file is supposed to do:
+
+### `src/index.ts`
+
+Single public entry.
+
+* Re-exports:
+
+  * `defineRoom`
+  * `createActorHandler`
+  * `VeraniClient`
+  * core types
+
+Future AI must keep this file small and stable. No logic here.
+
+---
+
+### `src/backend/types.ts`
+
+Core TypeScript types for the backend:
+
+* `ConnectionMeta`
+
+  * `{ userId: string; clientId: string; channels: string[] }`
+* `MessageFrame`
+
+  * `{ type: string; channel?: string; data?: any }`
+* `RoomContext`
+
+  * `{ actor; ws; meta; frame? }`
+* `RoomDefinition`
+
+  * `{ name?; onConnect?; onDisconnect?; onMessage?; extractMeta? }`
+
+This is the contract for everything else.
+
+---
+
+### `src/backend/router.ts`
+
+Implements `defineRoom`.
+
+Responsibilities:
+
+* Take a `RoomDefinition`, fill in defaults, return a normalized definition.
+* Provide a default `extractMeta(req)` that:
+
+  * Reads `userId` from query or header (later)
+  * Assigns a random `clientId`
+  * Sets `channels: ["default"]`
+
+Future AI can extend this to:
+
+* Support custom auth hooks
+* Support room configuration
+* Support path based meta extraction
+
+But MVP: simple defaults.
+
+---
+
+### `src/backend/attachment.ts`
+
+Utility around WebSocket attachments in Actors.
+
+Responsibilities:
+
+* `storeAttachment(ws, meta)`
+
+  * call `ws.serializeAttachment(meta)`
+
+* `restoreSessions(actor)`
+
+  * iterate `actor.ctx.getWebSockets()`
+  * call `ws.deserializeAttachment()`
+  * fill `actor.sessions` Map with `{ ws, meta }`
+
+This is the key to surviving hibernation.
+
+---
+
+### `src/backend/protocol.ts`
+
+Server side frame encoding/decoding.
+
+Current choice:
+
+* Use JSON for frames
+* `decodeFrame(raw): MessageFrame`
+* `encodeFrame(frame): string`
+
+Future AI can extend this to:
+
+* Support versioning
+* Typed events
+* Binary formats later if needed (but not now)
+
+---
+
+### `src/backend/actor-runtime.ts`
+
+This is the main integration with `@cloudflare/actors`.
+
+Key pieces:
+
+* `createActorHandler(roomDef)` returns `handler(Actor subclass)`
+* The Actor subclass:
+
+  * has `sessions = new Map<WebSocket, { ws, meta }>()`
+
+  * `onInit()` calls `restoreSessions(this)`
+
+  * `onWebSocketConnect(ws, req)`:
+
+    * calls `roomDef.extractMeta(req)`
+    * stores attachment
+    * stores session
+    * calls `roomDef.onConnect(context)`
+
+  * `onWebSocketMessage(ws, raw)`:
+
+    * decodes frame
+    * finds session
+    * calls `roomDef.onMessage(context, frame)`
+
+  * `onWebSocketDisconnect(ws)`:
+
+    * removes from sessions
+    * calls `roomDef.onDisconnect(context)`
+
+  * `broadcast(channel, data, opts)`:
+
+    * iterates `sessions`
+    * filters on `meta.channels.includes(channel)`
+    * respects `{ except: ws }`
+
+This is the core runtime contract that must stay consistent.
+
+---
+
+### `src/client/client.ts`
+
+Thin wrapper over `WebSocket`.
+
+Responsibilities:
+
+* Connect to a WS URL
+* Maintain `listeners: Map<string, Set<fn>>`
+* `on(event, fn)` registers listeners for `msg.type`
+* `emit(type, data)` sends JSON frame via WebSocket
+
+It is intentionally dumb and simple.
+
+---
+
+## 6. Wrangler and Durable Objects setup (high level)
+
+Future AI needs to handle Wrangler and DO config. Key expectations:
+
+* The Worker entry file will default export `createActorHandler(roomDefinition)` result
+
+Example Worker:
+
+```ts
+import { chatRoom } from "./dist/server-chat.js"; // or similar
+export default chatRoom; // this is handler(ActorSubclass)
+```
+
+Wrangler responsibilities (to be filled by future AI):
+
+* Bind the Actor / Durable Object properly in `wrangler.toml`
+* Ensure `/ws` route goes to this Worker so `Actor.configuration().sockets.upgradePath = "/ws"` works
+* Map `nameFromRequest` semantics if needed, or rely on Actor’s default routing
+
+Important: whatever wiring is needed in 2025 Cloudflare Actors API, Verani’s **conceptual** requirements are:
+
+* A WebSocket endpoint at `/ws` that upgrades and routes to the Actor instance
+* Actor class that can access `ctx.getWebSockets()`, `serializeAttachment`, `deserializeAttachment`
+
+Future AI should consult the latest Cloudflare Actors / Durable Objects docs for exact config syntax, but the logical responsibilities are fixed by this spec.
+
+---
+
+## 7. What is intentionally **not** implemented yet
+
+These are out of scope for the current MVP and should not be added before the basics are solid:
+
+* Persistence of room state in DO storage
+* History / scrollback
+* Presence protocol
+* Ordering guarantees or message ids
+* Auth verification (beyond trusting userId passed in)
+* Clustering or multi Actor per room topology
+* SDK adaptors for React / Next / Svelte
+* Type safe event union mapping
+* Binary protocol
+
+They can be layered later, but this document describes the **minimum viable architecture**.
+
+---
+
+## 8. What the next AI should do first
+
+If another AI picks this up, the priority order is:
+
+1. Verify the current skeleton compiles with `@cloudflare/actors` and TypeScript.
+2. Wire up a real Worker file plus `wrangler.toml` to make a **local dev chat example** work:
+
+   * Open 2 browser tabs
+   * Call `VeraniClient`
+   * See messages bounce between them
+3. Make sure hibernation works:
+
+   * Leave one tab idle
+   * Force DO to sleep (or wait/hibernate)
+   * Send a message
+   * Confirm that `restoreSessions` handled it gracefully
+4. Only then: polish API and types, and think about auth/channel helpers.

@@ -1,0 +1,26 @@
+{
+	"name": "verani",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"start": "wrangler dev",
+		"test": "vitest",
+		"cf-typegen": "wrangler types"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.8.19",
+		"typescript": "^5",
+		"vitest": "~3.2.0",
+		"wrangler": "^4.50.0"
+	},
+	"peerDependencies": {
+		"typescript": "^5",
+		"@cloudflare/actors": "^0.0.1-beta.6"
+	},
+	"dependencies": {
+		"esbuild-fix-imports-plugin": "^1.0.23",
+		"tsdown": "^0.16.7"
+	}
+}
