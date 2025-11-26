@@ -1,4 +1,4 @@
-import { Actor, handler } from "@cloudflare/actors";
+import { Actor } from "@cloudflare/actors";
 import { restoreSessions, storeAttachment } from "./attachment";
 import { decodeFrame, encodeFrame } from "./protocol";
 import type { RoomDefinition, RoomContext, MessageContext, MessageFrame, BroadcastOptions, ConnectionMeta } from "./types";
@@ -6,7 +6,7 @@ import type { RoomDefinition, RoomContext, MessageContext, MessageFrame, Broadca
 /**
  * Creates an Actor handler from a room definition
  * @param room - The room definition with lifecycle hooks
- * @returns Actor handler class for Cloudflare Workers
+ * @returns Actor class for Cloudflare Workers (extends DurableObject)
  */
 export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown>(
   room: RoomDefinition<TMeta, E>
@@ -256,5 +256,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
     }
   }
 
-  return handler(VeraniActorImpl);
+  // Return the Actor class directly (not wrapped in handler())
+  // This allows Wrangler to recognize it as a Durable Object export
+  return VeraniActorImpl;
 }

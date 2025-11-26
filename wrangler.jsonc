@@ -8,15 +8,23 @@
 	},
 	"migrations": [
 		{
-			"new_sqlite_classes": ["Verani"],
+			"new_sqlite_classes": ["ChatRoom", "PresenceRoom", "NotificationsRoom"],
 			"tag": "v1"
 		}
 	],
 	"durable_objects": {
 		"bindings": [
 		  {
-			"class_name": "Verani",
-			"name": "Verani"
+			"class_name": "ChatRoom",
+			"name": "CHAT"
+		  },
+		  {
+			"class_name": "PresenceRoom",
+			"name": "PRESENCE"
+		  },
+		  {
+			"class_name": "NotificationsRoom",
+			"name": "NOTIFICATIONS"
 		  }
 		]
 	  }

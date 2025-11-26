@@ -96,7 +96,7 @@ export const chatRoom = defineRoom({
 });
 ```
 
-## Step 3: Export the Actor Handler
+## Step 3: Export the Durable Object Class
 
 Update your `src/index.ts`:
 
@@ -104,33 +104,80 @@ Update your `src/index.ts`:
 import { createActorHandler } from "verani";
 import { chatRoom } from "./rooms/chat";
 
-// Export the Actor handler for Cloudflare
-export default createActorHandler(chatRoom);
+// Create the Durable Object class
+const ChatRoom = createActorHandler(chatRoom);
+
+// Export it - name MUST match wrangler.jsonc class_name
+export { ChatRoom };
+
+// Define environment bindings
+interface Env {
+  CHAT: DurableObjectNamespace;
+}
+
+// Export fetch handler
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Route WebSocket connections to the Durable Object
+    if (url.pathname.startsWith("/ws")) {
+      // Get or create a Durable Object instance
+      const id = env.CHAT.idFromName("chat-room");
+      const stub = env.CHAT.get(id);
+      return stub.fetch(request);
+    }
+
+    return new Response("Not Found", { status: 404 });
+  }
+};
 ```
+
+**Important**: The export name `ChatRoom` MUST match the `class_name` in your Wrangler configuration.
 
 ## Step 4: Configure Wrangler
 
-Update your `wrangler.toml`:
+Update your `wrangler.jsonc`:
 
-```toml
-name = "my-verani-app"
-main = "src/index.ts"
-compatibility_date = "2024-01-01"
+```jsonc
+{
+  "name": "my-verani-app",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
 
-[[durable_objects.bindings]]
-name = "CHAT_ROOM"
-class_name = "VeraniActor"
-script_name = "my-verani-app"
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "ChatRoom",  // MUST match export in src/index.ts
+        "name": "CHAT"              // Binding name (env.CHAT)
+      }
+    ]
+  },
 
-[[migrations]]
-tag = "v1"
-new_classes = ["VeraniActor"]
+  "migrations": [
+    {
+      "new_sqlite_classes": ["ChatRoom"],
+      "tag": "v1"
+    }
+  ]
+}
 ```
+
+**Three-way relationship** - these must all align:
+1. Export in `src/index.ts`: `export { ChatRoom }`
+2. Class name in config: `"class_name": "ChatRoom"`
+3. Environment binding: Access via `env.CHAT`
 
 ## Step 5: Deploy
 
+With npm:
 ```bash
 npx wrangler deploy
+```
+
+With Bun:
+```bash
+bunx wrangler deploy
 ```
 
 Your WebSocket endpoint will be available at:

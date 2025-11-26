@@ -100,7 +100,7 @@
       userId = username;
       
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/notifications?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(userId)}`;
+      const wsUrl = `${protocol}//${window.location.host}/ws/notifications?token=${encodeURIComponent(token)}&userId=${encodeURIComponent(userId)}`;
       
       ws = new WebSocket(wsUrl);
 

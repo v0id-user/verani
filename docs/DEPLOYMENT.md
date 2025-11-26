@@ -23,48 +23,137 @@ my-app/
 └── tsconfig.json
 ```
 
-## Step 1: Configure wrangler.toml
+## Durable Object Export Requirements
 
-Create or update your `wrangler.toml`:
+**Critical**: Wrangler requires a specific three-way relationship between your code, configuration, and Worker environment:
 
-```toml
-name = "my-verani-app"
-main = "src/index.ts"
-compatibility_date = "2024-01-01"
+### The Three-Way Relationship
 
-# Durable Object binding
-[[durable_objects.bindings]]
-name = "CHAT_ROOM"
-class_name = "VeraniActorImpl"  # The class name from createActorHandler
-script_name = "my-verani-app"
+1. **Export in `src/index.ts`** - The actual Durable Object class:
+```typescript
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
 
-# Migration to create the Durable Object
-[[migrations]]
-tag = "v1"
-new_classes = ["VeraniActorImpl"]
+// Create the Durable Object class
+const ChatRoom = createActorHandler(chatRoom);
+
+// Export with a specific name
+export { ChatRoom };
 ```
 
-### Important Notes:
+2. **Configuration in `wrangler.jsonc`** - Must reference the exported class:
+```jsonc
+{
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "ChatRoom",  // MUST match export name exactly
+        "name": "CHAT"              // Binding name for env.CHAT
+      }
+    ]
+  }
+}
+```
 
-1. **class_name**: This should match the internal class name created by `createActorHandler()`. By default, it's `VeraniActorImpl`.
+3. **Environment Binding** - Access in your Worker:
+```typescript
+interface Env {
+  CHAT: DurableObjectNamespace;  // From wrangler.jsonc "name"
+}
 
-2. **script_name**: Must match the `name` field at the top of your wrangler.toml.
+export default {
+  async fetch(request: Request, env: Env) {
+    // Use the binding to get a Durable Object instance
+    const id = env.CHAT.idFromName("room-123");
+    const stub = env.CHAT.get(id);
+    return stub.fetch(request);
+  }
+};
+```
 
-3. **migrations**: Required for Durable Objects. Increment the tag for each schema change.
+### Common Export Errors
 
-## Step 2: Configure WebSocket Routing
+**Error**: `"no such Durable Object class is exported from the worker"`
+- **Cause**: Export name doesn't match `class_name` in wrangler.jsonc
+- **Fix**: Ensure `export { ChatRoom }` matches `"class_name": "ChatRoom"`
 
-Verani needs a WebSocket upgrade endpoint. Update your `src/index.ts`:
+**Error**: `Property 'CHAT' does not exist on type 'Env'`
+- **Cause**: Missing TypeScript interface for environment bindings
+- **Fix**: Define the `Env` interface with your Durable Object namespace
+
+**Error**: `Generic type 'Actor<E>' requires 1 type argument`
+- **Cause**: Incorrect use of the handler wrapper
+- **Fix**: Use `createActorHandler()` which returns the properly typed class
+
+## Step 1: Configure wrangler.jsonc
+
+Create or update your `wrangler.jsonc`:
+
+```jsonc
+{
+  "name": "my-verani-app",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "ChatRoom",  // MUST match your export name
+        "name": "CHAT"              // env.CHAT binding
+      }
+    ]
+  },
+
+  "migrations": [
+    {
+      "new_sqlite_classes": ["ChatRoom"],
+      "tag": "v1"
+    }
+  ]
+}
+```
+
+### Critical Configuration Notes:
+
+1. **class_name**: MUST exactly match the exported class name in `src/index.ts`
+2. **name**: The binding name you'll use in your code (e.g., `env.CHAT`)
+3. **migrations**: Required for Durable Objects. Increment the tag for schema changes
+
+## Step 2: Export Your Durable Object Class
+
+In your `src/index.ts`, create and export the Durable Object class:
 
 ```typescript
 import { createActorHandler } from "verani";
 import { chatRoom } from "./rooms/chat";
 
-// Create the Actor handler
-export default createActorHandler(chatRoom);
-```
+// Create the Durable Object class
+const ChatRoom = createActorHandler(chatRoom);
 
-The Actor handler automatically configures WebSocket upgrades at the `/ws` path.
+// Export it - name MUST match wrangler.jsonc class_name
+export { ChatRoom };
+
+// Define environment bindings
+interface Env {
+  CHAT: DurableObjectNamespace;
+}
+
+// Export fetch handler for routing
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Route WebSocket connections to the Durable Object
+    if (url.pathname.startsWith("/ws")) {
+      const id = env.CHAT.idFromName("chat-room");
+      const stub = env.CHAT.get(id);
+      return stub.fetch(request);
+    }
+
+    return new Response("Not Found", { status: 404 });
+  }
+};
+```
 
 ## Step 3: Configure Actor Routing
 

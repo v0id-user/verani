@@ -14,14 +14,22 @@ import { notificationsRoom } from "../examples/notifications-room";
  * Also serves HTML clients for each example
  */
 
-// Create handlers for each room
-const chatHandler = createActorHandler(chatRoom);
-const presenceHandler = createActorHandler(presenceRoom);
-const notificationsHandler = createActorHandler(notificationsRoom);
+// Environment bindings interface
+interface Env {
+	CHAT: DurableObjectNamespace;
+	PRESENCE: DurableObjectNamespace;
+	NOTIFICATIONS: DurableObjectNamespace;
+}
 
-// Export the Durable Object class (Wrangler requirement)
-// We'll use the chat room as the default for the "Verani" binding
-export { chatHandler as Verani };
+// Create handlers for each room
+const ChatRoom = createActorHandler(chatRoom);
+const PresenceRoom = createActorHandler(presenceRoom);
+const NotificationsRoom = createActorHandler(notificationsRoom);
+
+// Export all Durable Object classes (Wrangler requirement)
+// Each export name MUST match its corresponding "class_name" in wrangler.jsonc
+export const Verani = ChatRoom;
+export { ChatRoom, PresenceRoom, NotificationsRoom };
 
 // Export default handler with routing logic
 export default {
@@ -29,17 +37,24 @@ export default {
 		const url = new URL(request.url);
 		const path = url.pathname;
 
-		// Route to appropriate example based on path
-		if (path.startsWith("/chat")) {
-			return chatHandler.fetch(request, env, ctx);
+		// Handle WebSocket upgrades by routing to appropriate Durable Object
+		if (path.startsWith("/ws/chat")) {
+			const id = env.CHAT.idFromName("chat-room");
+			const stub = env.CHAT.get(id);
+			return stub.fetch(request);
 		}
 
-		if (path.startsWith("/presence")) {
-			return presenceHandler.fetch(request, env, ctx);
+		if (path.startsWith("/ws/presence")) {
+			const id = env.PRESENCE.idFromName("presence-room");
+			const stub = env.PRESENCE.get(id);
+			return stub.fetch(request);
 		}
 
-		if (path.startsWith("/notifications")) {
-			return notificationsHandler.fetch(request, env, ctx);
+		if (path.startsWith("/ws/notifications")) {
+			const userId = url.searchParams.get("userId") || "anonymous";
+			const id = env.NOTIFICATIONS.idFromName(`notifications:${userId}`);
+			const stub = env.NOTIFICATIONS.get(id);
+			return stub.fetch(request);
 		}
 
 		// Serve HTML clients

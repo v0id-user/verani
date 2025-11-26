@@ -44,16 +44,16 @@
         <!-- Input -->
         <div class="border-t p-4">
           <div class="flex gap-2">
-            <input 
-              type="text" 
-              id="messageInput" 
+            <input
+              type="text"
+              id="messageInput"
               placeholder="Type a message..."
               class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled
             />
-            <button 
+            <button
               id="sendButton"
-              onclick="sendMessage()" 
+              onclick="sendMessage()"
               class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled
             >
@@ -70,14 +70,14 @@
     <div class="bg-white rounded-lg p-8 max-w-md w-full mx-4">
       <h2 class="text-2xl font-bold mb-4">Join Chat</h2>
       <p class="text-gray-600 mb-4">Enter a username to start chatting</p>
-      <input 
-        type="text" 
-        id="usernameInput" 
+      <input
+        type="text"
+        id="usernameInput"
         placeholder="user:yourname"
         class="w-full px-4 py-2 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
-      <button 
-        onclick="connect()" 
+      <button
+        onclick="connect()"
         class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600"
       >
         Connect
@@ -99,7 +99,7 @@
     window.connect = function() {
       const input = document.getElementById("usernameInput");
       const token = input.value.trim();
-      
+
       if (!token) {
         alert("Please enter a username");
         return;
@@ -107,11 +107,11 @@
 
       // Extract username from token
       username = token.split(":")[1] || token;
-      
+
       // Build WebSocket URL
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/chat?token=${encodeURIComponent(token)}`;
-      
+      const wsUrl = `${protocol}//${window.location.host}/ws/chat?token=${encodeURIComponent(token)}`;
+
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -146,23 +146,23 @@
         case "users.sync":
           updateOnlineUsers(msg.data.users);
           break;
-        
+
         case "user.joined":
           addSystemMessage(`${msg.username} joined the chat`);
           break;
-        
+
         case "user.left":
           addSystemMessage(`${msg.username} left the chat`);
           typingUsers.delete(msg.username);
           updateTypingIndicator();
           break;
-        
+
         case "chat.message":
           addMessage(msg.username, msg.text, msg.timestamp);
           typingUsers.delete(msg.username);
           updateTypingIndicator();
           break;
-        
+
         case "chat.typing":
           typingUsers.add(msg.username);
           updateTypingIndicator();
@@ -172,7 +172,7 @@
             updateTypingIndicator();
           }, 3000);
           break;
-        
+
         case "system.message":
           addSystemMessage(msg.data.text);
           break;
@@ -183,7 +183,7 @@
     window.sendMessage = function() {
       const input = document.getElementById("messageInput");
       const text = input.value.trim();
-      
+
       if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
 
       ws.send(JSON.stringify({
@@ -222,10 +222,10 @@
     function updateOnlineUsers(users) {
       const container = document.getElementById("onlineUsers");
       const count = document.getElementById("userCount");
-      
+
       count.textContent = `${users.length} online`;
-      
-      container.innerHTML = users.map(userId => 
+
+      container.innerHTML = users.map(userId =>
         `<span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">${userId}</span>`
       ).join("");
     }
@@ -233,7 +233,7 @@
     function addMessage(from, text, timestamp) {
       const messages = document.getElementById("messages");
       const isOwn = from === username;
-      
+
       const div = document.createElement("div");
       div.className = `flex ${isOwn ? "justify-end" : "justify-start"}`;
       div.innerHTML = `
@@ -243,7 +243,7 @@
           <div class="text-xs opacity-70 mt-1">${formatTime(timestamp)}</div>
         </div>
       `;
-      
+
       messages.appendChild(div);
       messages.scrollTop = messages.scrollHeight;
     }

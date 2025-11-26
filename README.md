@@ -55,9 +55,40 @@ export const chatRoom = defineRoom({
   }
 });
 
-// Export the Actor handler
-export default createActorHandler(chatRoom);
+// Create the Durable Object class
+const ChatRoom = createActorHandler(chatRoom);
+
+// Export it - the name must match wrangler.jsonc
+export { ChatRoom };
 ```
+
+### Wrangler Configuration
+
+**Critical**: Your Durable Object export names in `src/index.ts` **must match** the `class_name` in `wrangler.jsonc`:
+
+```jsonc
+{
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "ChatRoom",  // Must match export name
+        "name": "CHAT"              // Binding name in env
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["ChatRoom"],
+      "tag": "v1"
+    }
+  ]
+}
+```
+
+The three-way relationship:
+1. **Export** in `src/index.ts`: `export { ChatRoom }`
+2. **Class name** in `wrangler.jsonc`: `"class_name": "ChatRoom"`
+3. **Env binding**: Access via `env.CHAT` in your fetch handler
 
 ### Client Side
 
