@@ -49,6 +49,8 @@ bun install
 ```bash
 npm run dev
 # or
+bun run dev
+# or
 wrangler dev
 ```
 
@@ -121,7 +123,7 @@ import jwt from "@tsndr/cloudflare-worker-jwt";
 export const secureRoom = defineRoom({
   async extractMeta(req) {
     const token = new URL(req.url).searchParams.get("token");
-    
+
     if (!token) {
       throw new Error("Unauthorized");
     }
@@ -133,7 +135,7 @@ export const secureRoom = defineRoom({
     }
 
     const payload = jwt.decode(token);
-    
+
     return {
       userId: payload.sub,
       clientId: crypto.randomUUID(),
@@ -176,6 +178,8 @@ new_classes = ["VeraniActorImpl"]
 
 ```bash
 npx wrangler deploy
+# or
+bunx wrangler deploy
 ```
 
 Your examples will be available at:
@@ -194,15 +198,15 @@ import { defineRoom } from "../src/verani";
 
 export const yourRoom = defineRoom({
   name: "your-example",
-  
+
   onConnect(ctx) {
     // Handle connection
   },
-  
+
   onMessage(ctx, frame) {
     // Handle messages
   },
-  
+
   onDisconnect(ctx) {
     // Handle disconnection
   }

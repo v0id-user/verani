@@ -18,6 +18,8 @@ Verani brings the familiar developer experience of Socket.io to Cloudflare's Dur
 
 ```bash
 npm install verani @cloudflare/actors
+# or
+bun add verani @cloudflare/actors
 ```
 
 ### Server Side (Cloudflare Worker)
