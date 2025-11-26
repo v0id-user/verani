@@ -18,11 +18,13 @@ export interface BroadcastOptions {
 /**
  * Extended Actor interface with Verani-specific methods
  */
-export interface VeraniActor<E = unknown> extends Actor<E> {
-  sessions: Map<WebSocket, { ws: WebSocket; meta: ConnectionMeta }>;
+export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> extends Actor<E> {
+  sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }>;
   broadcast(channel: string, data: any, opts?: BroadcastOptions): number;
   getSessionCount(): number;
   getConnectedUserIds(): string[];
+  getUserSessions(userId: string): WebSocket[];
+  sendToUser(userId: string, type: string, data?: any): number;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface VeraniActor<E = unknown> extends Actor<E> {
  */
 export interface RoomContext<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> {
   /** The actor instance handling this connection */
-  actor: VeraniActor<E>;
+  actor: VeraniActor<TMeta, E>;
   /** The WebSocket connection */
   ws: WebSocket;
   /** Connection metadata */

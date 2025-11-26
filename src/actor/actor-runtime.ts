@@ -52,7 +52,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
         // Call user-defined onConnect hook
         if (room.onConnect) {
           const ctx: RoomContext<TMeta, E> = {
-            actor: this as any,
+            actor: this,
             ws,
             meta
           };
@@ -65,7 +65,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
         if (room.onError) {
           try {
             await room.onError(error as Error, {
-              actor: this as any,
+              actor: this,
               ws,
               meta: { userId: "unknown", clientId: "unknown", channels: [] } as unknown as TMeta
             });
@@ -99,7 +99,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
         // Call user-defined onMessage hook
         if (room.onMessage) {
           const ctx: MessageContext<TMeta, E> = {
-            actor: this as any,
+            actor: this,
             ws,
             meta: session.meta,
             frame
@@ -113,7 +113,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
         if (room.onError && session) {
           try {
             await room.onError(error as Error, {
-              actor: this as any,
+              actor: this,
               ws,
               meta: session.meta
             });
@@ -137,7 +137,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
         // Call user-defined onDisconnect hook
         if (session && room.onDisconnect) {
           const ctx: RoomContext<TMeta, E> = {
-            actor: this as any,
+            actor: this,
             ws,
             meta: session.meta
           };
