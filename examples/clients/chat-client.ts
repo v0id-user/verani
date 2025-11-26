@@ -1,22 +1,23 @@
 #!/usr/bin/env bun
 /**
  * Chat Client Example
- * 
+ *
  * Demonstrates real-time chat using VeraniClient SDK
- * 
+ *
  * Usage:
- *   bun run examples/clients/chat-client.ts user:alice
- * 
+ *   bun run examples/clients/chat-client.ts
+ *
+ * Each instance generates a random username and automatically sends demo messages.
+ * Open multiple terminals to see real-time message broadcasting!
+ *
  * Features:
  * - Real-time message broadcasting
  * - Typing indicators
  * - Online user list
- * - Interactive CLI interface
+ * - Automatic message sending (demo)
  */
 
 import { VeraniClient } from "../../src/client/client";
-import * as readline from "readline";
-
 // ANSI color codes for better UX
 const colors = {
   reset: "\x1b[0m",
@@ -52,42 +53,23 @@ function formatTime(timestamp: number): string {
 }
 
 /**
- * Clears the current line and moves cursor to beginning
- */
-function clearLine() {
-  process.stdout.write("\r\x1b[K");
-}
-
-/**
  * Prints a message to console
  */
 function printMessage(from: string, text: string, timestamp: number, isOwn = false) {
-  clearLine();
   const time = `${colors.gray}[${formatTime(timestamp)}]${colors.reset}`;
-  
+
   if (isOwn) {
     console.log(`${time} ${colors.blue}${from}:${colors.reset} ${text}`);
   } else {
     console.log(`${time} ${colors.green}${from}:${colors.reset} ${text}`);
   }
-  
-  showPrompt();
 }
 
 /**
  * Prints a system message
  */
 function printSystem(text: string) {
-  clearLine();
   console.log(`${colors.gray}* ${text}${colors.reset}`);
-  showPrompt();
-}
-
-/**
- * Shows the input prompt
- */
-function showPrompt() {
-  process.stdout.write(`${colors.cyan}>${colors.reset} `);
 }
 
 /**
@@ -95,28 +77,20 @@ function showPrompt() {
  */
 function updateTypingIndicator() {
   if (state.typingUsers.size === 0) return;
-  
-  clearLine();
+
   const users = Array.from(state.typingUsers).join(", ");
   const verb = state.typingUsers.size === 1 ? "is" : "are";
   console.log(`${colors.gray}${users} ${verb} typing...${colors.reset}`);
-  showPrompt();
 }
 
 /**
  * Main function
  */
 async function main() {
-  const args = process.argv.slice(2);
-  const token = args[0];
-
-  if (!token || !token.startsWith("user:")) {
-    console.error(`${colors.red}Error: Please provide a token in format 'user:username'${colors.reset}`);
-    console.error(`Usage: bun run examples/clients/chat-client.ts user:alice`);
-    process.exit(1);
-  }
-
-  state.username = token.split(":")[1] || token;
+  // Generate a random username for this session
+  const username = `user-${crypto.randomUUID().slice(0, 8)}`;
+  const token = `user:${username}`;
+  state.username = username;
 
   console.log(`${colors.bright}💬 Chat Room Client${colors.reset}`);
   console.log(`${colors.gray}Connecting as ${state.username}...${colors.reset}\n`);
@@ -137,7 +111,20 @@ async function main() {
   // Setup lifecycle callbacks
   client.onOpen(() => {
     console.log(`${colors.green}✓ Connected!${colors.reset}\n`);
-    showPrompt();
+
+    // Send some demo messages
+    setTimeout(() => {
+      console.log(`${colors.dim}[Sending demo messages...]${colors.reset}`);
+      client.emit("chat.message", { text: "Hello everyone! 👋" });
+    }, 1000);
+
+    setTimeout(() => {
+      client.emit("chat.message", { text: "This is a demo chat client using Verani SDK" });
+    }, 3000);
+
+    setTimeout(() => {
+      client.emit("chat.message", { text: "Open another terminal to see real-time sync!" });
+    }, 5000);
   });
 
   client.onClose((event) => {
@@ -148,23 +135,18 @@ async function main() {
     console.error(`${colors.red}✗ Error:${colors.reset}`, error);
   });
 
-  client.onStateChange((state) => {
-    if (state === "connecting") {
-      clearLine();
+  client.onStateChange((connectionState) => {
+    if (connectionState === "connecting") {
       console.log(`${colors.yellow}⟳ Reconnecting...${colors.reset}`);
-    } else if (state === "connected") {
-      clearLine();
+    } else if (connectionState === "connected") {
       console.log(`${colors.green}✓ Reconnected!${colors.reset}`);
-      showPrompt();
     }
   });
 
   // Handle incoming messages
   client.on("users.sync", (data: { users: string[]; count: number }) => {
     state.onlineUsers = data.users;
-    clearLine();
     console.log(`${colors.gray}Online users (${data.count}): ${data.users.join(", ")}${colors.reset}`);
-    showPrompt();
   });
 
   client.on("user.joined", (data: { userId: string; username: string; timestamp: number }) => {
@@ -186,12 +168,12 @@ async function main() {
 
   client.on("chat.typing", (data: { from: string; username: string; timestamp: number }) => {
     state.typingUsers.add(data.username);
-    
+
     // Clear typing indicator after 3 seconds
     setTimeout(() => {
       state.typingUsers.delete(data.username);
     }, 3000);
-    
+
     updateTypingIndicator();
   });
 
@@ -200,85 +182,11 @@ async function main() {
   });
 
   client.on("error", (data: { message: string }) => {
-    clearLine();
     console.log(`${colors.red}Error: ${data.message}${colors.reset}`);
-    showPrompt();
   });
 
-  // Setup readline for interactive input
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    prompt: "",
-  });
-
-  let lastTypingTime = 0;
-  const TYPING_THROTTLE = 2000; // Send typing indicator at most every 2 seconds
-
-  rl.on("line", (line) => {
-    const text = line.trim();
-    
-    if (!text) {
-      showPrompt();
-      return;
-    }
-
-    // Handle special commands
-    if (text === "/quit" || text === "/exit") {
-      console.log(`\n${colors.gray}Goodbye!${colors.reset}`);
-      client.close();
-      process.exit(0);
-    }
-
-    if (text === "/users") {
-      clearLine();
-      console.log(`${colors.gray}Online users (${state.onlineUsers.length}): ${state.onlineUsers.join(", ")}${colors.reset}`);
-      showPrompt();
-      return;
-    }
-
-    if (text === "/help") {
-      clearLine();
-      console.log(`${colors.bright}Commands:${colors.reset}`);
-      console.log(`  /users - List online users`);
-      console.log(`  /quit  - Exit chat`);
-      console.log(`  /help  - Show this help`);
-      showPrompt();
-      return;
-    }
-
-    // Send message
-    if (client.isConnected()) {
-      client.emit("chat.message", { text });
-    } else {
-      clearLine();
-      console.log(`${colors.red}✗ Not connected. Message queued.${colors.reset}`);
-      client.emit("chat.message", { text }); // Will be queued
-      showPrompt();
-    }
-  });
-
-  // Send typing indicator as user types
-  process.stdin.on("data", () => {
-    const now = Date.now();
-    if (now - lastTypingTime > TYPING_THROTTLE) {
-      lastTypingTime = now;
-      if (client.isConnected()) {
-        client.emit("chat.typing", {});
-      }
-    }
-  });
-
-  // Handle graceful shutdown
-  process.on("SIGINT", () => {
-    console.log(`\n${colors.gray}Disconnecting...${colors.reset}`);
-    client.close();
-    process.exit(0);
-  });
-
-  // Show help
-  console.log(`${colors.gray}Type a message and press Enter to send.${colors.reset}`);
-  console.log(`${colors.gray}Type /help for commands.${colors.reset}\n`);
+  // Keep the client running
+  console.log(`${colors.gray}Demo client listening for messages...${colors.reset}\n`);
 }
 
 main().catch(console.error);

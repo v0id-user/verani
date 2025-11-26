@@ -128,20 +128,20 @@ function getInfoPage(): string {
 
 	<div class="example">
 		<h3>💬 Chat Room</h3>
-		<pre><code>bun run examples/clients/chat-client.ts user:alice</code></pre>
-		<p>Real-time chat with typing indicators, online users, and message broadcasting.</p>
+		<pre><code>bun run examples/clients/chat-client.ts</code></pre>
+		<p>Real-time chat with typing indicators, online users, and message broadcasting. Each instance uses a random username.</p>
 	</div>
 
 	<div class="example">
 		<h3>👥 Presence Tracking</h3>
-		<pre><code>bun run examples/clients/presence-client.ts user:bob</code></pre>
-		<p>Track who's online with multi-device support and status indicators.</p>
+		<pre><code>bun run examples/clients/presence-client.ts</code></pre>
+		<p>Track who's online with multi-device support and status indicators. Each instance uses a random username.</p>
 	</div>
 
 	<div class="example">
 		<h3>🔔 Notifications Feed</h3>
-		<pre><code>bun run examples/clients/notifications-client.ts user:charlie</code></pre>
-		<p>Personal notification stream with read/unread tracking and multi-device sync.</p>
+		<pre><code>bun run examples/clients/notifications-client.ts</code></pre>
+		<p>Personal notification stream with read/unread tracking and multi-device sync. Each instance uses a random username.</p>
 	</div>
 
 	<h2>🔗 WebSocket Endpoints</h2>

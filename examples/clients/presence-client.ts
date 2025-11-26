@@ -1,17 +1,21 @@
 #!/usr/bin/env bun
 /**
  * Presence Client Example
- * 
+ *
  * Demonstrates real-time presence tracking using VeraniClient SDK
- * 
+ *
  * Usage:
- *   bun run examples/clients/presence-client.ts user:alice
- * 
+ *   bun run examples/clients/presence-client.ts
+ *
+ * Each instance generates a random username and displays a live presence dashboard.
+ * Open multiple terminals to see real-time presence tracking!
+ *
  * Features:
  * - Real-time presence updates
  * - Multi-device tracking (same user, multiple terminals)
  * - Status indicators (online/away/busy)
  * - Device count per user
+ * - Auto-updating dashboard
  */
 
 import { VeraniClient } from "../../src/client/client";
@@ -79,44 +83,44 @@ function getStatusDisplay(status: string): { emoji: string; color: string } {
  */
 function render() {
   clearScreen();
-  
+
   console.log(`${colors.bright}${colors.cyan}👥 Presence Tracking${colors.reset}`);
   console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}\n`);
-  
+
   // Stats
   const myUser = state.users.get(state.currentUserId);
   const myDevices = myUser?.devices || 0;
-  
+
   console.log(`${colors.bright}Stats:${colors.reset}`);
   console.log(`  Total Users:       ${colors.blue}${state.totalUsers}${colors.reset}`);
   console.log(`  Total Connections: ${colors.green}${state.totalConnections}${colors.reset}`);
   console.log(`  Your Devices:      ${colors.magenta}${myDevices}${colors.reset}`);
   console.log();
-  
+
   // Users list
   console.log(`${colors.bright}Online Users:${colors.reset}`);
-  
+
   if (state.users.size === 0) {
     console.log(`  ${colors.gray}No users online${colors.reset}`);
   } else {
-    const sortedUsers = Array.from(state.users.values()).sort((a, b) => 
+    const sortedUsers = Array.from(state.users.values()).sort((a, b) =>
       a.username.localeCompare(b.username)
     );
-    
+
     for (const user of sortedUsers) {
       const isMe = user.userId === state.currentUserId;
       const { emoji, color } = getStatusDisplay(user.status);
       const deviceText = user.devices === 1 ? "1 device" : `${user.devices} devices`;
-      
-      const nameDisplay = isMe 
+
+      const nameDisplay = isMe
         ? `${colors.bright}${user.username}${colors.reset} ${colors.cyan}(you)${colors.reset}`
         : user.username;
-      
+
       console.log(`  ${emoji} ${nameDisplay}`);
       console.log(`     ${color}${user.status}${colors.reset} • ${colors.gray}${deviceText}${colors.reset}`);
     }
   }
-  
+
   console.log();
   console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
   console.log(`${colors.gray}Press Ctrl+C to exit${colors.reset}`);
@@ -129,7 +133,7 @@ function showNotification(message: string, type: "info" | "success" = "info") {
   const icon = type === "success" ? "✓" : "ℹ";
   const color = type === "success" ? colors.green : colors.blue;
   console.log(`\n${color}${icon} ${message}${colors.reset}`);
-  
+
   // Re-render after a short delay
   setTimeout(render, 1500);
 }
@@ -138,16 +142,9 @@ function showNotification(message: string, type: "info" | "success" = "info") {
  * Main function
  */
 async function main() {
-  const args = process.argv.slice(2);
-  const token = args[0];
-
-  if (!token || !token.startsWith("user:")) {
-    console.error(`${colors.red}Error: Please provide a token in format 'user:username'${colors.reset}`);
-    console.error(`Usage: bun run examples/clients/presence-client.ts user:alice`);
-    process.exit(1);
-  }
-
-  const username = token.split(":")[1] || token;
+  // Generate a random username for this session
+  const username = `user-${crypto.randomUUID().slice(0, 8)}`;
+  const token = `user:${username}`;
   state.currentUserId = username;
 
   clearScreen();
@@ -193,7 +190,7 @@ async function main() {
   });
 
   // Handle presence sync
-  client.on("presence.sync", (data: { 
+  client.on("presence.sync", (data: {
     users: Array<{ userId: string; username: string; status: string; devices: number }>;
     totalUsers: number;
     totalConnections: number;
@@ -201,7 +198,7 @@ async function main() {
     state.users.clear();
     state.totalUsers = data.totalUsers;
     state.totalConnections = data.totalConnections;
-    
+
     for (const user of data.users) {
       state.users.set(user.userId, {
         userId: user.userId,
@@ -210,15 +207,15 @@ async function main() {
         devices: user.devices,
       });
     }
-    
+
     render();
   });
 
   // Handle user coming online
-  client.on("presence.online", (data: { 
-    userId: string; 
-    username: string; 
-    status: string; 
+  client.on("presence.online", (data: {
+    userId: string;
+    username: string;
+    status: string;
     devices: number;
   }) => {
     state.users.set(data.userId, {
@@ -227,7 +224,7 @@ async function main() {
       status: data.status as "online" | "away" | "busy",
       devices: data.devices,
     });
-    
+
     render();
     showNotification(`${data.username} is now online`, "success");
   });
@@ -257,13 +254,7 @@ async function main() {
     }
   });
 
-  // Handle graceful shutdown
-  process.on("SIGINT", () => {
-    clearScreen();
-    console.log(`${colors.gray}Disconnecting...${colors.reset}`);
-    client.close();
-    process.exit(0);
-  });
+  // Keep the client running (it will auto-update as events come in)
 }
 
 main().catch(console.error);

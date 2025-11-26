@@ -13,12 +13,13 @@ Real-time chat application with:
 - Online user list
 - Join/leave notifications
 - Multi-user support
-- Interactive CLI interface
 
 **Usage**:
 ```bash
-bun run examples/clients/chat-client.ts user:alice
+bun run examples/clients/chat-client.ts
 ```
+
+Each instance generates a random username and automatically sends demo messages.
 
 ### 👥 Presence Tracking
 **Server**: `/presence` (WebSocket) | **Client**: `presence-client.ts`
@@ -32,8 +33,10 @@ Track who's online with:
 
 **Usage**:
 ```bash
-bun run examples/clients/presence-client.ts user:bob
+bun run examples/clients/presence-client.ts
 ```
+
+Each instance generates a random username and displays a live presence dashboard.
 
 ### 🔔 Notifications Feed
 **Server**: `/notifications` (WebSocket) | **Client**: `notifications-client.ts`
@@ -43,12 +46,14 @@ Personal notification stream with:
 - Push notifications
 - Read/unread tracking
 - Multi-device synchronization
-- Interactive command menu
+- Auto-simulated notifications
 
 **Usage**:
 ```bash
-bun run examples/clients/notifications-client.ts user:charlie
+bun run examples/clients/notifications-client.ts
 ```
+
+Each instance generates a random username and simulates notifications every 10 seconds.
 
 ## Running Locally
 
@@ -91,29 +96,39 @@ In a new terminal, run any of the TypeScript client examples:
 
 **Chat Client**:
 ```bash
-bun run examples/clients/chat-client.ts user:alice
+bun run examples/clients/chat-client.ts
 ```
 
 **Presence Client**:
 ```bash
-bun run examples/clients/presence-client.ts user:bob
+bun run examples/clients/presence-client.ts
 ```
 
 **Notifications Client**:
 ```bash
-bun run examples/clients/notifications-client.ts user:charlie
+bun run examples/clients/notifications-client.ts
 ```
 
-### 4. Test Multi-User
+Each client generates a random username using `crypto.randomUUID()`, so you can run multiple instances without conflicts.
 
-Open multiple terminals with different usernames to see real-time synchronization!
+### 4. Test Multi-Device
 
-**Username format**: `user:yourname`
+Open multiple terminals running the same client to see real-time synchronization!
 
-Examples:
-- `user:alice`
-- `user:bob`
-- `user:charlie`
+For example, run the presence client in 3 different terminals to see multi-device tracking:
+
+```bash
+# Terminal 1
+bun run examples/clients/presence-client.ts
+
+# Terminal 2
+bun run examples/clients/presence-client.ts
+
+# Terminal 3
+bun run examples/clients/presence-client.ts
+```
+
+You'll see the device count increment as each connects!
 
 ## Architecture
 
