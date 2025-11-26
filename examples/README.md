@@ -38,20 +38,33 @@ Personal notification stream with:
 
 ### 1. Install Dependencies
 
+With npm:
 ```bash
 npm install
-# or
+```
+
+With Bun (faster! ⚡):
+```bash
 bun install
 ```
 
 ### 2. Start Development Server
 
+With npm:
 ```bash
 npm run dev
-# or
+```
+
+With Bun:
+```bash
 bun run dev
-# or
+```
+
+Or directly with Wrangler:
+```bash
 wrangler dev
+# or
+bunx wrangler dev
 ```
 
 The server will start at `http://localhost:8787`

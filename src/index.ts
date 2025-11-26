@@ -19,6 +19,10 @@ const chatHandler = createActorHandler(chatRoom);
 const presenceHandler = createActorHandler(presenceRoom);
 const notificationsHandler = createActorHandler(notificationsRoom);
 
+// Export the Durable Object class (Wrangler requirement)
+// We'll use the chat room as the default for the "Verani" binding
+export { chatHandler as Verani };
+
 // Export default handler with routing logic
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
