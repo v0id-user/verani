@@ -144,6 +144,22 @@ Verani handles Cloudflare's hibernation automatically:
 - Promise-based connection waiting
 - Lifecycle callbacks
 
+## Live Examples
+
+Try out Verani with working examples:
+
+```bash
+# Clone and run
+git clone https://github.com/your-org/verani
+cd verani
+bun install  # or npm install
+bun run dev  # or npm run dev
+
+# Open http://localhost:8787
+```
+
+See `examples/` for chat, presence, and notifications demos!
+
 ## Project Status
 
 Verani is in active development. Current version is an MVP focused on core functionality:
