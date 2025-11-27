@@ -124,8 +124,8 @@ export default {
     // Route WebSocket connections to the Durable Object
     if (url.pathname.startsWith("/ws")) {
       // Get or create a Durable Object instance
-      const id = env.CHAT.idFromName("chat-room");
-      const stub = env.CHAT.get(id);
+      const id = env.ChatRoom.idFromName("chat-room");
+      const stub = env.ChatRoom.get(id);
       return stub.fetch(request);
     }
 
@@ -150,7 +150,7 @@ Update your `wrangler.jsonc`:
     "bindings": [
       {
         "class_name": "ChatRoom",  // MUST match export in src/index.ts
-        "name": "CHAT"              // Binding name (env.CHAT)
+        "name": "CHAT"              // Binding name (env.ChatRoom)
       }
     ]
   },
@@ -167,7 +167,7 @@ Update your `wrangler.jsonc`:
 **Three-way relationship** - these must all align:
 1. Export in `src/index.ts`: `export { ChatRoom }`
 2. Class name in config: `"class_name": "ChatRoom"`
-3. Environment binding: Access via `env.CHAT`
+3. Environment binding: Access via `env.ChatRoom`
 
 ## Step 5: Deploy
 

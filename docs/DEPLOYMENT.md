@@ -48,7 +48,7 @@ export { ChatRoom };
     "bindings": [
       {
         "class_name": "ChatRoom",  // MUST match export name exactly
-        "name": "CHAT"              // Binding name for env.CHAT
+        "name": "CHAT"              // Binding name for env.ChatRoom
       }
     ]
   }
@@ -64,8 +64,8 @@ interface Env {
 export default {
   async fetch(request: Request, env: Env) {
     // Use the binding to get a Durable Object instance
-    const id = env.CHAT.idFromName("room-123");
-    const stub = env.CHAT.get(id);
+    const id = env.ChatRoom.idFromName("room-123");
+    const stub = env.ChatRoom.get(id);
     return stub.fetch(request);
   }
 };
@@ -99,7 +99,7 @@ Create or update your `wrangler.jsonc`:
     "bindings": [
       {
         "class_name": "ChatRoom",  // MUST match your export name
-        "name": "CHAT"              // env.CHAT binding
+        "name": "CHAT"              // env.ChatRoom binding
       }
     ]
   },
@@ -116,7 +116,7 @@ Create or update your `wrangler.jsonc`:
 ### Critical Configuration Notes:
 
 1. **class_name**: MUST exactly match the exported class name in `src/index.ts`
-2. **name**: The binding name you'll use in your code (e.g., `env.CHAT`)
+2. **name**: The binding name you'll use in your code (e.g., `env.ChatRoom`)
 3. **migrations**: Required for Durable Objects. Increment the tag for schema changes
 
 ## Step 2: Export Your Durable Object Class
@@ -145,8 +145,8 @@ export default {
 
     // Route WebSocket connections to the Durable Object
     if (url.pathname.startsWith("/ws")) {
-      const id = env.CHAT.idFromName("chat-room");
-      const stub = env.CHAT.get(id);
+      const id = env.ChatRoom.idFromName("chat-room");
+      const stub = env.ChatRoom.get(id);
       return stub.fetch(request);
     }
 

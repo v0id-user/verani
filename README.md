@@ -86,7 +86,7 @@ export const ChatRoom = createActorHandler(chatRoom);
 The three-way relationship:
 1. **Export** in `src/index.ts`: `export { ChatRoom }`
 2. **Class name** in `wrangler.jsonc`: `"class_name": "ChatRoom"`
-3. **Env binding**: Access via `env.CHAT` in your fetch handler
+3. **Env binding**: Access via `env.ChatRoom` in your fetch handler
 
 ### Client Side
 
