@@ -36,7 +36,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	const className = sanitizeToClassName(room.name || room.websocketPath || "VeraniActor");
 
 	// Create named class dynamically
-	const NamedActorClass = class extends Actor<E>{
+	const NamedActorClass = class extends Actor<E> {
 		sessions = new Map<WebSocket, { ws: WebSocket; meta: TMeta }>();
 
 		/**
@@ -47,7 +47,11 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 			const config: ActorConfiguration = {
 				locationHint: "me",
 				sockets: {
-					upgradePath: room.websocketPath
+					upgradePath: room.websocketPath,
+					autoResponse: {
+						ping: 'ping',
+						pong: 'pong'
+					}
 				}
 			};
 
@@ -57,15 +61,31 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 			return config;
 		}
 
-		protected shouldUpgradeWebSocket(): boolean {
+		protected async shouldUpgradeWebSocket(request: Request): Promise<boolean> {
 			return true;
 		}
+
+		// https://github.com/cloudflare/actors/issues/92
+		async fetch(request: Request): Promise<Response> {
+			const url = new URL(request.url);
+			const upgradeHeader = request.headers.get("Upgrade");
+
+			if (url.pathname === room.websocketPath && upgradeHeader === 'websocket') {
+				const shouldUpgrade = await this.shouldUpgradeWebSocket(request);
+				if (shouldUpgrade) {
+					return this.onWebSocketUpgrade(request);
+				}
+			}
+
+			return this.onRequest(request);
+		}
+
 
 		/**
 		 * Called when the Actor initializes or wakes from hibernation
 		 * Restores sessions from WebSocket attachments
 		 */
-		async onInit() {
+		protected async onInit() {
 			console.debug("[Verani:ActorRuntime] onInit called");
 			try {
 				restoreSessions(this);
@@ -78,13 +98,13 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 		/**
 		 * Called when a new WebSocket connection is established
 		 */
-		async onWebSocketConnect(ws: WebSocket, req: Request) {
+		protected onWebSocketConnect(ws: WebSocket, req: Request) {
 			console.debug("[Verani:ActorRuntime] onWebSocketConnect called, url:", req.url);
 			try {
 				// Extract metadata from request
 				let meta: TMeta;
 				if (room.extractMeta) {
-					meta = await room.extractMeta(req);
+					meta = room.extractMeta(req) as TMeta;
 					console.debug("[Verani:ActorRuntime] Extracted metadata:", { userId: meta.userId, clientId: meta.clientId, channels: meta.channels });
 				} else {
 					meta = {
@@ -110,7 +130,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 						ws,
 						meta
 					};
-					await room.onConnect(ctx);
+					room.onConnect(ctx);
 					console.debug("[Verani:ActorRuntime] User onConnect hook completed");
 				}
 			} catch (error) {
@@ -119,7 +139,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 				// Call error handler if defined
 				if (room.onError) {
 					try {
-						await room.onError(error as Error, {
+						room.onError(error as Error, {
 							actor: this,
 							ws,
 							meta: { userId: "unknown", clientId: "unknown", channels: [] } as unknown as TMeta
@@ -137,7 +157,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 		/**
 		 * Called when a message is received from a WebSocket
 		 */
-		async onWebSocketMessage(ws: WebSocket, raw: any) {
+		protected onWebSocketMessage(ws: WebSocket, raw: any) {
 			let session: { ws: WebSocket; meta: TMeta } | undefined;
 
 			try {
@@ -162,7 +182,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 						meta: session.meta,
 						frame
 					};
-					await room.onMessage(ctx, frame);
+					room.onMessage(ctx, frame);
 					console.debug("[Verani:ActorRuntime] User onMessage hook completed");
 				}
 			} catch (error) {
@@ -171,7 +191,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 				// Call error handler if defined
 				if (room.onError && session) {
 					try {
-						await room.onError(error as Error, {
+						room.onError(error as Error, {
 							actor: this,
 							ws,
 							meta: session.meta
@@ -186,7 +206,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 		/**
 		 * Called when a WebSocket connection is closed
 		 */
-		async onWebSocketDisconnect(ws: WebSocket) {
+		protected onWebSocketDisconnect(ws: WebSocket) {
 			console.debug("[Verani:ActorRuntime] onWebSocketDisconnect called");
 			try {
 				const session = this.sessions.get(ws);
@@ -206,7 +226,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 						ws,
 						meta: session.meta
 					};
-					await room.onDisconnect(ctx);
+					room.onDisconnect(ctx);
 					console.debug("[Verani:ActorRuntime] User onDisconnect hook completed");
 				}
 			} catch (error) {

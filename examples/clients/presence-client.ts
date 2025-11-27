@@ -56,13 +56,6 @@ const state: PresenceState = {
 };
 
 /**
- * Clears the screen
- */
-function clearScreen() {
-  console.clear();
-}
-
-/**
  * Gets status emoji and color
  */
 function getStatusDisplay(status: string): { emoji: string; color: string } {
@@ -82,7 +75,7 @@ function getStatusDisplay(status: string): { emoji: string; color: string } {
  * Renders the presence UI
  */
 function render() {
-  clearScreen();
+  // Screen clearing removed
 
   console.log(`${colors.bright}${colors.cyan}👥 Presence Tracking${colors.reset}`);
   console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}\n`);
@@ -147,7 +140,7 @@ async function main() {
   const token = `user:${username}`;
   state.currentUserId = username;
 
-  clearScreen();
+  // Screen clearing removed
   console.log(`${colors.bright}👥 Presence Tracking Client${colors.reset}`);
   console.log(`${colors.gray}Connecting as ${username}...${colors.reset}\n`);
 
@@ -171,7 +164,7 @@ async function main() {
   });
 
   client.onClose((event) => {
-    clearScreen();
+    // Screen clearing removed
     console.log(`${colors.red}✗ Disconnected: ${event.reason || "Unknown reason"}${colors.reset}`);
   });
 
@@ -181,7 +174,7 @@ async function main() {
 
   client.onStateChange((connectionState) => {
     if (connectionState === "connecting") {
-      clearScreen();
+      // Screen clearing removed
       console.log(`${colors.yellow}⟳ Reconnecting...${colors.reset}`);
     } else if (connectionState === "connected") {
       render();

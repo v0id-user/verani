@@ -74,7 +74,6 @@ export class VeraniClient {
     };
 
     this.connectionManager = new ConnectionManager(
-      url,
       this.options.reconnection,
       (state) => {
         this.onStateChangeCallback?.(state);

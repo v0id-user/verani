@@ -35,7 +35,6 @@ export class ConnectionManager {
   private currentDelay: number;
 
   constructor(
-    private url: string,
     private config: ReconnectionConfig = DEFAULT_RECONNECTION_CONFIG,
     private onStateChange?: (state: ConnectionState) => void
   ) {
