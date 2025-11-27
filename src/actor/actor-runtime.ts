@@ -4,6 +4,27 @@ import { decodeFrame, encodeFrame } from "./protocol";
 import type { RoomDefinition, RoomContext, MessageContext, MessageFrame, BroadcastOptions, ConnectionMeta } from "./types";
 
 /**
+ * Sanitizes a room name or path to a valid PascalCase class name
+ * @param name - The name to sanitize (e.g., "chat-example" or "/ws/presence")
+ * @returns PascalCase class name (e.g., "ChatExample" or "WsPresence")
+ */
+function sanitizeToClassName(name: string): string {
+	// Remove leading slashes and split by common separators
+	const cleaned = name.replace(/^\/+/, '');
+	const parts = cleaned.split(/[-_\/\s]+/);
+
+	// Convert each part to PascalCase
+	const pascalCase = parts
+		.map(part => part.replace(/[^a-zA-Z0-9]/g, '')) // Remove special chars
+		.filter(part => part.length > 0) // Remove empty parts
+		.map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+		.join('');
+
+	// Fallback if sanitization results in empty string
+	return pascalCase || 'VeraniActor';
+}
+
+/**
  * Creates an Actor handler from a room definition
  * @param room - The room definition with lifecycle hooks
  * @returns Actor class for Cloudflare Workers (extends DurableObject)
@@ -11,30 +32,32 @@ import type { RoomDefinition, RoomContext, MessageContext, MessageFrame, Broadca
 export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown>(
 	room: RoomDefinition<TMeta, E>
 ) {
-	class VeraniActorImpl extends Actor<E> {
+	// Determine class name with priority: room.name > room.websocketPath > "VeraniActor"
+	const className = sanitizeToClassName(room.name || room.websocketPath || "VeraniActor");
+
+	// Create named class dynamically
+	const NamedActorClass = class extends Actor<E>{
 		sessions = new Map<WebSocket, { ws: WebSocket; meta: TMeta }>();
 
 		/**
 		 * Static configuration method for Cloudflare Actors
 		 * Specifies WebSocket upgrade path and other options
 		 */
-		static configuration = (request: Request) => {
+		static configuration(request?: Request): ActorConfiguration {
 			const config: ActorConfiguration = {
-				locationHint: 'me',
+				locationHint: "me",
 				sockets: {
-					upgradePath: room.websocketPath || "/ws"
+					upgradePath: room.websocketPath
 				}
 			};
-			console.debug("[Verani:ActorRuntime] configuration() called with request URL:", request.url);
-			console.debug("[Verani:ActorRuntime] configuration() resolved config:", config);
-			return config;
-		};
 
-		protected async onRequest(request: Request): Promise<Response> {
-			return new Response("WebSocket endpoint", { status: 400 });
+			console.debug("[Verani:ActorRuntime] configuration() called, request:", request ? request.url : "undefined");
+			console.debug("[Verani:ActorRuntime] configuration() resolved config:", config);
+
+			return config;
 		}
 
-		protected async shouldUpgradeWebSocket(request: Request): Promise<boolean> {
+		protected shouldUpgradeWebSocket(): boolean {
 			return true;
 		}
 
@@ -301,9 +324,14 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 			console.debug("[Verani:ActorRuntime] SendToUser complete, sent to:", sentCount, "sessions");
 			return sentCount;
 		}
-	}
+	};
 
-	// Return the Actor class directly (not wrapped in handler())
-	// This allows Wrangler to recognize it as a Durable Object export
-	return VeraniActorImpl;
+	// Set the name property for proper Actor binding resolution
+	Object.defineProperty(NamedActorClass, 'name', {
+		value: className,
+		writable: false,
+		configurable: true
+	});
+
+	return NamedActorClass;
 }

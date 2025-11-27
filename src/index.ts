@@ -1,20 +1,11 @@
-import { ConnectionMeta, createActorHandler, VeraniActor } from "./verani";
-import { chatRoom } from "../examples/chat-room";
+import { Actor } from "@cloudflare/actors";
 import { presenceRoom } from "../examples/presence-room";
-import { notificationsRoom } from "../examples/notifications-room";
-import { ActorConstructor, getActor } from "@cloudflare/actors";
+import { createActorHandler } from "./actor/actor-runtime";
 
-/**
- * Verani Examples Worker
- *
- * Routes WebSocket connections to different example rooms based on path:
- * - /ws/chat -> Chat room example
- * - /ws/presence -> Presence tracking example
- * - /ws/notifications -> Personal notifications feed
- *
- * TypeScript CLI clients available in examples/clients/
- * Run with: bun run examples/clients/<client-name>.ts user:yourname
- */
+export const PresenceExample = createActorHandler(presenceRoom);
+
+export class ChatExample extends Actor<Env> {}
+export class NotificationsExample extends Actor<Env> {}
 
 
 // Export default handler with routing logic
@@ -23,22 +14,9 @@ export default {
 		const url = new URL(request.url);
 		const path = url.pathname;
 
-		// Handle WebSocket upgrades by routing to appropriate Durable Object
-		if (path.startsWith("/ws/chat")) {
-			const stub = ChatRoom.get("chat-room");
-			return stub.fetch(request);
-		}
 
 		if (path.startsWith("/ws/presence")) {
-			console.debug("[Verani:Index] Routing to presence room");
-			const stub = PresenceRoom.get("presence-room");
-			console.debug("[Verani:Index] Presence room stub:", stub);
-			return stub.fetch(request);
-		}
-
-		if (path.startsWith("/ws/notifications")) {
-			const userId = url.searchParams.get("userId") || "anonymous";
-			const stub = NotificationsRoom.get(`notifications:${userId}`);
+			const stub = PresenceExample.get("presence-room");
 			return stub.fetch(request);
 		}
 
@@ -148,14 +126,3 @@ function getInfoPage(): string {
 </body>
 </html>`;
 }
-
-
-// Create handlers for each room
-const ChatRoom = createActorHandler(chatRoom);
-const PresenceRoom = createActorHandler(presenceRoom);
-const NotificationsRoom = createActorHandler(notificationsRoom);
-
-
-// Export all Durable Object classes (Wrangler requirement)
-// Each export name MUST match its corresponding "class_name" in wrangler.jsonc
-export { ChatRoom, PresenceRoom, NotificationsRoom };

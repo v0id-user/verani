@@ -92,6 +92,7 @@ export function defineRoom<TMeta extends ConnectionMeta = ConnectionMeta>(
 ): RoomDefinition<TMeta> {
   return {
     name: def.name,
+    websocketPath: def.websocketPath,
     extractMeta: def.extractMeta || (defaultExtractMeta as any),
     onConnect: def.onConnect,
     onDisconnect: def.onDisconnect,
