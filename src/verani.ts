@@ -64,10 +64,3 @@ export {
 } from "./shared/decode";
 
 export { PROTOCOL_VERSION } from "./shared/types";
-
-// ============================================================================
-// Utilities
-// ============================================================================
-
-export { parseJWT } from "./actor/router";
-

@@ -359,7 +359,7 @@ export const publicRoom = defineRoom({
 Production applications should verify user identity:
 
 ```typescript
-import { parseJWT } from "verani";
+import { parseJWT } from "your-jwt-library";
 
 export const secureRoom = defineRoom({
   extractMeta(req) {

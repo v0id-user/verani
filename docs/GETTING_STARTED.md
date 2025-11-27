@@ -472,7 +472,7 @@ export const chatRoom = defineRoom({
 Verify JWT tokens:
 
 ```typescript
-import { parseJWT } from 'verani';
+import { parseJWT } from 'your-jwt-library';
 
 export const chatRoom = defineRoom({
   extractMeta(req) {
