@@ -347,14 +347,15 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 		 * @param data - Message data
 		 * @returns Number of sessions that received the message
 		 */
-		sendToUser(userId: string, type: string, data?: any): number {
-			console.debug("[Verani:ActorRuntime] Sending to user:", userId, "type:", type);
+		sendToUser(userId: string, channel: string, data?: any): number {
+			console.debug("[Verani:ActorRuntime] Sending to user:", userId, "on channel:", channel);
 			let sentCount = 0;
-			const frame: MessageFrame = { type, data };
+			const frame: MessageFrame = { type: "event", channel, data };
 			const encoded = encodeFrame(frame);
 
+			// Send only to sessions of that user which are subscribed to the channel
 			for (const { ws, meta } of this.sessions.values()) {
-				if (meta.userId === userId) {
+				if (meta.userId === userId && meta.channels.includes(channel)) {
 					try {
 						ws.send(encoded);
 						sentCount++;
