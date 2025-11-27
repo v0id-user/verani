@@ -15,7 +15,10 @@ export type { ClientMessage, ServerMessage, MessageFrame };
  * @returns JSON string representation
  */
 export function encodeClientMessage(msg: ClientMessage): string {
-  return sharedEncodeClientMessage(msg);
+  console.debug("[Verani:Protocol:Client] Encoding message:", { type: msg.type, channel: msg.channel });
+  const encoded = sharedEncodeClientMessage(msg);
+  console.debug("[Verani:Protocol:Client] Encoded length:", encoded.length);
+  return encoded;
 }
 
 /**
@@ -24,7 +27,14 @@ export function encodeClientMessage(msg: ClientMessage): string {
  * @returns Decoded message or null if invalid
  */
 export function decodeServerMessage(raw: any): MessageFrame | null {
-  return sharedDecodeServerMessage(raw);
+  console.debug("[Verani:Protocol:Client] Decoding server message, raw length:", typeof raw === "string" ? raw.length : "unknown");
+  const decoded = sharedDecodeServerMessage(raw);
+  if (decoded) {
+    console.debug("[Verani:Protocol:Client] Decoded successfully:", { type: decoded.type, channel: decoded.channel });
+  } else {
+    console.debug("[Verani:Protocol:Client] Decode failed");
+  }
+  return decoded;
 }
 
 // Re-export shared utilities

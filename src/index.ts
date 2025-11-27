@@ -1,7 +1,8 @@
-import { createActorHandler } from "./verani";
+import { ConnectionMeta, createActorHandler, VeraniActor } from "./verani";
 import { chatRoom } from "../examples/chat-room";
 import { presenceRoom } from "../examples/presence-room";
 import { notificationsRoom } from "../examples/notifications-room";
+import { ActorConstructor, getActor } from "@cloudflare/actors";
 
 /**
  * Verani Examples Worker
@@ -15,22 +16,6 @@ import { notificationsRoom } from "../examples/notifications-room";
  * Run with: bun run examples/clients/<client-name>.ts user:yourname
  */
 
-// Environment bindings interface
-interface Env {
-	CHAT: DurableObjectNamespace;
-	PRESENCE: DurableObjectNamespace;
-	NOTIFICATIONS: DurableObjectNamespace;
-}
-
-// Create handlers for each room
-const ChatRoom = createActorHandler(chatRoom);
-const PresenceRoom = createActorHandler(presenceRoom);
-const NotificationsRoom = createActorHandler(notificationsRoom);
-
-// Export all Durable Object classes (Wrangler requirement)
-// Each export name MUST match its corresponding "class_name" in wrangler.jsonc
-export const Verani = ChatRoom;
-export { ChatRoom, PresenceRoom, NotificationsRoom };
 
 // Export default handler with routing logic
 export default {
@@ -40,21 +25,18 @@ export default {
 
 		// Handle WebSocket upgrades by routing to appropriate Durable Object
 		if (path.startsWith("/ws/chat")) {
-			const id = env.CHAT.idFromName("chat-room");
-			const stub = env.CHAT.get(id);
+			const stub = ChatRoom.get("chat-room");
 			return stub.fetch(request);
 		}
 
 		if (path.startsWith("/ws/presence")) {
-			const id = env.PRESENCE.idFromName("presence-room");
-			const stub = env.PRESENCE.get(id);
+			const stub = PresenceRoom.get("presence-room");
 			return stub.fetch(request);
 		}
 
 		if (path.startsWith("/ws/notifications")) {
 			const userId = url.searchParams.get("userId") || "anonymous";
-			const id = env.NOTIFICATIONS.idFromName(`notifications:${userId}`);
-			const stub = env.NOTIFICATIONS.get(id);
+			const stub = NotificationsRoom.get(`notifications:${userId}`);
 			return stub.fetch(request);
 		}
 
@@ -164,3 +146,14 @@ function getInfoPage(): string {
 </body>
 </html>`;
 }
+
+
+// Create handlers for each room
+const ChatRoom = createActorHandler(chatRoom);
+const PresenceRoom = createActorHandler(presenceRoom);
+const NotificationsRoom = createActorHandler(notificationsRoom);
+
+
+// Export all Durable Object classes (Wrangler requirement)
+// Each export name MUST match its corresponding "class_name" in wrangler.jsonc
+export { ChatRoom, PresenceRoom, NotificationsRoom };

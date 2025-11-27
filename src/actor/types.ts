@@ -55,6 +55,9 @@ export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E
   /** Optional room name for debugging */
   name?: string;
 
+  /** WebSocket upgrade path (default: "/ws") */
+  websocketPath?: string;
+
   /** Extract metadata from the connection request */
   extractMeta?(req: Request): TMeta | Promise<TMeta>;
 

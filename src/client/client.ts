@@ -89,6 +89,7 @@ export class VeraniClient {
    * Establishes WebSocket connection
    */
   private connect(): void {
+    console.debug("[Verani:Client] Connecting to:", this.url);
     try {
       this.connectionManager.setState("connecting");
       this.ws = new WebSocket(this.url);
@@ -128,6 +129,7 @@ export class VeraniClient {
    * Handles successful WebSocket connection
    */
   private handleOpen(): void {
+    console.debug("[Verani:Client] Connection opened");
     this.connectionManager.setState("connected");
     this.connectionManager.resetReconnection();
 
@@ -150,11 +152,18 @@ export class VeraniClient {
    * Handles incoming WebSocket messages
    */
   private handleMessage(ev: MessageEvent): void {
+    console.debug("[Verani:Client] Message received, data length:", typeof ev.data === "string" ? ev.data.length : "unknown");
     const msg = decodeServerMessage(ev.data);
-    if (!msg) return;
+    if (!msg) {
+      console.debug("[Verani:Client] Failed to decode message");
+      return;
+    }
+    console.debug("[Verani:Client] Decoded message:", { type: msg.type, channel: msg.channel });
 
     const set = this.listeners.get(msg.type);
     if (set) {
+      console.debug("[Verani:Client] Dispatching to", set.size, "listeners");
+
       for (const fn of set) {
         try {
           fn(msg.data);
@@ -162,6 +171,8 @@ export class VeraniClient {
           console.error("[Verani] Error in message handler:", error);
         }
       }
+    } else {
+      console.debug("[Verani:Client] No listeners for message type:", msg.type);
     }
   }
 
@@ -169,6 +180,7 @@ export class VeraniClient {
    * Handles WebSocket closure
    */
   private handleClose(event: CloseEvent): void {
+    console.debug("[Verani:Client] Connection closed, code:", event.code, "reason:", event.reason);
     this.connectionManager.setState("disconnected");
 
     // Reject connection promise if pending
@@ -192,6 +204,7 @@ export class VeraniClient {
    * Handles WebSocket errors
    */
   private handleError(error: Event): void {
+    console.debug("[Verani:Client] WebSocket error event");
     console.error("[Verani] WebSocket error:", error);
     this.onErrorCallback?.(error);
   }
@@ -222,6 +235,7 @@ export class VeraniClient {
       return;
     }
 
+    console.debug("[Verani:Client] Flushing message queue, count:", this.messageQueue.length);
     while (this.messageQueue.length > 0) {
       const msg = this.messageQueue.shift()!;
       try {
@@ -311,11 +325,13 @@ export class VeraniClient {
    * @param data - Optional message data
    */
   emit(type: string, data?: any): void {
+    console.debug("[Verani:Client] Emitting message, type:", type);
     const msg: QueuedMessage = { type, data };
 
     if (this.isConnected()) {
       try {
         this.ws!.send(encodeClientMessage(msg));
+        console.debug("[Verani:Client] Message sent successfully");
       } catch (error) {
         console.error("[Verani] Failed to send message:", error);
         // Queue message if send fails
@@ -331,6 +347,7 @@ export class VeraniClient {
    * Queues a message for sending when connected
    */
   private queueMessage(msg: QueuedMessage): void {
+    console.debug("[Verani:Client] Queuing message, type:", msg.type, "queue size:", this.messageQueue.length);
     if (this.messageQueue.length >= this.options.maxQueueSize) {
       console.warn("[Verani] Message queue full, dropping oldest message");
       this.messageQueue.shift();
@@ -370,6 +387,7 @@ export class VeraniClient {
    * Manually triggers a reconnection
    */
   reconnect(): void {
+    console.debug("[Verani:Client] Manual reconnect triggered");
     this.disconnect();
     this.connect();
   }
@@ -378,6 +396,7 @@ export class VeraniClient {
    * Closes the connection without reconnecting
    */
   disconnect(): void {
+    console.debug("[Verani:Client] Disconnecting");
     this.connectionManager.cancelReconnect();
     if (this.ws) {
       this.ws.close(1000, "Client disconnect");

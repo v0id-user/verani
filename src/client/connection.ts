@@ -33,7 +33,7 @@ export class ConnectionManager {
   private reconnectAttempts = 0;
   private reconnectTimer?: number;
   private currentDelay: number;
-  
+
   constructor(
     private url: string,
     private config: ReconnectionConfig = DEFAULT_RECONNECTION_CONFIG,
@@ -54,6 +54,7 @@ export class ConnectionManager {
    */
   setState(newState: ConnectionState): void {
     if (this.state !== newState) {
+      console.debug("[Verani:Connection] State change:", this.state, "->", newState);
       this.state = newState;
       this.onStateChange?.(newState);
     }
@@ -63,6 +64,7 @@ export class ConnectionManager {
    * Resets reconnection state (called on successful connection)
    */
   resetReconnection(): void {
+    console.debug("[Verani:Connection] Resetting reconnection state");
     this.reconnectAttempts = 0;
     this.currentDelay = this.config.initialDelay;
     this.clearReconnectTimer();
@@ -74,10 +76,12 @@ export class ConnectionManager {
   scheduleReconnect(connectFn: () => void): boolean {
     // Check if we should attempt reconnection
     if (!this.config.enabled) {
+      console.debug("[Verani:Connection] Reconnection disabled");
       return false;
     }
 
     if (this.config.maxAttempts > 0 && this.reconnectAttempts >= this.config.maxAttempts) {
+      console.debug("[Verani:Connection] Max reconnection attempts reached:", this.reconnectAttempts);
       this.setState("error");
       return false;
     }
@@ -88,10 +92,11 @@ export class ConnectionManager {
     // Schedule reconnection
     this.setState("reconnecting");
     this.reconnectAttempts++;
+    console.debug("[Verani:Connection] Scheduling reconnect attempt", this.reconnectAttempts, "in", this.currentDelay, "ms");
 
     this.reconnectTimer = setTimeout(() => {
       connectFn();
-      
+
       // Increase delay for next attempt (exponential backoff)
       this.currentDelay = Math.min(
         this.currentDelay * this.config.backoffMultiplier,
