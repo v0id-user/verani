@@ -27,7 +27,7 @@ function validateToken(token: string): { userId: string; username: string } | nu
 
 /**
  * Chat Room Example
- * 
+ *
  * Features:
  * - User authentication
  * - Message broadcasting
