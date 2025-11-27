@@ -159,19 +159,30 @@ export class VeraniClient {
     }
     console.debug("[Verani:Client] Decoded message:", { type: msg.type, channel: msg.channel });
 
-    const set = this.listeners.get(msg.type);
+    // Extract the actual event type from wrapped broadcast messages
+    let eventType = msg.type;
+    let eventData = msg.data;
+
+    if (msg.type === "event" && msg.data && typeof msg.data === "object" && "type" in msg.data) {
+      // This is a wrapped broadcast message - extract the real event type
+      eventType = msg.data.type;
+      eventData = msg.data;
+      console.debug("[Verani:Client] Unwrapped event type:", eventType);
+    }
+
+    const set = this.listeners.get(eventType);
     if (set) {
       console.debug("[Verani:Client] Dispatching to", set.size, "listeners");
 
       for (const fn of set) {
         try {
-          fn(msg.data);
+          fn(eventData);
         } catch (error) {
           console.error("[Verani] Error in message handler:", error);
         }
       }
     } else {
-      console.debug("[Verani:Client] No listeners for message type:", msg.type);
+      console.debug("[Verani:Client] No listeners for message type:", eventType);
     }
   }
 

@@ -32,6 +32,8 @@ const colors = {
   magenta: "\x1b[35m",
   cyan: "\x1b[36m",
   gray: "\x1b[90m",
+  whiteBG: "\x1b[47m",
+  black: "\x1b[30m",
 };
 
 interface UserPresence {
@@ -56,6 +58,13 @@ const state: PresenceState = {
 };
 
 /**
+ * Clear the terminal screen for pretty print
+ */
+function clearScreen() {
+  process.stdout.write("\x1b[2J\x1b[0f");
+}
+
+/**
  * Gets status emoji and color
  */
 function getStatusDisplay(status: string): { emoji: string; color: string } {
@@ -72,13 +81,20 @@ function getStatusDisplay(status: string): { emoji: string; color: string } {
 }
 
 /**
- * Renders the presence UI
+ * Pretty prints a separator bar with color
+ */
+function prettySeparator() {
+  return `${colors.gray}${"━".repeat(55)}${colors.reset}`;
+}
+
+/**
+ * Renders the presence UI with pretty print and clears the screen
  */
 function render() {
-  // Screen clearing removed
+  clearScreen();
 
-  console.log(`${colors.bright}${colors.cyan}👥 Presence Tracking${colors.reset}`);
-  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}\n`);
+  console.log(`${colors.bright}${colors.cyan}👥 ${colors.whiteBG}${colors.black} Presence Tracking Dashboard ${colors.reset}`);
+  console.log(prettySeparator() + "\n");
 
   // Stats
   const myUser = state.users.get(state.currentUserId);
@@ -106,16 +122,30 @@ function render() {
       const deviceText = user.devices === 1 ? "1 device" : `${user.devices} devices`;
 
       const nameDisplay = isMe
-        ? `${colors.bright}${user.username}${colors.reset} ${colors.cyan}(you)${colors.reset}`
+        ? `${colors.bright}\x1b[4m${user.username}${colors.reset} ${colors.cyan}(you)${colors.reset}`
         : user.username;
 
-      console.log(`  ${emoji} ${nameDisplay}`);
-      console.log(`     ${color}${user.status}${colors.reset} • ${colors.gray}${deviceText}${colors.reset}`);
+      // Box around your user
+      if (isMe) {
+        console.log(
+          `${colors.bright}${colors.green} ┌──────────────────────────────┐${colors.reset}`
+        );
+        console.log(`  ${emoji} ${nameDisplay}`);
+        console.log(
+          `     ${color}${user.status}${colors.reset} • ${colors.gray}${deviceText}${colors.reset}`
+        );
+        console.log(
+          `${colors.bright}${colors.green} └──────────────────────────────┘${colors.reset}`
+        );
+      } else {
+        console.log(`  ${emoji} ${nameDisplay}`);
+        console.log(`     ${color}${user.status}${colors.reset} • ${colors.gray}${deviceText}${colors.reset}`);
+      }
     }
   }
 
   console.log();
-  console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
+  console.log(prettySeparator());
   console.log(`${colors.gray}Press Ctrl+C to exit${colors.reset}`);
 }
 
@@ -123,9 +153,15 @@ function render() {
  * Shows a notification banner
  */
 function showNotification(message: string, type: "info" | "success" = "info") {
+  clearScreen();
+  render();
   const icon = type === "success" ? "✓" : "ℹ";
   const color = type === "success" ? colors.green : colors.blue;
-  console.log(`\n${color}${icon} ${message}${colors.reset}`);
+  // Pretty notification box
+  const banner = `${color}${colors.bright}┏${"━".repeat(message.length+8)}┓${colors.reset}
+${color}${colors.bright}┃${colors.reset}  ${icon} ${message}  ${color}${colors.bright}┃${colors.reset}
+${color}${colors.bright}┗${"━".repeat(message.length+8)}┛${colors.reset}`;
+  console.log(banner);
 
   // Re-render after a short delay
   setTimeout(render, 1500);
@@ -140,7 +176,7 @@ async function main() {
   const token = `user:${username}`;
   state.currentUserId = username;
 
-  // Screen clearing removed
+  clearScreen();
   console.log(`${colors.bright}👥 Presence Tracking Client${colors.reset}`);
   console.log(`${colors.gray}Connecting as ${username}...${colors.reset}\n`);
 
@@ -159,24 +195,28 @@ async function main() {
 
   // Setup lifecycle callbacks
   client.onOpen(() => {
+    clearScreen();
     render();
     showNotification("Connected!", "success");
   });
 
   client.onClose((event) => {
-    // Screen clearing removed
+    clearScreen();
     console.log(`${colors.red}✗ Disconnected: ${event.reason || "Unknown reason"}${colors.reset}`);
   });
 
   client.onError((error) => {
+    clearScreen();
     console.error(`${colors.red}✗ Error:${colors.reset}`, error);
   });
 
   client.onStateChange((connectionState) => {
     if (connectionState === "connecting") {
-      // Screen clearing removed
+      clearScreen();
+      render();
       console.log(`${colors.yellow}⟳ Reconnecting...${colors.reset}`);
     } else if (connectionState === "connected") {
+      clearScreen();
       render();
       showNotification("Reconnected!", "success");
     }
@@ -201,6 +241,7 @@ async function main() {
       });
     }
 
+    clearScreen();
     render();
   });
 
@@ -218,13 +259,25 @@ async function main() {
       devices: data.devices,
     });
 
+    // Update totals
+    state.totalUsers = state.users.size;
+    state.totalConnections += data.devices;
+
+    clearScreen();
     render();
     showNotification(`${data.username} is now online`, "success");
   });
 
   // Handle user going offline
   client.on("presence.offline", (data: { userId: string; username: string }) => {
+    const user = state.users.get(data.userId);
+    if (user) {
+      state.totalConnections -= user.devices;
+    }
     state.users.delete(data.userId);
+    state.totalUsers = state.users.size;
+
+    clearScreen();
     render();
     showNotification(`${data.username} went offline`, "info");
   });
@@ -233,7 +286,10 @@ async function main() {
   client.on("presence.update", (data: { userId: string; devices: number }) => {
     const user = state.users.get(data.userId);
     if (user) {
+      const deviceDiff = data.devices - user.devices;
       user.devices = data.devices;
+      state.totalConnections += deviceDiff;
+      clearScreen();
       render();
     }
   });
@@ -243,6 +299,7 @@ async function main() {
     const user = state.users.get(data.userId);
     if (user) {
       user.status = data.status as "online" | "away" | "busy";
+      clearScreen();
       render();
     }
   });
