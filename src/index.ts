@@ -30,7 +30,9 @@ export default {
 		}
 
 		if (path.startsWith("/ws/presence")) {
+			console.debug("[Verani:Index] Routing to presence room");
 			const stub = PresenceRoom.get("presence-room");
+			console.debug("[Verani:Index] Presence room stub:", stub);
 			return stub.fetch(request);
 		}
 

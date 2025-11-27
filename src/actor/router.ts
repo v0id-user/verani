@@ -108,13 +108,20 @@ export function defineRoom<TMeta extends ConnectionMeta = ConnectionMeta>(
  */
 export function parseJWT(token: string): any {
   try {
+    console.debug("[Verani:Router] Parsing JWT:", token);
     const parts = token.split(".");
-    if (parts.length !== 3) return null;
+    if (parts.length !== 3) {
+      console.debug("[Verani:Router] Invalid JWT format:", token);
+      return null;
+    }
 
     const payload = parts[1];
     const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(decoded);
-  } catch {
+    const result = JSON.parse(decoded);
+    console.debug("[Verani:Router] Decoded JWT payload:", result);
+    return result;
+  } catch (err) {
+    console.debug("[Verani:Router] Failed to parse JWT:", err);
     return null;
   }
 }

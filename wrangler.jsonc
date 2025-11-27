@@ -16,15 +16,15 @@
 		"bindings": [
 		  {
 			"class_name": "ChatRoom",
-			"name": "CHAT"
+			"name": "ChatRoom"
 		  },
 		  {
 			"class_name": "PresenceRoom",
-			"name": "PRESENCE"
+			"name": "PresenceRoom"
 		  },
 		  {
 			"class_name": "NotificationsRoom",
-			"name": "NOTIFICATIONS"
+			"name": "NotificationsRoom"
 		  }
 		]
 	  }
