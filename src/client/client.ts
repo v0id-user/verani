@@ -91,6 +91,7 @@ export class VeraniClient {
     console.debug("[Verani:Client] Connecting to:", this.url);
     try {
       this.connectionManager.setState("connecting");
+      this.emitLifecycleEvent("connecting");
       this.ws = new WebSocket(this.url);
 
       // Setup connection timeout
@@ -143,7 +144,11 @@ export class VeraniClient {
       this.connectionReject = undefined;
     }
 
-    // Call user callback
+    // Emit lifecycle events
+    this.emitLifecycleEvent("open");
+    this.emitLifecycleEvent("connected");
+
+    // Call user callback (for backward compatibility)
     this.onOpenCallback?.();
   }
 
@@ -201,12 +206,19 @@ export class VeraniClient {
       this.connectionReject = undefined;
     }
 
-    // Call user callback
+    // Emit lifecycle events
+    this.emitLifecycleEvent("close", event);
+    this.emitLifecycleEvent("disconnected", event);
+
+    // Call user callback (for backward compatibility)
     this.onCloseCallback?.(event);
 
     // Attempt reconnection if not a clean close
     if (event.code !== 1000 && event.code !== 1001) {
-      this.connectionManager.scheduleReconnect(() => this.connect());
+      const reconnecting = this.connectionManager.scheduleReconnect(() => this.connect());
+      if (reconnecting) {
+        this.emitLifecycleEvent("reconnecting");
+      }
     }
   }
 
@@ -216,6 +228,11 @@ export class VeraniClient {
   private handleError(error: Event): void {
     console.debug("[Verani:Client] WebSocket error event");
     console.error("[Verani] WebSocket error:", error);
+
+    // Emit lifecycle event
+    this.emitLifecycleEvent("error", error);
+
+    // Call user callback (for backward compatibility)
     this.onErrorCallback?.(error);
   }
 
@@ -233,8 +250,31 @@ export class VeraniClient {
       this.connectionReject = undefined;
     }
 
+    // Emit lifecycle event
+    this.emitLifecycleEvent("error", error);
+
     // Attempt reconnection
-    this.connectionManager.scheduleReconnect(() => this.connect());
+    const reconnecting = this.connectionManager.scheduleReconnect(() => this.connect());
+    if (reconnecting) {
+      this.emitLifecycleEvent("reconnecting");
+    }
+  }
+
+  /**
+   * Emits a lifecycle event to registered listeners
+   */
+  private emitLifecycleEvent(event: string, data?: any): void {
+    const set = this.listeners.get(event);
+    if (set) {
+      console.debug("[Verani:Client] Emitting lifecycle event:", event, "to", set.size, "listeners");
+      for (const fn of set) {
+        try {
+          fn(data);
+        } catch (error) {
+          console.error("[Verani] Error in lifecycle event handler:", error);
+        }
+      }
+    }
   }
 
   /**
