@@ -14,6 +14,7 @@ Examples marked with:
 ## Table of Contents
 
 - [Basic Chat Room](#basic-chat-room) 🔓
+- [Custom WebSocket Paths](#custom-websocket-paths) 🔓
 - [User Presence](#user-presence) 🔓
 - [Private Messages](#private-messages) 🔓
 - [Multiple Channels](#multiple-channels) 🔓
@@ -86,6 +87,92 @@ document.getElementById("sendBtn").onclick = () => {
   const text = document.getElementById("input").value;
   client.emit("chat.message", { text });
 };
+```
+
+---
+
+## Custom WebSocket Paths
+
+🔓 **Public** - Configure custom WebSocket endpoint paths
+
+By default, Verani accepts WebSocket connections at `/ws`. You can customize this per room:
+
+**Important:** Verani **ONLY supports WebSocket connections**. All non-WebSocket requests are rejected with clear error messages:
+- HTTP 426 (Upgrade Required) for non-WebSocket requests
+- HTTP 404 for wrong paths with the correct path information
+
+```typescript
+import { defineRoom, createActorHandler } from "verani";
+
+// Chat room at /chat
+export const chatRoom = defineRoom({
+  name: "chat",
+  websocketPath: "/chat", // Custom path
+  
+  onConnect(ctx) {
+    console.log(`User connected to /chat`);
+  },
+  
+  onMessage(ctx, frame) {
+    // Handle messages
+  }
+});
+
+// Presence room at /presence
+export const presenceRoom = defineRoom({
+  name: "presence",
+  websocketPath: "/presence", // Different path
+  
+  onConnect(ctx) {
+    console.log(`User connected to /presence`);
+  }
+});
+
+// Create handlers
+const ChatRoom = createActorHandler(chatRoom);
+const PresenceRoom = createActorHandler(presenceRoom);
+
+export { ChatRoom, PresenceRoom };
+```
+
+**Worker routing:**
+
+```typescript
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    
+    // Route to chat room
+    if (url.pathname.startsWith("/chat")) {
+      const stub = ChatRoom.get("chat-instance");
+      return stub.fetch(request);
+    }
+    
+    // Route to presence room
+    if (url.pathname.startsWith("/presence")) {
+      const stub = PresenceRoom.get("presence-instance");
+      return stub.fetch(request);
+    }
+    
+    return new Response("Not Found", { status: 404 });
+  }
+};
+```
+
+**Client:**
+
+```typescript
+// Connect to chat
+const chatClient = new VeraniClient("wss://example.com/chat?userId=alice");
+
+// Connect to presence
+const presenceClient = new VeraniClient("wss://example.com/presence?userId=alice");
+
+// Trying to connect with HTTP will get clear error:
+// HTTP 426: "This endpoint only accepts WebSocket connections at /chat"
+
+// Wrong path will get clear error:
+// HTTP 404: "WebSocket endpoint is /chat, not /wrong-path"
 ```
 
 ---

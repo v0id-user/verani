@@ -34,6 +34,7 @@ import { defineRoom } from "verani";
 
 export const chatRoom = defineRoom({
   name: "chat",
+  websocketPath: "/ws", // Optional: WebSocket path (defaults to "/ws")
 
   // Called when a user connects
   onConnect(ctx) {
@@ -383,6 +384,43 @@ const client = new VeraniClient(
 **See [SECURITY.md](./SECURITY.md) for comprehensive authentication guide.**
 
 ## Next Steps
+
+### Configure Custom WebSocket Paths
+
+By default, Verani accepts WebSocket connections at `/ws`. You can customize this per room:
+
+```typescript
+export const chatRoom = defineRoom({
+  name: "chat",
+  websocketPath: "/chat", // Custom path instead of /ws
+  
+  onConnect(ctx) {
+    console.log("Connected!");
+  }
+});
+```
+
+**Important Notes:**
+- Verani **ONLY supports WebSocket connections**
+- Non-WebSocket requests return HTTP 426 (Upgrade Required) with an error message
+- Requests to wrong paths return HTTP 404 with the correct path information
+- Each room can have its own custom path
+
+**Example with multiple rooms:**
+
+```typescript
+// Chat at /chat
+const chatRoom = defineRoom({
+  websocketPath: "/chat",
+  // ...
+});
+
+// Presence at /presence
+const presenceRoom = defineRoom({
+  websocketPath: "/presence",
+  // ...
+});
+```
 
 ### Add Custom Metadata
 

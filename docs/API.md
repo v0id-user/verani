@@ -21,6 +21,7 @@ Defines a room with lifecycle hooks and metadata extraction.
 ```typescript
 const room = defineRoom({
   name: "chat",
+  websocketPath: "/ws", // Optional: defaults to "/ws"
   extractMeta(req) { /* ... */ },
   onConnect(ctx) { /* ... */ },
   onMessage(ctx, frame) { /* ... */ },
@@ -60,6 +61,28 @@ Configuration object for a room.
 #### `name?: string`
 
 Optional room name for debugging.
+
+#### `websocketPath?: string`
+
+WebSocket upgrade path for this room (default: `"/ws"`).
+
+This tells the Cloudflare Actors runtime which URL path should be used for WebSocket connections. The Actor will:
+- Accept WebSocket upgrade requests at this path
+- Return HTTP 404 for requests to different paths
+- Return HTTP 426 (Upgrade Required) for non-WebSocket requests
+
+**Default:** `"/ws"`
+
+**Example:**
+
+```typescript
+export const chatRoom = defineRoom({
+  websocketPath: "/chat", // Custom path
+  // ... other hooks
+});
+```
+
+**Important:** Verani only supports WebSocket connections. All non-WebSocket requests will be rejected with clear error messages.
 
 #### `extractMeta?(req: Request): TMeta | Promise<TMeta>`
 
