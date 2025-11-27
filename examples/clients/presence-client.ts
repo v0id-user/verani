@@ -57,6 +57,23 @@ const state: PresenceState = {
   totalConnections: 0,
 };
 
+// Debounce timer for rendering
+let renderTimeout: ReturnType<typeof setTimeout> | null = null;
+const RENDER_DEBOUNCE_MS = 100;
+
+/**
+ * Debounced render function to handle rapid updates
+ */
+function debouncedRender() {
+  if (renderTimeout) {
+    clearTimeout(renderTimeout);
+  }
+  renderTimeout = setTimeout(() => {
+    render();
+    renderTimeout = null;
+  }, RENDER_DEBOUNCE_MS);
+}
+
 /**
  * Clear the terminal screen for pretty print
  */
@@ -222,12 +239,13 @@ async function main() {
     }
   });
 
-  // Handle presence sync
+  // Handle presence sync (always from storage - source of truth)
   client.on("presence.sync", (data: {
     users: Array<{ userId: string; username: string; status: string; devices: number }>;
     totalUsers: number;
     totalConnections: number;
   }) => {
+    // Clear and rebuild state from sync (authoritative)
     state.users.clear();
     state.totalUsers = data.totalUsers;
     state.totalConnections = data.totalConnections;
@@ -241,6 +259,7 @@ async function main() {
       });
     }
 
+    // Immediate render for sync (critical state update)
     clearScreen();
     render();
   });
@@ -289,8 +308,8 @@ async function main() {
       const deviceDiff = data.devices - user.devices;
       user.devices = data.devices;
       state.totalConnections += deviceDiff;
-      clearScreen();
-      render();
+      // Use debounced render for rapid updates
+      debouncedRender();
     }
   });
 
@@ -299,8 +318,8 @@ async function main() {
     const user = state.users.get(data.userId);
     if (user) {
       user.status = data.status as "online" | "away" | "busy";
-      clearScreen();
-      render();
+      // Use debounced render for status updates
+      debouncedRender();
     }
   });
 

@@ -175,6 +175,62 @@ onError(error, ctx) {
 }
 ```
 
+#### `onHibernationRestore?(actor: VeraniActor): void | Promise<void>`
+
+Called after the Actor wakes from hibernation and sessions are restored from WebSocket attachments.
+
+Use this hook to:
+- Reconcile durable storage with actual connected sessions
+- Clean up stale data
+- Send state sync messages to restored clients
+- Ensure consistency after hibernation
+
+**Parameters:**
+- `actor: VeraniActor` - The actor instance with restored sessions
+
+**Example:**
+
+```typescript
+async onHibernationRestore(actor) {
+  console.log(`Actor restored with ${actor.sessions.size} sessions`);
+  
+  // Reconcile storage with actual connections
+  const storedUsers = await loadUsersFromStorage(actor.getStorage());
+  const connectedUserIds = new Set(
+    Array.from(actor.sessions.values()).map(s => s.meta.userId)
+  );
+  
+  // Clean up stale entries
+  await actor.getStorage().transaction(async (txn) => {
+    for (const [userId, userData] of storedUsers.entries()) {
+      if (!connectedUserIds.has(userId)) {
+        await txn.delete(`user:${userId}`);
+      }
+    }
+  });
+  
+  // Send sync to all restored clients
+  const syncData = await buildSyncData(actor.getStorage());
+  for (const session of actor.sessions.values()) {
+    session.ws.send(JSON.stringify({
+      type: "sync",
+      data: syncData
+    }));
+  }
+}
+```
+
+**When does hibernation occur?**
+
+Cloudflare Actors hibernate when:
+- No requests have been received for a period of time
+- No WebSocket messages have been sent/received
+- The runtime decides to optimize resource usage
+
+Sessions are automatically restored via WebSocket attachments, but application state must be reconciled manually using this hook.
+
+**See:** [examples/presence-room.ts](../examples/presence-room.ts) for a complete implementation.
+
 ---
 
 ### `RoomContext<TMeta>`
@@ -296,6 +352,67 @@ ctx.actor.sendToUser("alice", "notification", {
   body: "You have 3 unread messages"
 });
 ```
+
+#### `getStorage(): DurableObjectStorage`
+
+Returns the Durable Object storage interface for persistent state management.
+
+Use storage for:
+- Persisting state across actor hibernation
+- Atomic operations with transactions
+- Consistent state management
+- Historical data
+
+**Returns:** `DurableObjectStorage` instance
+
+**Example:**
+
+```typescript
+// Basic storage operations
+async onConnect(ctx) {
+  const storage = ctx.actor.getStorage();
+  
+  // Get value
+  const count = await storage.get<number>("connectionCount") || 0;
+  
+  // Put value
+  await storage.put("connectionCount", count + 1);
+  
+  // Delete value
+  await storage.delete("oldKey");
+}
+
+// Atomic transactions for consistency
+async onConnect(ctx) {
+  await ctx.actor.getStorage().transaction(async (txn) => {
+    // All operations in transaction are atomic
+    const user = await txn.get<UserData>(`user:${ctx.meta.userId}`);
+    const deviceCount = (user?.deviceCount || 0) + 1;
+    
+    await txn.put(`user:${ctx.meta.userId}`, {
+      ...user,
+      deviceCount,
+      lastSeen: Date.now()
+    });
+  });
+}
+
+// List operations with prefix
+async function getAllUsers(storage: DurableObjectStorage) {
+  const users = new Map();
+  const list = await storage.list<UserData>({ prefix: "user:" });
+  
+  for (const [key, value] of list.entries()) {
+    users.set(key, value);
+  }
+  
+  return users;
+}
+```
+
+**Important:** Always use transactions when multiple operations need to be atomic. Without transactions, race conditions can occur during rapid connect/disconnect events.
+
+**See:** [Durable Objects Storage API](https://developers.cloudflare.com/durable-objects/api/storage-api/) for complete documentation.
 
 ---
 

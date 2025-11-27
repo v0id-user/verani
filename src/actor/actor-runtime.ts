@@ -90,6 +90,13 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 			try {
 				restoreSessions(this);
 				console.debug("[Verani:ActorRuntime] Sessions restored, count:", this.sessions.size);
+
+				// Call hibernation restore hook if defined
+				if (room.onHibernationRestore && this.sessions.size > 0) {
+					console.debug("[Verani:ActorRuntime] Calling onHibernationRestore hook");
+					await room.onHibernationRestore(this);
+					console.debug("[Verani:ActorRuntime] onHibernationRestore hook completed");
+				}
 			} catch (error) {
 				console.error("[Verani] Failed to restore sessions:", error);
 			}
@@ -343,6 +350,14 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 
 			console.debug("[Verani:ActorRuntime] SendToUser complete, sent to:", sentCount, "sessions");
 			return sentCount;
+		}
+
+		/**
+		 * Gets the Durable Object storage interface
+		 * @returns DurableObjectStorage instance
+		 */
+		getStorage(): DurableObjectStorage {
+			return this.ctx.storage;
 		}
 	};
 

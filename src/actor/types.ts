@@ -25,6 +25,7 @@ export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = 
   getConnectedUserIds(): string[];
   getUserSessions(userId: string): WebSocket[];
   sendToUser(userId: string, type: string, data?: any): number;
+  getStorage(): DurableObjectStorage;
 }
 
 /**
@@ -72,4 +73,7 @@ export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E
 
   /** Called when an error occurs in a lifecycle hook */
   onError?(error: Error, ctx: RoomContext<TMeta, E>): void | Promise<void>;
+
+  /** Called after actor wakes from hibernation and sessions are restored */
+  onHibernationRestore?(actor: VeraniActor<TMeta, E>): void | Promise<void>;
 }
