@@ -108,11 +108,11 @@ import { defineRoom, createActorHandler } from "verani";
 export const chatRoom = defineRoom({
   name: "chat",
   websocketPath: "/chat", // Custom path
-  
+
   onConnect(ctx) {
     console.log(`User connected to /chat`);
   },
-  
+
   onMessage(ctx, frame) {
     // Handle messages
   }
@@ -122,7 +122,7 @@ export const chatRoom = defineRoom({
 export const presenceRoom = defineRoom({
   name: "presence",
   websocketPath: "/presence", // Different path
-  
+
   onConnect(ctx) {
     console.log(`User connected to /presence`);
   }
@@ -141,19 +141,19 @@ export { ChatRoom, PresenceRoom };
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    
+
     // Route to chat room
     if (url.pathname.startsWith("/chat")) {
       const stub = ChatRoom.get("chat-instance");
       return stub.fetch(request);
     }
-    
+
     // Route to presence room
     if (url.pathname.startsWith("/presence")) {
       const stub = PresenceRoom.get("presence-instance");
       return stub.fetch(request);
     }
-    
+
     return new Response("Not Found", { status: 404 });
   }
 };

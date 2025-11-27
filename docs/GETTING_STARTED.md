@@ -393,7 +393,7 @@ By default, Verani accepts WebSocket connections at `/ws`. You can customize thi
 export const chatRoom = defineRoom({
   name: "chat",
   websocketPath: "/chat", // Custom path instead of /ws
-  
+
   onConnect(ctx) {
     console.log("Connected!");
   }

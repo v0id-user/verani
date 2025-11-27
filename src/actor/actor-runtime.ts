@@ -30,13 +30,13 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
     /**
      * Override fetch to ONLY accept WebSocket requests
      * Rejects all non-WebSocket traffic with clear error messages
+     * Path validation is handled by the base class via configuration()
      */
     async fetch(request: Request): Promise<Response> {
-      const url = new URL(request.url);
-      const wsPath = room.websocketPath || "/ws";
-
-      // Reject non-WebSocket requests
+      // Only reject non-WebSocket requests
+      // Let the base class handle path matching via configuration()
       if (request.headers.get("Upgrade") !== "websocket") {
+        const wsPath = room.websocketPath || "/ws";
         return new Response(
           JSON.stringify({
             error: "WebSocket Required",
@@ -49,21 +49,8 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
         );
       }
 
-      // Reject wrong path
-      if (!url.pathname.startsWith(wsPath)) {
-        return new Response(
-          JSON.stringify({
-            error: "Invalid Path",
-            message: `WebSocket endpoint is ${wsPath}, not ${url.pathname}`
-          }),
-          {
-            status: 404,
-            headers: { "Content-Type": "application/json" }
-          }
-        );
-      }
-
       // Let the base Actor class handle the WebSocket upgrade
+      // It will use configuration() to check the path and perform the upgrade
       return super.fetch(request);
     }
 
