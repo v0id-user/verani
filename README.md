@@ -30,6 +30,7 @@ import { defineRoom, createActorHandler } from "verani";
 // Define your room with lifecycle hooks
 export const chatRoom = defineRoom({
   name: "chat",
+  websocketPath: "/chat",
 
   onConnect(ctx) {
     console.log(`User ${ctx.meta.userId} connected`);
@@ -56,10 +57,7 @@ export const chatRoom = defineRoom({
 });
 
 // Create the Durable Object class
-const ChatRoom = createActorHandler(chatRoom);
-
-// Export it - the name must match wrangler.jsonc
-export { ChatRoom };
+export const ChatRoom = createActorHandler(chatRoom);
 ```
 
 ### Wrangler Configuration
