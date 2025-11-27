@@ -37,6 +37,7 @@ function validateToken(token: string): { userId: string; username: string } | nu
  */
 export const chatRoom = defineRoom<ChatMeta>({
   name: "chat-example",
+  websocketPath: "/ws/chat",
 
   extractMeta(req) {
     const url = new URL(req.url);

@@ -48,6 +48,7 @@ function validateToken(token: string): { userId: string; username: string } | nu
  */
 export const notificationsRoom = defineRoom<NotificationMeta>({
   name: "notifications-example",
+  websocketPath: "/ws/notifications",
 
   extractMeta(req) {
     const url = new URL(req.url);

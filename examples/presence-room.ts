@@ -47,6 +47,7 @@ function getDeviceInfo(req: Request): string {
  */
 export const presenceRoom = defineRoom<PresenceMeta>({
   name: "presence-example",
+  websocketPath: "/ws/presence",
 
   extractMeta(req) {
     const url = new URL(req.url);
