@@ -1,8 +1,39 @@
 {
 	"name": "verani",
-	"version": "0.0.0",
-	"private": true,
+	"version": "0.1.1",
+	"description": "A simple, focused realtime SDK for Cloudflare Actors with Socket.io-like semantics",
+	"license": "ISC",
+	"keywords": [
+		"cloudflare",
+		"actors",
+		"durable-objects",
+		"realtime",
+		"websocket",
+		"socket.io"
+	],
+	"main": "./dist/verani.cjs",
+	"module": "./dist/verani.mjs",
+	"types": "./dist/verani.d.cts",
+	"exports": {
+		".": {
+			"import": {
+				"types": "./dist/verani.d.mts",
+				"default": "./dist/verani.mjs"
+			},
+			"require": {
+				"types": "./dist/verani.d.cts",
+				"default": "./dist/verani.cjs"
+			}
+		}
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"LICENSE"
+	],
 	"scripts": {
+		"build": "tsdown",
+		"prepublishOnly": "npm run build",
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
@@ -11,6 +42,8 @@
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.8.19",
+		"esbuild-fix-imports-plugin": "^1.0.23",
+		"tsdown": "^0.16.7",
 		"typescript": "^5",
 		"vitest": "~3.2.0",
 		"wrangler": "4.51.0"
@@ -18,9 +51,5 @@
 	"peerDependencies": {
 		"typescript": "^5",
 		"@cloudflare/actors": "^0.0.1-beta.6"
-	},
-	"dependencies": {
-		"esbuild-fix-imports-plugin": "^1.0.23",
-		"tsdown": "^0.16.7"
 	}
 }

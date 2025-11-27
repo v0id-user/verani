@@ -26,6 +26,11 @@ export type {
   RoomDefinition
 } from "./actor/types";
 
+export type {
+  ActorHandlerClass,
+  ActorStub
+} from "./actor/actor-runtime";
+
 // ============================================================================
 // Client exports - WebSocket client
 // ============================================================================

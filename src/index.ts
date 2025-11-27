@@ -3,7 +3,6 @@ import { presenceRoom } from "../examples/presence-room";
 import { createActorHandler } from "./actor/actor-runtime";
 
 export const PresenceExample = createActorHandler(presenceRoom);
-
 export class ChatExample extends Actor<Env> {}
 export class NotificationsExample extends Actor<Env> {}
 
@@ -16,7 +15,7 @@ export default {
 
 
 		if (path.startsWith("/ws/presence")) {
-			const stub = PresenceExample.get("presence-room");
+			const stub = PresenceExample.get("")
 			return stub.fetch(request);
 		}
 

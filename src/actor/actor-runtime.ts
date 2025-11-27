@@ -25,18 +25,34 @@ function sanitizeToClassName(name: string): string {
 }
 
 /**
+ * Actor stub interface returned by .get() method
+ */
+export interface ActorStub {
+	fetch(request: Request): Promise<Response>;
+}
+
+/**
+ * Return type for createActorHandler - represents an Actor class constructor
+ */
+export type ActorHandlerClass<E = unknown> = {
+	new(state: any, env: E): Actor<E>;
+	get(id: string): ActorStub;
+	configuration(request?: Request): ActorConfiguration;
+};
+
+/**
  * Creates an Actor handler from a room definition
  * @param room - The room definition with lifecycle hooks
  * @returns Actor class for Cloudflare Workers (extends DurableObject)
  */
 export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown>(
 	room: RoomDefinition<TMeta, E>
-) {
+): ActorHandlerClass<E> {
 	// Determine class name with priority: room.name > room.websocketPath > "VeraniActor"
 	const className = sanitizeToClassName(room.name || room.websocketPath || "VeraniActor");
 
 	// Create named class dynamically
-	const NamedActorClass = class extends Actor<E> {
+	class NamedActorClass extends Actor<E> {
 		sessions = new Map<WebSocket, { ws: WebSocket; meta: TMeta }>();
 
 		/**
@@ -368,5 +384,5 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 		configurable: true
 	});
 
-	return NamedActorClass;
+	return NamedActorClass as unknown as ActorHandlerClass<E>;
 }

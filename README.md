@@ -72,7 +72,7 @@ export { ChatRoom };
     "bindings": [
       {
         "class_name": "ChatRoom",  // Must match export name
-        "name": "CHAT"              // Binding name in env
+        "name": "ChatRoom"              // Binding name in env
       }
     ]
   },

@@ -86,7 +86,7 @@ export const presenceRoom = defineRoom<PresenceMeta>({
   async onConnect(ctx) {
     console.log(`[Presence][onConnect] User ${ctx.meta.username} connected from device ${ctx.meta.deviceInfo}`);
 
-    // Use transaction for atomic state updates
+		// Use transaction for atomic state updates
     await ctx.actor.getStorage().transaction(async (txn) => {
       // Get current user presence from storage
       const storageKey = `presence:user:${ctx.meta.userId}`;

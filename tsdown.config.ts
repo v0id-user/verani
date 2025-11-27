@@ -1,12 +1,16 @@
 import { defineConfig } from "tsdown";
-import { fixImportsPlugin } from 'esbuild-fix-imports-plugin'
 
 export default defineConfig({
   entry: ["./src/verani.ts"],
   format: ["esm", "cjs"],
   outDir: "dist",
   dts: true,
-  minify: false,
+  minify: {
+		compress: {
+			dropDebugger: true,
+			dropConsole: true,
+		},
+	},
   sourcemap: false,
   platform: "node",
   treeshake: true,
@@ -14,5 +18,4 @@ export default defineConfig({
   external: [
     "@cloudflare/actors",
   ],
-  plugins: [fixImportsPlugin()],
 });
