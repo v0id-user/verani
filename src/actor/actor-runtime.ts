@@ -97,199 +97,329 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 		}
 
 
-		/**
-		 * Called when the Actor initializes or wakes from hibernation
-		 * Restores sessions from WebSocket attachments
-		 */
-		protected async onInit() {
-			console.debug("[Verani:ActorRuntime] onInit called");
-			try {
-				restoreSessions(this);
-				console.debug("[Verani:ActorRuntime] Sessions restored, count:", this.sessions.size);
+	/**
+	 * Called when the Actor initializes or wakes from hibernation
+	 * Restores sessions from WebSocket attachments
+	 */
+	protected async onInit() {
+		console.debug("[Verani:ActorRuntime] onInit called");
 
-				// Call hibernation restore hook if defined
-				if (room.onHibernationRestore && this.sessions.size > 0) {
-					console.debug("[Verani:ActorRuntime] Calling onHibernationRestore hook");
-					await room.onHibernationRestore(this);
-					console.debug("[Verani:ActorRuntime] onHibernationRestore hook completed");
-				}
-			} catch (error) {
-				console.error("[Verani] Failed to restore sessions:", error);
-			}
+		// Restore sessions with separate error handling
+		let restoreError: Error | undefined;
+		try {
+			restoreSessions(this);
+			console.debug("[Verani:ActorRuntime] Sessions restored, count:", this.sessions.size);
+		} catch (error) {
+			restoreError = error as Error;
+			console.error("[Verani] Failed to restore sessions:", error);
 		}
 
-		/**
-		 * Called when a new WebSocket connection is established
-		 */
-		protected onWebSocketConnect(ws: WebSocket, req: Request) {
-			console.debug("[Verani:ActorRuntime] onWebSocketConnect called, url:", req.url);
+		// Always attempt to call onHibernationRestore if defined, even if restoration partially failed
+		// This allows user code to handle partial restoration scenarios
+		if (room.onHibernationRestore && this.sessions.size > 0) {
 			try {
-				// Extract metadata from request
-				let meta: TMeta;
-				if (room.extractMeta) {
-					meta = room.extractMeta(req) as TMeta;
-					console.debug("[Verani:ActorRuntime] Extracted metadata:", { userId: meta.userId, clientId: meta.clientId, channels: meta.channels });
-				} else {
-					meta = {
-						userId: "anonymous",
-						clientId: crypto.randomUUID(),
-						channels: ["default"]
-					} as unknown as TMeta;
-					console.debug("[Verani:ActorRuntime] Using default metadata:", meta);
-				}
+				console.debug("[Verani:ActorRuntime] Calling onHibernationRestore hook");
+				await room.onHibernationRestore(this);
+				console.debug("[Verani:ActorRuntime] onHibernationRestore hook completed");
+			} catch (error) {
+				console.error("[Verani] Error in onHibernationRestore hook:", error);
+			}
+		} else if (room.onHibernationRestore && this.sessions.size === 0 && !restoreError) {
+			console.debug("[Verani:ActorRuntime] Skipping onHibernationRestore - no sessions to restore");
+		}
+	}
 
-				// Store attachment for hibernation survival
-				storeAttachment(ws, meta);
+	/**
+	 * Called when a new WebSocket connection is established
+	 */
+	protected async onWebSocketConnect(ws: WebSocket, req: Request) {
+		console.debug("[Verani:ActorRuntime] onWebSocketConnect called, url:", req.url);
+		let meta: TMeta | undefined;
 
-				// Add to in-memory sessions
-				this.sessions.set(ws, { ws, meta });
-				console.debug("[Verani:ActorRuntime] Session added, total sessions:", this.sessions.size);
+		try {
+			// Extract metadata from request
+			if (room.extractMeta) {
+				meta = await room.extractMeta(req) as TMeta;
+				console.debug("[Verani:ActorRuntime] Extracted metadata:", { userId: meta.userId, clientId: meta.clientId, channels: meta.channels });
+			} else {
+				meta = {
+					userId: "anonymous",
+					clientId: crypto.randomUUID(),
+					channels: ["default"]
+				} as unknown as TMeta;
+				console.debug("[Verani:ActorRuntime] Using default metadata:", meta);
+			}
 
-				// Call user-defined onConnect hook
-				if (room.onConnect) {
-					console.debug("[Verani:ActorRuntime] Calling user onConnect hook");
-					const ctx: RoomContext<TMeta, E> = {
+			// Store attachment for hibernation survival
+			storeAttachment(ws, meta);
+
+			// Call user-defined onConnect hook BEFORE adding to sessions map
+			// This prevents orphaned sessions if onConnect throws
+			if (room.onConnect) {
+				console.debug("[Verani:ActorRuntime] Calling user onConnect hook");
+				const ctx: RoomContext<TMeta, E> = {
+					actor: this,
+					ws,
+					meta
+				};
+				await room.onConnect(ctx);
+				console.debug("[Verani:ActorRuntime] User onConnect hook completed");
+			}
+
+			// Add to in-memory sessions ONLY after successful onConnect
+			this.sessions.set(ws, { ws, meta });
+			console.debug("[Verani:ActorRuntime] Session added, total sessions:", this.sessions.size);
+		} catch (error) {
+			console.error("[Verani] Error in onWebSocketConnect:", error);
+
+			// Call error handler if defined
+			if (room.onError && meta) {
+				try {
+					await room.onError(error as Error, {
 						actor: this,
 						ws,
 						meta
-					};
-					room.onConnect(ctx);
-					console.debug("[Verani:ActorRuntime] User onConnect hook completed");
-				}
-			} catch (error) {
-				console.error("[Verani] Error in onWebSocketConnect:", error);
-
-				// Call error handler if defined
-				if (room.onError) {
-					try {
-						room.onError(error as Error, {
-							actor: this,
-							ws,
-							meta: { userId: "unknown", clientId: "unknown", channels: [] } as unknown as TMeta
-						});
-					} catch (errorHandlerError) {
-						console.error("[Verani] Error in onError handler:", errorHandlerError);
-					}
-				}
-
-				// Close connection on critical errors
-				ws.close(1011, "Internal server error");
-			}
-		}
-
-		/**
-		 * Called when a message is received from a WebSocket
-		 */
-		protected onWebSocketMessage(ws: WebSocket, raw: any) {
-			let session: { ws: WebSocket; meta: TMeta } | undefined;
-
-			try {
-				// Decode the incoming frame
-				const frame = decodeFrame(raw);
-				console.debug("[Verani:ActorRuntime] Message received, type:", frame.type, "channel:", frame.channel);
-
-				// Get session info
-				session = this.sessions.get(ws);
-				if (!session) {
-					console.warn("[Verani] Received message from unknown session");
-					return;
-				}
-				console.debug("[Verani:ActorRuntime] Session found:", { userId: session.meta.userId, clientId: session.meta.clientId });
-
-				// Call user-defined onMessage hook
-				if (room.onMessage) {
-					console.debug("[Verani:ActorRuntime] Calling user onMessage hook");
-					const ctx: MessageContext<TMeta, E> = {
-						actor: this,
-						ws,
-						meta: session.meta,
-						frame
-					};
-					room.onMessage(ctx, frame);
-					console.debug("[Verani:ActorRuntime] User onMessage hook completed");
-				}
-			} catch (error) {
-				console.error("[Verani] Error in onWebSocketMessage:", error);
-
-				// Call error handler if defined
-				if (room.onError && session) {
-					try {
-						room.onError(error as Error, {
-							actor: this,
-							ws,
-							meta: session.meta
-						});
-					} catch (errorHandlerError) {
-						console.error("[Verani] Error in onError handler:", errorHandlerError);
-					}
+					});
+				} catch (errorHandlerError) {
+					console.error("[Verani] Error in onError handler:", errorHandlerError);
 				}
 			}
+
+			// Close connection on critical errors
+			ws.close(1011, "Internal server error");
 		}
+	}
 
-		/**
-		 * Called when a WebSocket connection is closed
-		 */
-		protected onWebSocketDisconnect(ws: WebSocket) {
-			console.debug("[Verani:ActorRuntime] onWebSocketDisconnect called");
-			try {
-				const session = this.sessions.get(ws);
-				if (session) {
-					console.debug("[Verani:ActorRuntime] Disconnecting session:", { userId: session.meta.userId, clientId: session.meta.clientId });
-				}
+	/**
+	 * Called when a message is received from a WebSocket
+	 */
+	protected async onWebSocketMessage(ws: WebSocket, raw: any) {
+		let session: { ws: WebSocket; meta: TMeta } | undefined;
 
-				// Remove from sessions map
-				this.sessions.delete(ws);
-				console.debug("[Verani:ActorRuntime] Session removed, remaining sessions:", this.sessions.size);
+		try {
+			// Decode the incoming frame
+			const frame = decodeFrame(raw);
+			console.debug("[Verani:ActorRuntime] Message received, type:", frame.type, "channel:", frame.channel);
 
-				// Call user-defined onDisconnect hook
-				if (session && room.onDisconnect) {
-					console.debug("[Verani:ActorRuntime] Calling user onDisconnect hook");
-					const ctx: RoomContext<TMeta, E> = {
+			// Get session info
+			session = this.sessions.get(ws);
+			if (!session) {
+				console.warn("[Verani] Received message from unknown session");
+				return;
+			}
+			console.debug("[Verani:ActorRuntime] Session found:", { userId: session.meta.userId, clientId: session.meta.clientId });
+
+			// Call user-defined onMessage hook
+			if (room.onMessage) {
+				console.debug("[Verani:ActorRuntime] Calling user onMessage hook");
+				const ctx: MessageContext<TMeta, E> = {
+					actor: this,
+					ws,
+					meta: session.meta,
+					frame
+				};
+				await room.onMessage(ctx, frame);
+				console.debug("[Verani:ActorRuntime] User onMessage hook completed");
+			}
+		} catch (error) {
+			console.error("[Verani] Error in onWebSocketMessage:", error);
+
+			// Call error handler if defined
+			if (room.onError && session) {
+				try {
+					await room.onError(error as Error, {
 						actor: this,
 						ws,
 						meta: session.meta
-					};
-					room.onDisconnect(ctx);
-					console.debug("[Verani:ActorRuntime] User onDisconnect hook completed");
+					});
+				} catch (errorHandlerError) {
+					console.error("[Verani] Error in onError handler:", errorHandlerError);
 				}
-			} catch (error) {
-				console.error("[Verani] Error in onWebSocketDisconnect:", error);
+			}
+		}
+	}
 
-				// Error handler is not called here since we may not have session context
+	/**
+	 * Called when a WebSocket connection is closed
+	 */
+	protected async onWebSocketDisconnect(ws: WebSocket) {
+		console.debug("[Verani:ActorRuntime] onWebSocketDisconnect called");
+		try {
+			const session = this.sessions.get(ws);
+			if (session) {
+				console.debug("[Verani:ActorRuntime] Disconnecting session:", { userId: session.meta.userId, clientId: session.meta.clientId });
+			}
+
+			// Remove from sessions map
+			this.sessions.delete(ws);
+			console.debug("[Verani:ActorRuntime] Session removed, remaining sessions:", this.sessions.size);
+
+			// Call user-defined onDisconnect hook
+			if (session && room.onDisconnect) {
+				console.debug("[Verani:ActorRuntime] Calling user onDisconnect hook");
+				const ctx: RoomContext<TMeta, E> = {
+					actor: this,
+					ws,
+					meta: session.meta
+				};
+				await room.onDisconnect(ctx);
+				console.debug("[Verani:ActorRuntime] User onDisconnect hook completed");
+			}
+		} catch (error) {
+			console.error("[Verani] Error in onWebSocketDisconnect:", error);
+
+			// Error handler is not called here since we may not have session context
+		}
+	}
+
+	/**
+	 * Removes all WebSocket sessions that are not in OPEN state
+	 * This prevents stale connections from accumulating in memory
+	 * @returns Number of sessions cleaned up
+	 */
+	cleanupStaleSessions(): number {
+		let cleanedCount = 0;
+		const deadSessions: WebSocket[] = [];
+
+		// Collect dead sessions
+		for (const [ws, session] of this.sessions.entries()) {
+			if (ws.readyState !== WebSocket.OPEN) {
+				deadSessions.push(ws);
 			}
 		}
 
-		/**
-		 * Broadcasts a message to all connections in a channel
-		 * @param channel - The channel to broadcast to
-		 * @param data - The data to send
-		 * @param opts - Broadcast options (filtering, exclusions)
-		 * @returns Number of connections that received the message
-		 */
-		broadcast(channel: string, data: any, opts?: BroadcastOptions): number {
-			console.debug("[Verani:ActorRuntime] Broadcasting to channel:", channel, "options:", opts);
-			let sentCount = 0;
-			const frame: MessageFrame = { type: "event", channel, data };
-			const encoded = encodeFrame(frame);
+		// Remove dead sessions
+		for (const ws of deadSessions) {
+			this.sessions.delete(ws);
+			cleanedCount++;
+		}
 
-			for (const { ws, meta } of this.sessions.values()) {
-				// Skip if channel filter doesn't match
-				if (!meta.channels.includes(channel)) {
-					continue;
-				}
+		if (cleanedCount > 0) {
+			console.debug("[Verani:ActorRuntime] Cleaned up", cleanedCount, "dead sessions");
+		}
 
-				// Skip if this is the excluded WebSocket
-				if (opts?.except && ws === opts.except) {
-					continue;
-				}
+		return cleanedCount;
+	}
 
-				// Skip if userIds filter is specified and doesn't match
-				if (opts?.userIds && !opts.userIds.includes(meta.userId)) {
-					continue;
-				}
+	/**
+	 * Broadcasts a message to all connections in a channel
+	 * @param channel - The channel to broadcast to
+	 * @param data - The data to send
+	 * @param opts - Broadcast options (filtering, exclusions)
+	 * @returns Number of connections that received the message
+	 */
+	broadcast(channel: string, data: any, opts?: BroadcastOptions): number {
+		console.debug("[Verani:ActorRuntime] Broadcasting to channel:", channel, "options:", opts);
+		let sentCount = 0;
+		const frame: MessageFrame = { type: "event", channel, data };
+		const encoded = encodeFrame(frame);
+		const failedSessions: WebSocket[] = [];
 
-				// Skip if clientIds filter is specified and doesn't match
-				if (opts?.clientIds && !opts.clientIds.includes(meta.clientId)) {
+		for (const { ws, meta } of this.sessions.values()) {
+			// Skip if channel filter doesn't match
+			if (!meta.channels.includes(channel)) {
+				continue;
+			}
+
+			// Skip if this is the excluded WebSocket
+			if (opts?.except && ws === opts.except) {
+				continue;
+			}
+
+			// Skip if userIds filter is specified and doesn't match
+			if (opts?.userIds && !opts.userIds.includes(meta.userId)) {
+				continue;
+			}
+
+			// Skip if clientIds filter is specified and doesn't match
+			if (opts?.clientIds && !opts.clientIds.includes(meta.clientId)) {
+				continue;
+			}
+
+			// Check WebSocket state before sending
+			if (ws.readyState !== WebSocket.OPEN) {
+				console.debug("[Verani:ActorRuntime] Skipping closed/closing WebSocket");
+				failedSessions.push(ws);
+				continue;
+			}
+
+			try {
+				ws.send(encoded);
+				sentCount++;
+			} catch (error) {
+				console.error("[Verani] Failed to send to WebSocket:", error);
+				failedSessions.push(ws);
+			}
+		}
+
+		// Clean up failed sessions
+		for (const ws of failedSessions) {
+			this.sessions.delete(ws);
+		}
+		if (failedSessions.length > 0) {
+			console.debug("[Verani:ActorRuntime] Removed", failedSessions.length, "failed sessions during broadcast");
+		}
+
+		console.debug("[Verani:ActorRuntime] Broadcast complete, sent to:", sentCount, "sessions");
+		return sentCount;
+	}
+
+	/**
+	 * Gets the total number of active sessions
+	 * @returns Number of connected WebSockets
+	 */
+	getSessionCount(): number {
+		return this.sessions.size;
+	}
+
+	/**
+	 * Gets all unique user IDs currently connected
+	 * @returns Array of unique user IDs
+	 */
+	getConnectedUserIds(): string[] {
+		const userIds = new Set<string>();
+		for (const { meta } of this.sessions.values()) {
+			userIds.add(meta.userId);
+		}
+		return Array.from(userIds);
+	}
+
+	/**
+	 * Gets all sessions for a specific user
+	 * @param userId - The user ID to filter by
+	 * @returns Array of WebSockets belonging to the user
+	 */
+	getUserSessions(userId: string): WebSocket[] {
+		const sockets: WebSocket[] = [];
+		for (const { ws, meta } of this.sessions.values()) {
+			if (meta.userId === userId) {
+				sockets.push(ws);
+			}
+		}
+		return sockets;
+	}
+
+	/**
+	 * Sends a message to a specific user (all their sessions)
+	 * @param userId - The user ID to send to
+	 * @param type - Message type
+	 * @param data - Message data
+	 * @returns Number of sessions that received the message
+	 */
+	sendToUser(userId: string, channel: string, data?: any): number {
+		console.debug("[Verani:ActorRuntime] Sending to user:", userId, "on channel:", channel);
+		let sentCount = 0;
+		const frame: MessageFrame = { type: "event", channel, data };
+		const encoded = encodeFrame(frame);
+		const failedSessions: WebSocket[] = [];
+
+		// Send only to sessions of that user which are subscribed to the channel
+		for (const { ws, meta } of this.sessions.values()) {
+			if (meta.userId === userId && meta.channels.includes(channel)) {
+				// Check WebSocket state before sending
+				if (ws.readyState !== WebSocket.OPEN) {
+					console.debug("[Verani:ActorRuntime] Skipping closed/closing WebSocket for user:", userId);
+					failedSessions.push(ws);
 					continue;
 				}
 
@@ -297,85 +427,31 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 					ws.send(encoded);
 					sentCount++;
 				} catch (error) {
-					console.error("[Verani] Failed to send to WebSocket:", error);
+					console.error("[Verani] Failed to send to user:", error);
+					failedSessions.push(ws);
 				}
 			}
-
-			console.debug("[Verani:ActorRuntime] Broadcast complete, sent to:", sentCount, "sessions");
-			return sentCount;
 		}
 
-		/**
-		 * Gets the total number of active sessions
-		 * @returns Number of connected WebSockets
-		 */
-		getSessionCount(): number {
-			return this.sessions.size;
+		// Clean up failed sessions
+		for (const ws of failedSessions) {
+			this.sessions.delete(ws);
+		}
+		if (failedSessions.length > 0) {
+			console.debug("[Verani:ActorRuntime] Removed", failedSessions.length, "failed sessions during sendToUser");
 		}
 
-		/**
-		 * Gets all unique user IDs currently connected
-		 * @returns Array of unique user IDs
-		 */
-		getConnectedUserIds(): string[] {
-			const userIds = new Set<string>();
-			for (const { meta } of this.sessions.values()) {
-				userIds.add(meta.userId);
-			}
-			return Array.from(userIds);
-		}
+		console.debug("[Verani:ActorRuntime] SendToUser complete, sent to:", sentCount, "sessions");
+		return sentCount;
+	}
 
-		/**
-		 * Gets all sessions for a specific user
-		 * @param userId - The user ID to filter by
-		 * @returns Array of WebSockets belonging to the user
-		 */
-		getUserSessions(userId: string): WebSocket[] {
-			const sockets: WebSocket[] = [];
-			for (const { ws, meta } of this.sessions.values()) {
-				if (meta.userId === userId) {
-					sockets.push(ws);
-				}
-			}
-			return sockets;
-		}
-
-		/**
-		 * Sends a message to a specific user (all their sessions)
-		 * @param userId - The user ID to send to
-		 * @param type - Message type
-		 * @param data - Message data
-		 * @returns Number of sessions that received the message
-		 */
-		sendToUser(userId: string, channel: string, data?: any): number {
-			console.debug("[Verani:ActorRuntime] Sending to user:", userId, "on channel:", channel);
-			let sentCount = 0;
-			const frame: MessageFrame = { type: "event", channel, data };
-			const encoded = encodeFrame(frame);
-
-			// Send only to sessions of that user which are subscribed to the channel
-			for (const { ws, meta } of this.sessions.values()) {
-				if (meta.userId === userId && meta.channels.includes(channel)) {
-					try {
-						ws.send(encoded);
-						sentCount++;
-					} catch (error) {
-						console.error("[Verani] Failed to send to user:", error);
-					}
-				}
-			}
-
-			console.debug("[Verani:ActorRuntime] SendToUser complete, sent to:", sentCount, "sessions");
-			return sentCount;
-		}
-
-		/**
-		 * Gets the Durable Object storage interface
-		 * @returns DurableObjectStorage instance
-		 */
-		getStorage(): DurableObjectStorage {
-			return this.ctx.storage;
-		}
+	/**
+	 * Gets the Durable Object storage interface
+	 * @returns DurableObjectStorage instance
+	 */
+	getStorage(): DurableObjectStorage {
+		return this.ctx.storage;
+	}
 	};
 
 	// Set the name property for proper Actor binding resolution

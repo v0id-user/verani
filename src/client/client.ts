@@ -21,6 +21,10 @@ export interface VeraniClientOptions {
   maxQueueSize?: number;
   /** Connection timeout in milliseconds */
   connectionTimeout?: number;
+  /** Ping interval in milliseconds (0 = disabled, default: 30000) */
+  pingInterval?: number;
+  /** Pong timeout in milliseconds (default: 10000) */
+  pongTimeout?: number;
 }
 
 /**
@@ -30,6 +34,8 @@ interface ResolvedClientOptions {
   reconnection: ReconnectionConfig;
   maxQueueSize: number;
   connectionTimeout: number;
+  pingInterval: number;
+  pongTimeout: number;
 }
 
 /**
@@ -58,6 +64,11 @@ export class VeraniClient {
   private isConnecting = false;
   private connectionId = 0; // Track connection attempts to identify stale connections
 
+  // Ping/pong keepalive state
+  private pingInterval?: number;
+  private pongTimeout?: number;
+  private lastPongReceived = 0;
+
   /**
    * Creates a new Verani client
    * @param url - WebSocket URL to connect to
@@ -75,7 +86,9 @@ export class VeraniClient {
     this.options = {
       reconnection: reconnectionConfig,
       maxQueueSize: options.maxQueueSize ?? 100,
-      connectionTimeout: options.connectionTimeout ?? 10000
+      connectionTimeout: options.connectionTimeout ?? 10000,
+      pingInterval: options.pingInterval ?? 30000,
+      pongTimeout: options.pongTimeout ?? 10000
     };
 
     this.connectionManager = new ConnectionManager(
@@ -90,9 +103,66 @@ export class VeraniClient {
   }
 
   /**
+   * Starts the ping interval to keep the connection alive
+   */
+  private startPingInterval(): void {
+    // Don't start if ping is disabled or already running
+    if (this.options.pingInterval === 0 || this.pingInterval !== undefined) {
+      return;
+    }
+
+    console.debug("[Verani:Client] Starting ping interval:", this.options.pingInterval, "ms");
+    this.lastPongReceived = Date.now();
+
+    this.pingInterval = setInterval(() => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        console.debug("[Verani:Client] WebSocket not open, stopping ping");
+        this.stopPingInterval();
+        return;
+      }
+
+      // Check if we've received a pong recently
+      const timeSinceLastPong = Date.now() - this.lastPongReceived;
+      if (timeSinceLastPong > this.options.pongTimeout + this.options.pingInterval) {
+        console.warn("[Verani:Client] Pong timeout exceeded, triggering reconnection");
+        this.stopPingInterval();
+        this.ws.close(1006, "Pong timeout");
+        return;
+      }
+
+      // Send ping message
+      try {
+        console.debug("[Verani:Client] Sending ping");
+        this.emit("ping", { timestamp: Date.now() });
+      } catch (error) {
+        console.error("[Verani:Client] Failed to send ping:", error);
+      }
+    }, this.options.pingInterval) as unknown as number;
+  }
+
+  /**
+   * Stops the ping interval
+   */
+  private stopPingInterval(): void {
+    if (this.pingInterval !== undefined) {
+      console.debug("[Verani:Client] Stopping ping interval");
+      clearInterval(this.pingInterval);
+      this.pingInterval = undefined;
+    }
+
+    if (this.pongTimeout !== undefined) {
+      clearTimeout(this.pongTimeout);
+      this.pongTimeout = undefined;
+    }
+  }
+
+  /**
    * Cleans up existing WebSocket connection and resources
    */
   private cleanupWebSocket(): void {
+    // Stop ping interval
+    this.stopPingInterval();
+
     // Clear connection timeout
     if (this.connectionTimeout !== undefined) {
       clearTimeout(this.connectionTimeout);
@@ -209,6 +279,9 @@ export class VeraniClient {
     this.connectionManager.setState("connected");
     this.connectionManager.resetReconnection();
 
+    // Start ping interval to keep connection alive
+    this.startPingInterval();
+
     // Flush queued messages
     this.flushMessageQueue();
 
@@ -239,6 +312,13 @@ export class VeraniClient {
       return;
     }
     console.debug("[Verani:Client] Decoded message:", { type: msg.type, channel: msg.channel });
+
+    // Handle pong responses to keep connection alive
+    if (msg.type === "event" && msg.channel === "pong") {
+      console.debug("[Verani:Client] Received pong");
+      this.lastPongReceived = Date.now();
+      return;
+    }
 
     // Extract the actual event type from wrapped broadcast messages
     let eventType = msg.type;

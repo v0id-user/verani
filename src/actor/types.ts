@@ -62,6 +62,14 @@ export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = 
   sendToUser(userId: string, channel: string, data?: any): number;
 
   /**
+   * Validates and removes stale WebSocket sessions.
+   * Called automatically during broadcast/send operations, but can be called manually.
+   * Returns the number of stale sessions removed.
+   * @see @src/actor/actor-runtime.ts cleanupStaleSessions()
+   */
+  cleanupStaleSessions(): number;
+
+  /**
    * Access the Durable Object storage API for this actor instance.
    * @see @src/actor/actor-runtime.ts getStorage()
    */
@@ -91,6 +99,10 @@ export interface MessageContext<TMeta extends ConnectionMeta = ConnectionMeta, E
 
 /**
  * Room definition with lifecycle hooks
+ *
+ * **Important:** All lifecycle hooks are properly awaited if they return a Promise.
+ * This ensures async operations complete before the actor proceeds to the next step
+ * or potentially enters hibernation.
  */
 export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> {
   /** Optional room name for debugging */
@@ -99,21 +111,44 @@ export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E
   /** WebSocket upgrade path (default: "/ws") */
   websocketPath: string;
 
-  /** Extract metadata from the connection request */
+  /**
+   * Extract metadata from the connection request.
+   * This function is awaited if it returns a Promise.
+   */
   extractMeta?(req: Request): TMeta | Promise<TMeta>;
 
-  /** Called when a new WebSocket connection is established */
+  /**
+   * Called when a new WebSocket connection is established.
+   * This hook is awaited if it returns a Promise. The session is only added to the
+   * sessions map after this hook completes successfully. If this hook throws, the
+   * connection is closed and no orphaned session is created.
+   */
   onConnect?(ctx: RoomContext<TMeta, E>): void | Promise<void>;
 
-  /** Called when a WebSocket connection is closed */
+  /**
+   * Called when a WebSocket connection is closed.
+   * This hook is awaited if it returns a Promise. The session is removed from the
+   * sessions map before this hook is called.
+   */
   onDisconnect?(ctx: RoomContext<TMeta, E>): void | Promise<void>;
 
-  /** Called when a message is received from a connection */
+  /**
+   * Called when a message is received from a connection.
+   * This hook is awaited if it returns a Promise. The actor will not process
+   * other messages from this connection until this hook completes.
+   */
   onMessage?(ctx: MessageContext<TMeta, E>, frame: MessageFrame): void | Promise<void>;
 
-  /** Called when an error occurs in a lifecycle hook */
+  /**
+   * Called when an error occurs in a lifecycle hook.
+   * This hook is also awaited if it returns a Promise.
+   */
   onError?(error: Error, ctx: RoomContext<TMeta, E>): void | Promise<void>;
 
-  /** Called after actor wakes from hibernation and sessions are restored */
+  /**
+   * Called after actor wakes from hibernation and sessions are restored.
+   * This hook is awaited if it returns a Promise. It is called even if some
+   * sessions failed to restore, allowing you to handle partial restoration scenarios.
+   */
   onHibernationRestore?(actor: VeraniActor<TMeta, E>): void | Promise<void>;
 }
