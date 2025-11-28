@@ -21,9 +21,9 @@ export interface VeraniClientOptions {
   maxQueueSize?: number;
   /** Connection timeout in milliseconds */
   connectionTimeout?: number;
-  /** Ping interval in milliseconds (0 = disabled, default: 30000) */
+  /** Ping interval in milliseconds (0 = disabled, default: 5000) */
   pingInterval?: number;
-  /** Pong timeout in milliseconds (default: 10000) */
+  /** Pong timeout in milliseconds (default: 5000) */
   pongTimeout?: number;
 }
 
@@ -87,8 +87,8 @@ export class VeraniClient {
       reconnection: reconnectionConfig,
       maxQueueSize: options.maxQueueSize ?? 100,
       connectionTimeout: options.connectionTimeout ?? 10000,
-      pingInterval: options.pingInterval ?? 30000,
-      pongTimeout: options.pongTimeout ?? 10000
+      pingInterval: options.pingInterval ?? 5000,
+      pongTimeout: options.pongTimeout ?? 5000
     };
 
     this.connectionManager = new ConnectionManager(
