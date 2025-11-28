@@ -196,6 +196,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	protected async onWebSocketMessage(ws: WebSocket, raw: any) {
 		// Skip raw ping messages - let autoResponse handle them
 		if (raw === "ping") {
+			ws.send("pong");
 			console.debug("[Verani:ActorRuntime] Received raw ping, skipping (handled by autoResponse)");
 			return;
 		}
