@@ -53,6 +53,11 @@ export class VeraniClient {
   private connectionResolve?: () => void;
   private connectionReject?: (error: Error) => void;
 
+  // Connection state tracking
+  private connectionTimeout?: number;
+  private isConnecting = false;
+  private connectionId = 0; // Track connection attempts to identify stale connections
+
   /**
    * Creates a new Verani client
    * @param url - WebSocket URL to connect to
@@ -85,42 +90,105 @@ export class VeraniClient {
   }
 
   /**
+   * Cleans up existing WebSocket connection and resources
+   */
+  private cleanupWebSocket(): void {
+    // Clear connection timeout
+    if (this.connectionTimeout !== undefined) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = undefined;
+    }
+
+    // Close and cleanup WebSocket
+    if (this.ws) {
+      // Store reference and clear instance variable first
+      // This prevents event handlers from processing events from old connection
+      const oldWs = this.ws;
+      this.ws = undefined;
+
+      // Increment connection ID to invalidate all event handlers for this connection
+      // Event handlers check connectionId, so they won't process events from old connection
+
+      // Close the connection if still open
+      if (oldWs.readyState === WebSocket.OPEN || oldWs.readyState === WebSocket.CONNECTING) {
+        try {
+          // Use code 1000 (normal closure) to prevent triggering reconnection
+          oldWs.close(1000, "Cleanup");
+        } catch (error) {
+          console.debug("[Verani:Client] Error closing WebSocket during cleanup:", error);
+        }
+      }
+    }
+  }
+
+  /**
    * Establishes WebSocket connection
    */
   private connect(): void {
+    // Guard: Prevent concurrent connection attempts
+    if (this.isConnecting) {
+      console.debug("[Verani:Client] Already connecting, ignoring duplicate connect call");
+      return;
+    }
+
+    // Guard: Don't reconnect if already connected
+    if (this.isConnected()) {
+      console.debug("[Verani:Client] Already connected, ignoring connect call");
+      return;
+    }
+
     console.debug("[Verani:Client] Connecting to:", this.url);
+
+    // Cleanup any existing WebSocket
+    this.cleanupWebSocket();
+
     try {
+      this.isConnecting = true;
+      this.connectionId++; // Increment to track this connection attempt
+      const currentConnectionId = this.connectionId;
+
       this.connectionManager.setState("connecting");
       this.emitLifecycleEvent("connecting");
       this.ws = new WebSocket(this.url);
 
       // Setup connection timeout
-      const timeout = setTimeout(() => {
-        if (this.connectionManager.getState() === "connecting") {
+      this.connectionTimeout = setTimeout(() => {
+        if (this.isConnecting && this.connectionId === currentConnectionId) {
+          console.debug("[Verani:Client] Connection timeout");
           this.ws?.close();
           this.handleConnectionError(new Error("Connection timeout"));
         }
-      }, this.options.connectionTimeout);
+      }, this.options.connectionTimeout) as unknown as number;
 
       this.ws.addEventListener("open", () => {
-        clearTimeout(timeout);
-        this.handleOpen();
+        // Only handle if this is still the current connection attempt
+        if (this.connectionId === currentConnectionId) {
+          this.handleOpen();
+        }
       });
 
       this.ws.addEventListener("message", (ev: MessageEvent) => {
-        this.handleMessage(ev);
+        // Only handle messages from current connection
+        if (this.connectionId === currentConnectionId) {
+          this.handleMessage(ev);
+        }
       });
 
       this.ws.addEventListener("close", (ev: CloseEvent) => {
-        clearTimeout(timeout);
-        this.handleClose(ev);
+        // Only handle close from current connection
+        if (this.connectionId === currentConnectionId) {
+          this.handleClose(ev);
+        }
       });
 
       this.ws.addEventListener("error", (ev: Event) => {
-        clearTimeout(timeout);
-        this.handleError(ev);
+        // Only handle error from current connection
+        if (this.connectionId === currentConnectionId) {
+          this.handleError(ev);
+        }
       });
     } catch (error) {
+      this.isConnecting = false;
       this.handleConnectionError(error as Error);
     }
   }
@@ -130,6 +198,14 @@ export class VeraniClient {
    */
   private handleOpen(): void {
     console.debug("[Verani:Client] Connection opened");
+
+    // Clear connecting state and timeout
+    this.isConnecting = false;
+    if (this.connectionTimeout !== undefined) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = undefined;
+    }
+
     this.connectionManager.setState("connected");
     this.connectionManager.resetReconnection();
 
@@ -196,6 +272,14 @@ export class VeraniClient {
    */
   private handleClose(event: CloseEvent): void {
     console.debug("[Verani:Client] Connection closed, code:", event.code, "reason:", event.reason);
+
+    // Clear connecting state and timeout
+    this.isConnecting = false;
+    if (this.connectionTimeout !== undefined) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = undefined;
+    }
+
     this.connectionManager.setState("disconnected");
 
     // Reject connection promise if pending
@@ -229,11 +313,21 @@ export class VeraniClient {
     console.debug("[Verani:Client] WebSocket error event");
     console.error("[Verani] WebSocket error:", error);
 
+    // Clear connecting state and timeout
+    this.isConnecting = false;
+    if (this.connectionTimeout !== undefined) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = undefined;
+    }
+
     // Emit lifecycle event
     this.emitLifecycleEvent("error", error);
 
     // Call user callback (for backward compatibility)
     this.onErrorCallback?.(error);
+
+    // Consolidate error handling: delegate to handleConnectionError
+    this.handleConnectionError(new Error("WebSocket error"));
   }
 
   /**
@@ -241,6 +335,13 @@ export class VeraniClient {
    */
   private handleConnectionError(error: Error): void {
     console.error("[Verani] Connection error:", error);
+
+    // Clear connecting state and timeout
+    this.isConnecting = false;
+    if (this.connectionTimeout !== undefined) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = undefined;
+    }
 
     // Reject connection promise if pending
     if (this.connectionReject) {
@@ -250,7 +351,7 @@ export class VeraniClient {
       this.connectionReject = undefined;
     }
 
-    // Emit lifecycle event
+    // Emit lifecycle event (only if not already emitted by handleError)
     this.emitLifecycleEvent("error", error);
 
     // Attempt reconnection
@@ -307,7 +408,29 @@ export class VeraniClient {
    * Checks if the client is currently connected
    */
   isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+    return (
+      this.ws?.readyState === WebSocket.OPEN &&
+      this.connectionManager.getState() === "connected"
+    );
+  }
+
+  /**
+   * Gets detailed connection information
+   */
+  getConnectionState(): {
+    state: ConnectionState;
+    isConnected: boolean;
+    isConnecting: boolean;
+    reconnectAttempts: number;
+    connectionId: number;
+  } {
+    return {
+      state: this.connectionManager.getState(),
+      isConnected: this.isConnected(),
+      isConnecting: this.isConnecting,
+      reconnectAttempts: this.connectionManager.getReconnectAttempts(),
+      connectionId: this.connectionId
+    };
   }
 
   /**
@@ -319,10 +442,29 @@ export class VeraniClient {
       return Promise.resolve();
     }
 
+    // Create a new promise for each connection attempt
+    // This ensures each caller gets proper resolution/rejection
     if (!this.connectionPromise) {
       this.connectionPromise = new Promise<void>((resolve, reject) => {
         this.connectionResolve = resolve;
         this.connectionReject = reject;
+
+        // Add timeout to prevent hanging promises
+        const timeout = setTimeout(() => {
+          if (this.connectionReject) {
+            this.connectionReject(new Error("Connection wait timeout"));
+            this.connectionPromise = undefined;
+            this.connectionResolve = undefined;
+            this.connectionReject = undefined;
+          }
+        }, this.options.connectionTimeout * 2); // Give it more time than connection timeout
+
+				if (this.connectionPromise) {
+          // Store the timeout so we can clear it on success/failure
+          this.connectionPromise.finally(() => {
+            clearTimeout(timeout);
+          });
+        }
       });
     }
 
@@ -438,7 +580,21 @@ export class VeraniClient {
    */
   reconnect(): void {
     console.debug("[Verani:Client] Manual reconnect triggered");
-    this.disconnect();
+
+    // Reset reconnection attempts for manual reconnect
+    this.connectionManager.resetReconnection();
+
+    // Cancel any pending reconnection timers
+    this.connectionManager.cancelReconnect();
+
+    // Cleanup existing connection without triggering auto-reconnection
+    this.cleanupWebSocket();
+
+    // Clear state flags
+    this.isConnecting = false;
+    this.connectionManager.setState("disconnected");
+
+    // Start new connection attempt
     this.connect();
   }
 
@@ -447,17 +603,40 @@ export class VeraniClient {
    */
   disconnect(): void {
     console.debug("[Verani:Client] Disconnecting");
+
+    // Cancel any pending reconnection
     this.connectionManager.cancelReconnect();
-    if (this.ws) {
-      this.ws.close(1000, "Client disconnect");
-      this.ws = undefined;
+
+    // Clear connecting state
+    this.isConnecting = false;
+
+    // Reject any pending connection promises
+    if (this.connectionReject) {
+      this.connectionReject(new Error("Connection disconnected"));
+      this.connectionPromise = undefined;
+      this.connectionResolve = undefined;
+      this.connectionReject = undefined;
     }
+
+    // Cleanup WebSocket connection
+    this.cleanupWebSocket();
+
+    // Update state
+    this.connectionManager.setState("disconnected");
   }
 
   /**
    * Closes the connection and cleans up resources
    */
   close(): void {
+    // Reject any pending connection promises
+    if (this.connectionReject) {
+      this.connectionReject(new Error("Client closed"));
+      this.connectionPromise = undefined;
+      this.connectionResolve = undefined;
+      this.connectionReject = undefined;
+    }
+
     this.disconnect();
     this.listeners.clear();
     this.messageQueue = [];

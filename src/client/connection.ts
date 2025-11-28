@@ -49,10 +49,36 @@ export class ConnectionManager {
   }
 
   /**
+   * Validates if a state transition is valid
+   */
+  private isValidStateTransition(from: ConnectionState, to: ConnectionState): boolean {
+    // Define valid state transitions
+    const validTransitions: Record<ConnectionState, ConnectionState[]> = {
+      disconnected: ["connecting", "reconnecting"],
+      connecting: ["connected", "disconnected", "error", "reconnecting"],
+      connected: ["disconnected", "reconnecting"],
+      reconnecting: ["connecting", "disconnected", "error"],
+      error: ["reconnecting", "disconnected", "connecting"]
+    };
+
+    return validTransitions[from]?.includes(to) ?? false;
+  }
+
+  /**
    * Updates the connection state and notifies listeners
    */
   setState(newState: ConnectionState): void {
     if (this.state !== newState) {
+      // Validate state transition
+      if (!this.isValidStateTransition(this.state, newState)) {
+        console.warn(
+          "[Verani:Connection] Invalid state transition:",
+          this.state,
+          "->",
+          newState
+        );
+      }
+      
       console.debug("[Verani:Connection] State change:", this.state, "->", newState);
       this.state = newState;
       this.onStateChange?.(newState);
