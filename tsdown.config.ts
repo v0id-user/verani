@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["./src/verani.ts"],
+  entry: ["./src/verani.ts", "./src/client.ts"],
   format: ["esm", "cjs"],
   outDir: "dist",
   dts: true,

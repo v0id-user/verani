@@ -1,35 +1,21 @@
 /**
- * Verani - Realtime SDK for Cloudflare Actors
+ * Verani Client - WebSocket client for Cloudflare Actors
  *
- * A simple, focused realtime SDK that provides Socket.io-like semantics
- * for Cloudflare Durable Objects / Actors with proper hibernation support.
+ * Client-side SDK that provides Socket.io-like semantics for connecting
+ * to Verani-powered Cloudflare Actors with automatic reconnection support.
  *
  * @packageDocumentation
  */
 
 // ============================================================================
-// Backend exports - Actor/Room definitions
+// Client exports - WebSocket client
 // ============================================================================
 
-export { defineRoom } from "./actor/router";
-export { createActorHandler } from "./actor/actor-runtime";
-export { storeAttachment, restoreSessions } from "./actor/attachment";
+export { VeraniClient } from "./client/client";
+export type { VeraniClientOptions } from "./client/client";
 
-// Backend types
-export type {
-  ConnectionMeta,
-  MessageFrame,
-  BroadcastOptions,
-  VeraniActor,
-  RoomContext,
-  MessageContext,
-  RoomDefinition
-} from "./actor/types";
-
-export type {
-  ActorHandlerClass,
-  ActorStub
-} from "./actor/actor-runtime";
+export { ConnectionManager, DEFAULT_RECONNECTION_CONFIG } from "./client/connection";
+export type { ConnectionState, ReconnectionConfig } from "./client/connection";
 
 // ============================================================================
 // Shared exports - Protocol and types
@@ -54,3 +40,4 @@ export {
 } from "./shared/decode";
 
 export { PROTOCOL_VERSION } from "./shared/types";
+
