@@ -130,10 +130,10 @@ export class VeraniClient {
         return;
       }
 
-      // Send ping message
+      // Send protocol-encoded ping message
       try {
-        console.debug("[Verani:Client] Sending ping");
-        this.ws.send("ping");
+        console.debug("[Verani:Client] Sending protocol-encoded ping");
+        this.ws.send(encodeClientMessage({ type: "ping" }));
       } catch (error) {
         console.error("[Verani:Client] Failed to send ping:", error);
       }
@@ -307,19 +307,19 @@ export class VeraniClient {
   private handleMessage(ev: MessageEvent): void {
     console.debug("[Verani:Client] Message received, data length:", typeof ev.data === "string" ? ev.data.length : "unknown");
 
-    // Handle raw pong responses to keep connection alive (bypass JSON decoding)
-    if (ev.data === "pong") {
-      console.debug("[Verani:Client] Received raw pong");
-      this.lastPongReceived = Date.now();
-      return;
-    }
-
     const msg = decodeServerMessage(ev.data);
     if (!msg) {
       console.debug("[Verani:Client] Failed to decode message");
       return;
     }
     console.debug("[Verani:Client] Decoded message:", { type: msg.type, channel: msg.channel });
+
+    // Handle protocol-encoded pong responses to keep connection alive
+    if (msg.type === "pong") {
+      console.debug("[Verani:Client] Received protocol-encoded pong");
+      this.lastPongReceived = Date.now();
+      return;
+    }
 
     // Extract the actual event type from wrapped broadcast messages
     let eventType = msg.type;

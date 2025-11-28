@@ -63,11 +63,8 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 			const config: ActorConfiguration = {
 				locationHint: "me",
 				sockets: {
-					upgradePath: room.websocketPath,
-					autoResponse: {
-						ping: 'ping',
-						pong: 'pong'
-					}
+					upgradePath: room.websocketPath
+					// autoResponse removed - we handle ping/pong manually via protocol-encoded messages
 				}
 			};
 
@@ -194,18 +191,33 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * Called when a message is received from a WebSocket
 	 */
 	protected async onWebSocketMessage(ws: WebSocket, raw: any) {
-		// Skip raw ping messages - let autoResponse handle them
-		if (raw === "ping") {
-			ws.send("pong");
-			console.debug("[Verani:ActorRuntime] Received raw ping, skipping (handled by autoResponse)");
-			return;
-		}
-
 		let session: { ws: WebSocket; meta: TMeta } | undefined;
 
 		try {
 			// Decode the incoming frame
 			const frame = decodeFrame(raw);
+
+			// Handle protocol-encoded ping messages
+			if (frame && frame.type === "ping") {
+				console.debug("[Verani:ActorRuntime] Received protocol-encoded ping, responding with pong");
+				// Respond immediately with protocol-encoded pong
+				if (ws.readyState === WebSocket.OPEN) {
+					try {
+						const pongFrame: MessageFrame = { type: "pong" };
+						ws.send(encodeFrame(pongFrame));
+						console.debug("[Verani:ActorRuntime] Sent protocol-encoded pong");
+					} catch (error) {
+						console.error("[Verani] Failed to send pong:", error);
+					}
+				}
+				return;
+			}
+
+			if (!frame || frame.type === "invalid") {
+				console.debug("[Verani:ActorRuntime] Invalid or unparseable frame, skipping");
+				return;
+			}
+
 			console.debug("[Verani:ActorRuntime] Message received, type:", frame.type, "channel:", frame.channel);
 
 			// Get session info
