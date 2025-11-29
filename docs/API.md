@@ -693,9 +693,28 @@ const client = new VeraniClient(
       backoffMultiplier: 1.5
     },
     maxQueueSize: 100,
-    connectionTimeout: 10000
+    connectionTimeout: 10000,
+    pingInterval: 5000,  // Send ping every 5 seconds
+    pongTimeout: 5000    // Expect pong within 5 seconds
   }
 );
+```
+
+**Ping/Pong Keepalive:**
+
+Verani automatically manages connection keepalive using ping/pong messages:
+
+- **Automatic ping**: Sends ping messages at the configured interval to keep the connection alive
+- **Pong detection**: Monitors pong responses and triggers reconnection if timeout is exceeded
+- **Page Visibility API**: Automatically resyncs ping intervals when browser tabs become active again, preventing silent failures after tab inactivity
+- **Environment-aware**: Only activates in browser environments; gracefully handles Node.js/SSR environments
+
+To disable ping/pong keepalive:
+
+```typescript
+const client = new VeraniClient(url, {
+  pingInterval: 0  // Disable keepalive
+});
 ```
 
 ---
@@ -917,8 +936,42 @@ interface VeraniClientOptions {
   reconnection?: Partial<ReconnectionConfig>;
   maxQueueSize?: number;
   connectionTimeout?: number;
+  pingInterval?: number;  // Ping interval in milliseconds (0 = disabled, default: 5000)
+  pongTimeout?: number;   // Pong timeout in milliseconds (default: 5000)
 }
 ```
+
+**Properties:**
+
+#### `reconnection?: Partial<ReconnectionConfig>`
+
+Reconnection behavior configuration. See `ReconnectionConfig` below.
+
+#### `maxQueueSize?: number`
+
+Maximum number of messages to queue when disconnected. Messages are queued when the connection is not ready and flushed when reconnected.
+
+**Default:** `100`
+
+#### `connectionTimeout?: number`
+
+Connection timeout in milliseconds. If the WebSocket connection doesn't establish within this time, it will timeout and trigger reconnection.
+
+**Default:** `10000` (10 seconds)
+
+#### `pingInterval?: number`
+
+Ping interval in milliseconds. The client will send ping messages at this interval to keep the connection alive. Set to `0` to disable ping/pong keepalive.
+
+**Default:** `5000` (5 seconds)
+
+**Note:** Verani automatically handles Page Visibility API to resync ping intervals when browser tabs become active again. This prevents ping intervals from going silent after tab inactivity.
+
+#### `pongTimeout?: number`
+
+Pong timeout in milliseconds. If no pong response is received within this time plus the ping interval, the connection will be considered dead and trigger reconnection.
+
+**Default:** `5000` (5 seconds)
 
 ---
 

@@ -715,6 +715,22 @@ const client = new VeraniClient(url, {
 });
 ```
 
+### Connection keepalive and tab visibility
+
+Verani automatically manages connection keepalive using ping/pong messages. The client includes built-in support for the Page Visibility API, which automatically resyncs ping intervals when browser tabs become active again. This prevents connection issues after tab inactivity.
+
+To customize keepalive behavior:
+
+```typescript
+const client = new VeraniClient(url, {
+  pingInterval: 5000,  // Send ping every 5 seconds (default)
+  pongTimeout: 5000,   // Expect pong within 5 seconds (default)
+  // Set pingInterval to 0 to disable keepalive
+});
+```
+
+**Note:** The Page Visibility API integration is environment-aware and only activates in browser environments. It gracefully handles Node.js and SSR environments without errors.
+
 ## Quick Reference
 
 ### Common Patterns

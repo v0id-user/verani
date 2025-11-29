@@ -179,6 +179,7 @@ Verani handles Cloudflare's hibernation automatically:
 - Event-based API (on/off/once/emit)
 - Promise-based connection waiting
 - Lifecycle callbacks
+- **Ping/pong keepalive** with automatic Page Visibility API resync
 
 ### RPC Support
 
