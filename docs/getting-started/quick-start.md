@@ -1,31 +1,8 @@
-# Getting Started
+# Quick Start Guide
 
 A step-by-step guide to building your first Verani application.
 
-## Prerequisites
-
-- Node.js 18+ or Bun
-- A Cloudflare account (free tier works)
-- Basic understanding of WebSockets
-
-## Installation
-
-```bash
-npm install verani @cloudflare/actors
-# or
-bun add verani @cloudflare/actors
-```
-
-## Step 1: Set Up Your Cloudflare Worker Project
-
-If you don't have a Cloudflare Worker project yet:
-
-```bash
-npm create cloudflare@latest my-verani-app
-cd my-verani-app
-```
-
-## Step 2: Create Your First Room
+## Step 1: Create Your First Room
 
 Create a file `src/rooms/chat.ts`:
 
@@ -97,7 +74,7 @@ export const chatRoom = defineRoom({
 });
 ```
 
-## Step 3: Export the Durable Object Class
+## Step 2: Export the Durable Object Class
 
 Update your `src/index.ts`:
 
@@ -135,7 +112,7 @@ export default {
 
 **Important**: The export name `ChatRoom` MUST match the `class_name` in your Wrangler configuration.
 
-## Step 3.5: Calling Actor Methods via RPC
+## Step 3: Calling Actor Methods via RPC
 
 Since Actors are Durable Objects, you can call their methods remotely using RPC (Remote Procedure Calls). This is useful when you want to send messages to users from HTTP endpoints or other Workers.
 
@@ -242,6 +219,8 @@ const cleaned = await stub.cleanupStaleSessions();
 console.log(`Cleaned up ${cleaned} stale sessions`);
 ```
 
+For more RPC details, see the [RPC Guide](../guides/rpc.md).
+
 ## Step 4: Configure Wrangler
 
 Update your `wrangler.jsonc`:
@@ -276,6 +255,8 @@ Update your `wrangler.jsonc`:
 
 **Note**: You access the Actor via `ChatRoom.get(id)` - no namespace binding needed in your code!
 
+For detailed configuration information, see the [Configuration Guide](../guides/configuration.md).
+
 ## Step 5: Deploy
 
 With npm:
@@ -292,6 +273,8 @@ Your WebSocket endpoint will be available at:
 ```
 wss://my-verani-app.your-subdomain.workers.dev/ws
 ```
+
+For more deployment details, see the [Deployment Guide](../guides/deployment.md).
 
 ## Step 6: Build a Client
 
@@ -488,7 +471,7 @@ const client = new VeraniClient(
 );
 ```
 
-**See [SECURITY.md](./SECURITY.md) for comprehensive authentication guide.**
+**See [Security Guide - Authentication](../security/authentication.md) for comprehensive authentication guide.**
 
 ## Next Steps
 
@@ -665,122 +648,13 @@ export const chatRoom = defineRoom<ChatMeta>({
 });
 ```
 
-## Troubleshooting
-
-### WebSocket not connecting
-
-1. Check your Worker URL is correct
-2. Use `wss://` not `ws://` for production
-3. Check browser console for errors
-4. Verify your Durable Object binding is correct in `wrangler.jsonc`
-5. Ensure the export name matches `class_name` in wrangler config
-
-### Messages not reaching clients
-
-1. Check you're broadcasting to the right channel
-2. Verify clients are subscribed to that channel
-3. Check server logs with `npx wrangler tail`
-4. Use browser DevTools → Network → WS to inspect WebSocket frames
-5. Ensure the Actor instance ID matches (same `idFromName()` value)
-
-### RPC calls not working
-
-1. **"Method not found"**: Ensure you're using the stub from `ChatRoom.get(id)`, not calling methods directly on the class
-2. **"Promise not awaited"**: RPC methods always return Promises - use `await`
-3. **"Cannot serialize"**: Don't pass WebSocket objects or DurableObjectStorage in RPC calls
-4. **"Actor not found"**: Ensure the Actor ID matches what you used for WebSocket connections
-
-```typescript
-// ✅ Correct: Get stub using class's static get() method
-const stub = ChatRoom.get("chat-room");
-await stub.sendToUser("alice", "default", data);
-
-// ❌ Wrong: Can't call methods directly on the class
-await ChatRoom.sendToUser(...); // This won't work! Use stub instead.
-```
-
-### Reconnection not working
-
-The client automatically reconnects on connection loss. To customize:
-
-```typescript
-const client = new VeraniClient(url, {
-  reconnection: {
-    enabled: true,
-    maxAttempts: 10,
-    initialDelay: 1000,
-    maxDelay: 30000,
-    backoffMultiplier: 1.5
-  }
-});
-```
-
-### Connection keepalive and tab visibility
-
-Verani automatically manages connection keepalive using ping/pong messages. The client includes built-in support for the Page Visibility API, which automatically resyncs ping intervals when browser tabs become active again. This prevents connection issues after tab inactivity.
-
-To customize keepalive behavior:
-
-```typescript
-const client = new VeraniClient(url, {
-  pingInterval: 5000,  // Send ping every 5 seconds (default)
-  pongTimeout: 5000,   // Expect pong within 5 seconds (default)
-  // Set pingInterval to 0 to disable keepalive
-});
-```
-
-**Note:** The Page Visibility API integration is environment-aware and only activates in browser environments. It gracefully handles Node.js and SSR environments without errors.
-
-## Quick Reference
-
-### Common Patterns
-
-**Send message to user from lifecycle hook:**
-```typescript
-ctx.actor.sendToUser("alice", "default", { type: "message", text: "Hello" });
-```
-
-**Send message to user via RPC (from Worker):**
-```typescript
-const stub = ChatRoom.get("chat-room");
-await stub.sendToUser("alice", "default", { type: "message", text: "Hello" });
-```
-
-**Broadcast to channel:**
-```typescript
-// Inside lifecycle hook - can use except option
-ctx.actor.broadcast("default", data, { except: ctx.ws });
-
-// Via RPC - use RpcBroadcastOptions (no except option)
-await stub.broadcast("default", data, { userIds: ["alice", "bob"] });
-```
-
-**Get actor state:**
-```typescript
-// Inside lifecycle hook
-const count = ctx.actor.getSessionCount();
-const userIds = ctx.actor.getConnectedUserIds();
-
-// Via RPC
-const count = await stub.getSessionCount();
-const userIds = await stub.getConnectedUserIds();
-```
-
-### Key Differences: Direct vs RPC
-
-| Feature | Direct (`ctx.actor`) | RPC (`stub`) |
-|---------|---------------------|--------------|
-| **Where** | Inside lifecycle hooks | From Workers/other Actors |
-| **Returns** | Synchronous value | Always `Promise<T>` |
-| **Broadcast options** | `BroadcastOptions` (includes `except`) | `RpcBroadcastOptions` (no `except`) |
-| **Available methods** | All methods | Only serializable return types |
-
 ## What's Next?
 
-- **[Mental Model](./MENTAL_MODEL.md)** - Understand the architecture and RPC concepts
-- **[API Reference](./API.md)** - Complete API docs including RPC methods
-- **[Examples](./EXAMPLES.md)** - More usage patterns including RPC examples
-- **[Security Guide](./SECURITY.md)** - Authentication and authorization
+- **[Concepts - Architecture](../concepts/architecture.md)** - Understand the architecture and RPC concepts
+- **[API Reference](../api/server.md)** - Complete API docs including RPC methods
+- **[Examples](../examples/README.md)** - More usage patterns including RPC examples
+- **[Security Guide](../security/authentication.md)** - Authentication and authorization
+- **[Troubleshooting](./troubleshooting.md)** - Common issues and solutions
 
 Congratulations! You've built your first Verani application. 🎉
 
