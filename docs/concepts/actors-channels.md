@@ -11,7 +11,7 @@ Think of each Actor instance as a **self-contained realtime room**.
 | Actor Instance (Durable Object)       |
 |                                       |
 |   [WebSocket]  [WebSocket]  [WebSocket]
-|    User A       User B       User C  |
+|    User A       User B       User C   |
 |                                       |
 |   Memory: Sessions Map                |
 |   Hibernation: Attachments            |
