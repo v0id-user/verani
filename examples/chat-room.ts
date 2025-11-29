@@ -64,105 +64,32 @@ export const chatRoom = defineRoom<ChatMeta>({
   onConnect(ctx) {
     console.log(`[Chat] ${ctx.meta.username} connected`);
 
-    // Send current online users to the new user
+    // Send current online users to the new user using emit API
     const onlineUsers = ctx.actor.getConnectedUserIds();
-    ctx.ws.send(JSON.stringify({
-      type: "users.sync",
-      data: {
-        users: onlineUsers,
-        count: onlineUsers.length
-      }
-    }));
+    ctx.emit.emit("users.sync", {
+      users: onlineUsers,
+      count: onlineUsers.length
+    });
 
-    // Notify others about new user
-    ctx.actor.broadcast("default", {
-      type: "user.joined",
+    // Notify others about new user using emit API
+    ctx.actor.emit.to("default").emit("user.joined", {
       userId: ctx.meta.userId,
       username: ctx.meta.username,
       timestamp: Date.now()
-    }, { except: ctx.ws });
+    });
 
-    // Send welcome message to new user
-    ctx.ws.send(JSON.stringify({
-      type: "system.message",
-      data: {
-        text: `Welcome to the chat, ${ctx.meta.username}!`,
-        timestamp: Date.now()
-      }
-    }));
-  },
-
-  onMessage(ctx, frame) {
-    switch (frame.type) {
-      case "chat.message": {
-        const { text } = frame.data;
-
-        // Validate message
-        if (!text || typeof text !== "string") {
-          ctx.ws.send(JSON.stringify({
-            type: "error",
-            data: { message: "Invalid message format" }
-          }));
-          return;
-        }
-
-        if (text.length > 1000) {
-          ctx.ws.send(JSON.stringify({
-            type: "error",
-            data: { message: "Message too long (max 1000 chars)" }
-          }));
-          return;
-        }
-
-        // Sanitize and broadcast
-        const sanitized = text.trim();
-        ctx.actor.broadcast("default", {
-          type: "chat.message",
-          from: ctx.meta.userId,
-          username: ctx.meta.username,
-          text: sanitized,
-          timestamp: Date.now()
-        });
-
-        console.log(`[Chat] ${ctx.meta.username}: ${sanitized}`);
-        break;
-      }
-
-      case "chat.typing": {
-        // Broadcast typing indicator (except to sender)
-        ctx.actor.broadcast("default", {
-          type: "chat.typing",
-          from: ctx.meta.userId,
-          username: ctx.meta.username,
-          timestamp: Date.now()
-        }, { except: ctx.ws });
-        break;
-      }
-
-      case "users.list": {
-        // Send current user list
-        const onlineUsers = ctx.actor.getConnectedUserIds();
-        ctx.ws.send(JSON.stringify({
-          type: "users.sync",
-          data: {
-            users: onlineUsers,
-            count: onlineUsers.length
-          }
-        }));
-        break;
-      }
-
-      default:
-        console.warn(`[Chat] Unknown message type: ${frame.type}`);
-    }
+    // Send welcome message to new user using emit API
+    ctx.emit.emit("system.message", {
+      text: `Welcome to the chat, ${ctx.meta.username}!`,
+      timestamp: Date.now()
+    });
   },
 
   onDisconnect(ctx) {
     console.log(`[Chat] ${ctx.meta.username} disconnected`);
 
-    // Notify others about user leaving
-    ctx.actor.broadcast("default", {
-      type: "user.left",
+    // Notify others about user leaving using emit API
+    ctx.actor.emit.to("default").emit("user.left", {
       userId: ctx.meta.userId,
       username: ctx.meta.username,
       timestamp: Date.now()
@@ -172,5 +99,50 @@ export const chatRoom = defineRoom<ChatMeta>({
   onError(error, ctx) {
     console.error(`[Chat] Error for ${ctx.meta.username}:`, error);
   }
+});
+
+// Register event handlers (socket.io-like)
+chatRoom.on("chat.message", (ctx, data) => {
+  const { text } = data;
+
+  // Validate message
+  if (!text || typeof text !== "string") {
+    ctx.emit.emit("error", { message: "Invalid message format" });
+    return;
+  }
+
+  if (text.length > 1000) {
+    ctx.emit.emit("error", { message: "Message too long (max 1000 chars)" });
+    return;
+  }
+
+  // Sanitize and broadcast using emit API
+  const sanitized = text.trim();
+  ctx.actor.emit.to("default").emit("chat.message", {
+    from: ctx.meta.userId,
+    username: ctx.meta.username,
+    text: sanitized,
+    timestamp: Date.now()
+  });
+
+  console.log(`[Chat] ${ctx.meta.username}: ${sanitized}`);
+});
+
+chatRoom.on("chat.typing", (ctx, data) => {
+  // Broadcast typing indicator using emit API
+  ctx.actor.emit.to("default").emit("chat.typing", {
+    from: ctx.meta.userId,
+    username: ctx.meta.username,
+    timestamp: Date.now()
+  });
+});
+
+chatRoom.on("users.list", (ctx, data) => {
+  // Send current user list using emit API
+  const onlineUsers = ctx.actor.getConnectedUserIds();
+  ctx.emit.emit("users.sync", {
+    users: onlineUsers,
+    count: onlineUsers.length
+  });
 });
 

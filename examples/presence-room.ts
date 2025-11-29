@@ -118,119 +118,37 @@ export const presenceRoom = defineRoom<PresenceMeta>({
       const totalConnections = Array.from(allUsers.values())
         .reduce((sum, user) => sum + user.deviceCount, 0);
 
-      // Send full presence list to new user
-      ctx.ws.send(JSON.stringify({
-        type: "presence.sync",
-        data: {
-          users: presenceList,
-          totalUsers: allUsers.size,
-          totalConnections
-        }
-      }));
+      // Send full presence list to new user using emit API
+      ctx.emit.emit("presence.sync", {
+        users: presenceList,
+        totalUsers: allUsers.size,
+        totalConnections
+      });
 
       console.log(`[Presence][onConnect] Sent presence.sync to ${ctx.meta.username}`);
 
-      // Broadcast to others based on whether this is first device
+      // Broadcast to others based on whether this is first device using emit API
       if (isNewUser) {
         console.log(`[Presence][onConnect] Broadcasting presence.online for ${ctx.meta.username}, first device`);
-        ctx.actor.broadcast("default", {
-          type: "presence.online",
+        ctx.actor.emit.to("default").emit("presence.online", {
           userId: ctx.meta.userId,
           username: ctx.meta.username,
           status: ctx.meta.status,
           devices: newDeviceCount,
           timestamp: Date.now()
-        }, { except: ctx.ws });
+        });
       } else {
         console.log(`[Presence][onConnect] Broadcasting presence.update for ${ctx.meta.username}, device count: ${newDeviceCount}`);
-        ctx.actor.broadcast("default", {
-          type: "presence.update",
+        ctx.actor.emit.to("default").emit("presence.update", {
           userId: ctx.meta.userId,
           username: ctx.meta.username,
           devices: newDeviceCount,
           timestamp: Date.now()
-        }, { except: ctx.ws });
+        });
       }
     });
   },
 
-  async onMessage(ctx, frame) {
-    switch (frame.type) {
-      case "presence.status": {
-        const { status } = frame.data;
-
-        // Validate status
-        if (!["online", "away", "busy"].includes(status)) {
-          console.warn(`[Presence][onMessage] Invalid status received: ${status} from ${ctx.meta.username}`);
-          ctx.ws.send(JSON.stringify({
-            type: "error",
-            data: { message: "Invalid status" }
-          }));
-          return;
-        }
-
-        // Update status in storage atomically
-        await ctx.actor.getStorage().transaction(async (txn) => {
-          const storageKey = `presence:user:${ctx.meta.userId}`;
-          const existingUser = await txn.get<StoredUserPresence>(storageKey);
-
-          if (existingUser) {
-            await txn.put(storageKey, {
-              ...existingUser,
-              status,
-              lastSeen: Date.now()
-            });
-            console.log(`[Presence][onMessage] Updated status in storage for ${ctx.meta.username}: ${status}`);
-          }
-        });
-
-        // Update local metadata
-        ctx.meta.status = status;
-
-        // Broadcast status change
-        ctx.actor.broadcast("default", {
-          type: "presence.status",
-          userId: ctx.meta.userId,
-          username: ctx.meta.username,
-          status,
-          timestamp: Date.now()
-        });
-
-        console.log(`[Presence][onMessage] ${ctx.meta.username} changed status to ${status}`);
-        break;
-      }
-
-      case "presence.list": {
-        // Load presence list from storage (source of truth)
-        const allUsers = await loadAllPresenceFromStorage(ctx.actor.getStorage());
-
-        const presenceList = Array.from(allUsers.entries()).map(([userId, data]) => ({
-          userId,
-          username: data.username,
-          devices: data.deviceCount,
-          status: data.status
-        }));
-
-        const totalConnections = Array.from(allUsers.values())
-          .reduce((sum, user) => sum + user.deviceCount, 0);
-
-        ctx.ws.send(JSON.stringify({
-          type: "presence.sync",
-          data: {
-            users: presenceList,
-            totalUsers: allUsers.size,
-            totalConnections
-          }
-        }));
-
-        console.log(`[Presence][onMessage] Sent presence.sync (list) to ${ctx.meta.username}`);
-        break;
-      }
-
-      default:
-        console.warn(`[Presence][onMessage] Unknown message type: ${frame.type} from ${ctx.meta.username}`);
-    }
-  },
 
   async onDisconnect(ctx) {
     console.log(`[Presence][onDisconnect] ${ctx.meta.username} disconnected from ${ctx.meta.deviceInfo}`);
@@ -253,8 +171,8 @@ export const presenceRoom = defineRoom<PresenceMeta>({
 
         console.log(`[Presence][onDisconnect] Removed user ${ctx.meta.username} from storage (last device left)`);
 
-        ctx.actor.broadcast("default", {
-          type: "presence.offline",
+        // Broadcast offline using emit API
+        ctx.actor.emit.to("default").emit("presence.offline", {
           userId: ctx.meta.userId,
           username: ctx.meta.username,
           timestamp: Date.now()
@@ -270,8 +188,8 @@ export const presenceRoom = defineRoom<PresenceMeta>({
 
         console.log(`[Presence][onDisconnect] Updated deviceCount (${newDeviceCount}) for ${ctx.meta.username} in storage`);
 
-        ctx.actor.broadcast("default", {
-          type: "presence.update",
+        // Broadcast update using emit API
+        ctx.actor.emit.to("default").emit("presence.update", {
           userId: ctx.meta.userId,
           username: ctx.meta.username,
           devices: newDeviceCount,
@@ -345,7 +263,7 @@ export const presenceRoom = defineRoom<PresenceMeta>({
       }
     });
 
-    // Send presence sync to all restored connections
+    // Send presence sync to all restored connections using emit API
     const reconciledUsers = await loadAllPresenceFromStorage(actor.getStorage());
     const presenceList = Array.from(reconciledUsers.entries()).map(([userId, data]) => ({
       userId,
@@ -357,27 +275,79 @@ export const presenceRoom = defineRoom<PresenceMeta>({
     const totalConnections = Array.from(reconciledUsers.values())
       .reduce((sum, user) => sum + user.deviceCount, 0);
 
-    const syncMessage = JSON.stringify({
-      type: "presence.sync",
-      data: {
-        users: presenceList,
-        totalUsers: reconciledUsers.size,
-        totalConnections
-      }
+    // Broadcast sync to all sessions using emit API
+    actor.emit.to("default").emit("presence.sync", {
+      users: presenceList,
+      totalUsers: reconciledUsers.size,
+      totalConnections
     });
-
-    // Send to all connected sessions
-    for (const session of actor.sessions.values()) {
-      try {
-        session.ws.send(syncMessage);
-        console.log(`[Presence][onHibernationRestore] Sent presence.sync to session: userId=${session.meta.userId}`);
-      } catch (error) {
-        console.error(`[Presence][onHibernationRestore] Failed to send sync to session: userId=${session.meta.userId}`, error);
-      }
-    }
 
     console.log(`[Presence][onHibernationRestore] Restore complete, synced ${actor.sessions.size} sessions`);
   }
+});
+
+// Register event handlers (socket.io-like)
+presenceRoom.on("presence.status", async (ctx, data) => {
+  const { status } = data;
+
+  // Validate status
+  if (!["online", "away", "busy"].includes(status)) {
+    console.warn(`[Presence] Invalid status received: ${status} from ${ctx.meta.username}`);
+    ctx.emit.emit("error", { message: "Invalid status" });
+    return;
+  }
+
+  // Update status in storage atomically
+  await ctx.actor.getStorage().transaction(async (txn) => {
+    const storageKey = `presence:user:${ctx.meta.userId}`;
+    const existingUser = await txn.get<StoredUserPresence>(storageKey);
+
+    if (existingUser) {
+      await txn.put(storageKey, {
+        ...existingUser,
+        status,
+        lastSeen: Date.now()
+      });
+      console.log(`[Presence] Updated status in storage for ${ctx.meta.username}: ${status}`);
+    }
+  });
+
+  // Update local metadata
+  ctx.meta.status = status;
+
+  // Broadcast status change using emit API
+  ctx.actor.emit.to("default").emit("presence.status", {
+    userId: ctx.meta.userId,
+    username: ctx.meta.username,
+    status,
+    timestamp: Date.now()
+  });
+
+  console.log(`[Presence] ${ctx.meta.username} changed status to ${status}`);
+});
+
+presenceRoom.on("presence.list", async (ctx, data) => {
+  // Load presence list from storage (source of truth)
+  const allUsers = await loadAllPresenceFromStorage(ctx.actor.getStorage());
+
+  const presenceList = Array.from(allUsers.entries()).map(([userId, data]) => ({
+    userId,
+    username: data.username,
+    devices: data.deviceCount,
+    status: data.status
+  }));
+
+  const totalConnections = Array.from(allUsers.values())
+    .reduce((sum, user) => sum + user.deviceCount, 0);
+
+  // Send sync using emit API
+  ctx.emit.emit("presence.sync", {
+    users: presenceList,
+    totalUsers: allUsers.size,
+    totalConnections
+  });
+
+  console.log(`[Presence] Sent presence.sync (list) to ${ctx.meta.username}`);
 });
 
 /**

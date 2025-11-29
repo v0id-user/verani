@@ -80,7 +80,7 @@ export const notificationsRoom = defineRoom<NotificationMeta>({
   onConnect(ctx) {
     console.log(`[Notifications] ${ctx.meta.username} connected`);
 
-    // Send recent notifications
+    // Send recent notifications using emit API
     // In production, load from Durable Object storage
     const recentNotifications: Notification[] = [
       {
@@ -93,110 +93,28 @@ export const notificationsRoom = defineRoom<NotificationMeta>({
       }
     ];
 
-    ctx.ws.send(JSON.stringify({
-      type: "notifications.sync",
-      data: {
-        notifications: recentNotifications,
-        unreadCount: recentNotifications.filter(n => !n.read).length
-      }
-    }));
+    ctx.emit.emit("notifications.sync", {
+      notifications: recentNotifications,
+      unreadCount: recentNotifications.filter(n => !n.read).length
+    });
 
-    // Notify user's other devices
+    // Notify user's other devices using emit API
     const deviceCount = ctx.actor.getUserSessions(ctx.meta.userId).length;
     if (deviceCount > 1) {
-      ctx.actor.broadcast("notifications", {
-        type: "device.connected",
+      ctx.actor.emit.to("notifications").emit("device.connected", {
         deviceCount,
         timestamp: Date.now()
-      }, { except: ctx.ws });
-    }
-  },
-
-  onMessage(ctx, frame) {
-    switch (frame.type) {
-      case "notification.read": {
-        const { notificationId } = frame.data;
-
-        if (!notificationId) {
-          ctx.ws.send(JSON.stringify({
-            type: "error",
-            data: { message: "Missing notification ID" }
-          }));
-          return;
-        }
-
-        // Mark as read (in production, update storage)
-        console.log(`[Notifications] ${ctx.meta.username} read notification ${notificationId}`);
-
-        // Broadcast to all user's devices
-        ctx.actor.broadcast("notifications", {
-          type: "notification.read",
-          notificationId,
-          timestamp: Date.now()
-        });
-        break;
-      }
-
-      case "notification.readAll": {
-        console.log(`[Notifications] ${ctx.meta.username} marked all as read`);
-
-        // Broadcast to all user's devices
-        ctx.actor.broadcast("notifications", {
-          type: "notification.readAll",
-          timestamp: Date.now()
-        });
-        break;
-      }
-
-      case "notification.delete": {
-        const { notificationId } = frame.data;
-
-        if (!notificationId) {
-          ctx.ws.send(JSON.stringify({
-            type: "error",
-            data: { message: "Missing notification ID" }
-          }));
-          return;
-        }
-
-        // Delete (in production, remove from storage)
-        console.log(`[Notifications] ${ctx.meta.username} deleted notification ${notificationId}`);
-
-        // Broadcast to all user's devices
-        ctx.actor.broadcast("notifications", {
-          type: "notification.deleted",
-          notificationId,
-          timestamp: Date.now()
-        });
-        break;
-      }
-
-      case "notifications.list": {
-        // Resend notifications list
-        // In production, load from storage
-        ctx.ws.send(JSON.stringify({
-          type: "notifications.sync",
-          data: {
-            notifications: [],
-            unreadCount: 0
-          }
-        }));
-        break;
-      }
-
-      default:
-        console.warn(`[Notifications] Unknown message type: ${frame.type}`);
+      });
     }
   },
 
   onDisconnect(ctx) {
     console.log(`[Notifications] ${ctx.meta.username} disconnected`);
 
-    // Notify remaining devices
+    // Notify remaining devices using emit API
     const remainingDevices = ctx.actor.getUserSessions(ctx.meta.userId).length;
     if (remainingDevices > 0) {
-      ctx.actor.broadcast("notifications", {
-        type: "device.disconnected",
+      ctx.actor.emit.to("notifications").emit("device.disconnected", {
         deviceCount: remainingDevices,
         timestamp: Date.now()
       });
@@ -206,6 +124,61 @@ export const notificationsRoom = defineRoom<NotificationMeta>({
   onError(error, ctx) {
     console.error(`[Notifications] Error for ${ctx.meta.username}:`, error);
   }
+});
+
+// Register event handlers (socket.io-like)
+notificationsRoom.on("notification.read", (ctx, data) => {
+  const { notificationId } = data;
+
+  if (!notificationId) {
+    ctx.emit.emit("error", { message: "Missing notification ID" });
+    return;
+  }
+
+  // Mark as read (in production, update storage)
+  console.log(`[Notifications] ${ctx.meta.username} read notification ${notificationId}`);
+
+  // Broadcast to all user's devices using emit API
+  ctx.actor.emit.to("notifications").emit("notification.read", {
+    notificationId,
+    timestamp: Date.now()
+  });
+});
+
+notificationsRoom.on("notification.readAll", (ctx, data) => {
+  console.log(`[Notifications] ${ctx.meta.username} marked all as read`);
+
+  // Broadcast to all user's devices using emit API
+  ctx.actor.emit.to("notifications").emit("notification.readAll", {
+    timestamp: Date.now()
+  });
+});
+
+notificationsRoom.on("notification.delete", (ctx, data) => {
+  const { notificationId } = data;
+
+  if (!notificationId) {
+    ctx.emit.emit("error", { message: "Missing notification ID" });
+    return;
+  }
+
+  // Delete (in production, remove from storage)
+  console.log(`[Notifications] ${ctx.meta.username} deleted notification ${notificationId}`);
+
+  // Broadcast to all user's devices using emit API
+  ctx.actor.emit.to("notifications").emit("notification.deleted", {
+    notificationId,
+    timestamp: Date.now()
+  });
+});
+
+notificationsRoom.on("notifications.list", (ctx, data) => {
+  // Resend notifications list using emit API
+  // In production, load from storage
+  ctx.emit.emit("notifications.sync", {
+    notifications: [],
+    unreadCount: 0
+  });
 });
 
 /**
