@@ -29,25 +29,25 @@ Since Actors are Durable Objects, you can call their methods remotely from Worke
 |  HTTP Request → Fetch Handler                                |
 |                      |                                       |
 |                      v                                       |
-|              Get Actor Stub                                 |
-|              ActorClass.get("id")                              |
+|              Get Actor Stub                                  |
+|              ActorClass.get("id")                            |
 |                      |                                       |
 |                      v                                       |
-|              RPC Call (stub.sendToUser(...))                |
+|              RPC Call (stub.sendToUser(...))                 |
 |                      |                                       |
 |                      v                                       |
 |              Cloudflare RPC Layer                            |
 |                      |                                       |
 |                      v                                       |
 +-------------------------------------------------------------+
-|              Actor Instance (Durable Object)                |
+|              Actor Instance (Durable Object)                 |
 |                      |                                       |
 |                      v                                       |
-|              Method Execution                               |
-|              sendToUser()                                   |
+|              Method Execution                                |
+|              sendToUser()                                    |
 |                      |                                       |
 |                      v                                       |
-|              Send to WebSocket(s)                           |
+|              Send to WebSocket(s)                            |
 +-------------------------------------------------------------+
 ```
 
