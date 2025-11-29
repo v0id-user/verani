@@ -7,14 +7,18 @@ Performance tips and scaling strategies for Verani applications.
 ### 1. Limit Connections Per Actor
 
 ```typescript
-onConnect(ctx) {
-  const count = ctx.actor.getSessionCount();
+import { defineRoom } from "verani";
 
-  if (count > 1000) {
-    ctx.ws.close(1008, "Room is full");
-    return;
+export const chatRoom = defineRoom({
+  onConnect(ctx) {
+    const count = ctx.actor.getSessionCount();
+
+    if (count > 1000) {
+      ctx.ws.close(1008, "Room is full");
+      return;
+    }
   }
-}
+});
 ```
 
 ### 2. Use Channels for Selective Broadcasting
@@ -24,9 +28,13 @@ Instead of broadcasting to everyone:
 ```typescript
 // BAD: Everyone receives, many filter it out
 ctx.actor.broadcast("default", data);
+// or
+ctx.actor.emit.to("default").emit("event", data);
 
 // GOOD: Only subscribed users receive
 ctx.actor.broadcast("channel-123", data);
+// or using emit API
+ctx.actor.emit.to("channel-123").emit("event", data);
 ```
 
 ### 3. Batch Messages
@@ -38,8 +46,14 @@ Send multiple updates in one message:
 const updates = [];
 updates.push(update1, update2, update3);
 
+// Send as a single batched message
 ctx.actor.broadcast("default", {
   type: "batch.update",
+  updates
+});
+
+// Or using emit API
+ctx.actor.emit.to("default").emit("batch.update", {
   updates
 });
 ```

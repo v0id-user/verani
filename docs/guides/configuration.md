@@ -125,52 +125,88 @@ export default {
 
 ## Configure Actor Routing
 
-You need to tell Cloudflare which requests go to which Actor instance.
+You control which Actor instance handles requests by choosing the Actor ID when calling `.get()`. The Actor ID determines which Durable Object instance is used.
 
 ### Option A: Single Room (All Users in One Actor)
 
 ```typescript
-import { Actor } from "@cloudflare/actors";
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
 
-const handler = createActorHandler(chatRoom);
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
 
-// Configure Actor
-export default handler.configure({
-  // All requests go to the same Actor instance
-  nameFromRequest: () => "global-chat-room"
-});
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/ws")) {
+      // All requests go to the same Actor instance
+      const stub = ChatRoom.get("global-chat-room");
+      return stub.fetch(request);
+    }
+
+    return new Response("Not Found", { status: 404 });
+  }
+};
 ```
 
 ### Option B: Room-Based Routing
 
 ```typescript
-export default handler.configure({
-  // Route by room ID from URL
-  nameFromRequest: (req) => {
-    const url = new URL(req.url);
-    const roomId = url.searchParams.get("roomId") || "default";
-    return `room:${roomId}`;
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
+
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/ws")) {
+      // Route by room ID from URL
+      const roomId = url.searchParams.get("roomId") || "default";
+      const stub = ChatRoom.get(`room:${roomId}`);
+      return stub.fetch(request);
+    }
+
+    return new Response("Not Found", { status: 404 });
   }
-});
+};
 ```
 
 ### Option C: User-Based Routing
 
 ```typescript
-export default handler.configure({
-  // Each user gets their own Actor
-  nameFromRequest: (req) => {
-    const url = new URL(req.url);
-    const userId = url.searchParams.get("userId");
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
 
-    if (!userId) {
-      throw new Error("userId required");
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/ws")) {
+      // Each user gets their own Actor
+      const userId = url.searchParams.get("userId");
+
+      if (!userId) {
+        return new Response("userId required", { status: 400 });
+      }
+
+      const stub = ChatRoom.get(`user:${userId}`);
+      return stub.fetch(request);
     }
 
-    return `user:${userId}`;
+    return new Response("Not Found", { status: 404 });
   }
-});
+};
 ```
+
+**Important**: Use the same Actor ID for WebSocket connections and RPC calls to reach the same Actor instance.
 
 ## Environment Variables
 
@@ -221,10 +257,14 @@ script_name = "my-verani-app"  # Must match name field
 
 ### Issue: "Actor is not defined"
 
-**Solution:** Import from `@cloudflare/actors`:
+**Solution:** Use `createActorHandler()` from `verani`:
 
 ```typescript
-import { Actor } from "@cloudflare/actors";
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
+
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
 ```
 
 ## Related Documentation
