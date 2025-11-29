@@ -53,33 +53,29 @@ export const secureRoom = defineRoom<AuthMeta>({
   onConnect(ctx) {
     // ctx.meta.userId is now VERIFIED and TRUSTED
     console.log(`Verified user ${ctx.meta.username} connected`);
-  },
+  }
+});
 
-  onMessage(ctx, frame) {
-    // Authorization check: Moderator-only actions
-    if (frame.type === "mod.kick") {
-      if (ctx.meta.role !== "moderator" && ctx.meta.role !== "admin") {
-        ctx.ws.send(JSON.stringify({
-          type: "error",
-          data: { message: "Insufficient permissions" }
-        }));
-        return;
-      }
+// Register event handlers (socket.io-like)
+secureRoom.on("mod.kick", (ctx, data) => {
+  // Authorization check: Moderator-only actions
+  if (ctx.meta.role !== "moderator" && ctx.meta.role !== "admin") {
+    ctx.emit.emit("error", { message: "Insufficient permissions" });
+    return;
+  }
 
-      // Perform kick action
-      const { targetUserId } = frame.data;
-      // Close target user's connections
-      const sessions = ctx.actor.getUserSessions(targetUserId);
-      sessions.forEach(ws => ws.close(1008, "Kicked by moderator"));
+  // Perform kick action
+  const { targetUserId } = data;
+  // Close target user's connections
+  const sessions = ctx.actor.getUserSessions(targetUserId);
+  sessions.forEach(ws => ws.close(1008, "Kicked by moderator"));
 
-      // Notify room
-      ctx.actor.broadcast("default", {
-        type: "user.kicked",
-        userId: targetUserId,
-        by: ctx.meta.userId
-      });
-    }
-  },
+  // Notify room using emit API
+  ctx.actor.emit.to("default").emit("user.kicked", {
+    userId: targetUserId,
+    by: ctx.meta.userId
+  });
+});
 
   onError(error, ctx) {
     console.error(`Auth error for ${ctx.meta.userId}:`, error);

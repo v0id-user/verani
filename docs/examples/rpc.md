@@ -17,12 +17,13 @@ export const notificationsRoom = defineRoom({
 
   onConnect(ctx) {
     console.log(`User ${ctx.meta.userId} connected to notifications`);
-  },
-
-  onMessage(ctx, frame) {
-    // Handle client messages if needed
   }
 });
+
+// Register event handlers if needed (socket.io-like)
+// notificationsRoom.on("some.event", (ctx, data) => {
+//   // Handle client messages
+// });
 ```
 
 **Worker with RPC Endpoint:**
@@ -186,23 +187,21 @@ export default {
 Call Actor methods from other Actors:
 
 ```typescript
-// In one Actor's lifecycle hook
-onMessage(ctx, frame) {
-  if (frame.type === "cross-room-message") {
-    const { targetRoom, targetUser, message } = frame.data;
+// In one Actor's event handler (socket.io-like)
+room.on("cross-room-message", async (ctx, data) => {
+  const { targetRoom, targetUser, message } = data;
 
-    // Get another Actor's stub
-    const targetId = env.OTHER_ROOM.idFromName(targetRoom);
-    const targetStub = env.OTHER_ROOM.get(targetId);
+  // Get another Actor's stub
+  const targetId = env.OTHER_ROOM.idFromName(targetRoom);
+  const targetStub = env.OTHER_ROOM.get(targetId);
 
-    // Send message via RPC
-    targetStub.sendToUser(targetUser, "default", {
-      type: "cross-room",
-      from: ctx.meta.userId,
-      message
-    });
-  }
-}
+  // Send message via RPC
+  await targetStub.sendToUser(targetUser, "default", {
+    type: "cross-room",
+    from: ctx.meta.userId,
+    message
+  });
+});
 ```
 
 ## Key Points

@@ -104,55 +104,54 @@ export const multiChannelRoom = defineRoom<ChannelMeta>({
       channels: ["lobby"], // Start in lobby
       subscribedChannels: new Set(["lobby"])
     };
-  },
+  }
+});
 
-  onMessage(ctx, frame) {
-    // Join a channel
-    if (frame.type === "channel.join") {
-      const { channel } = frame.data;
+// Register event handlers (socket.io-like)
+multiChannelRoom.on("channel.join", (ctx, data) => {
+  const { channel } = data;
 
-      if (!ctx.meta.channels.includes(channel)) {
-        ctx.meta.channels.push(channel);
-        ctx.meta.subscribedChannels.add(channel);
+  if (!ctx.meta.channels.includes(channel)) {
+    ctx.meta.channels.push(channel);
+    ctx.meta.subscribedChannels.add(channel);
 
-        // Notify others in that channel
-        ctx.actor.broadcast(channel, {
-          type: "channel.userJoined",
-          userId: ctx.meta.userId
-        }, { except: ctx.ws });
-      }
-    }
+    // Notify others in that channel using emit API
+    ctx.actor.emit.to(channel).emit("channel.userJoined", {
+      userId: ctx.meta.userId
+    });
+  }
+});
 
-    // Leave a channel
-    if (frame.type === "channel.leave") {
-      const { channel } = frame.data;
-      const idx = ctx.meta.channels.indexOf(channel);
+multiChannelRoom.on("channel.leave", (ctx, data) => {
+  const { channel } = data;
+  const idx = ctx.meta.channels.indexOf(channel);
 
-      if (idx !== -1) {
-        ctx.meta.channels.splice(idx, 1);
-        ctx.meta.subscribedChannels.delete(channel);
+  if (idx !== -1) {
+    ctx.meta.channels.splice(idx, 1);
+    ctx.meta.subscribedChannels.delete(channel);
 
-        ctx.actor.broadcast(channel, {
-          type: "channel.userLeft",
-          userId: ctx.meta.userId
-        });
-      }
-    }
+    // Notify others using emit API
+    ctx.actor.emit.to(channel).emit("channel.userLeft", {
+      userId: ctx.meta.userId
+    });
+  }
+});
 
-    // Send message to specific channel
-    if (frame.type === "channel.message") {
-      const { channel, text } = frame.data;
+multiChannelRoom.on("channel.message", (ctx, data) => {
+  const { channel, text } = data;
 
-      // Verify user is in channel
-      if (ctx.meta.subscribedChannels.has(channel)) {
-        ctx.actor.broadcast(channel, {
-          type: "chat.message",
-          channel,
-          from: ctx.meta.userId,
-          text
-        });
-      }
-    }
+  // Verify user is in channel
+  if (ctx.meta.subscribedChannels.has(channel)) {
+    // Broadcast to channel using emit API
+    ctx.actor.emit.to(channel).emit("chat.message", {
+      channel,
+      from: ctx.meta.userId,
+      text
+    });
+  } else {
+    ctx.emit.emit("error", {
+      message: `Not subscribed to channel: ${channel}`
+    });
   }
 });
 ```

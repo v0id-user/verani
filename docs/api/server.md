@@ -22,9 +22,13 @@ const room = defineRoom({
   websocketPath: "/ws", // Optional: defaults to "/ws"
   extractMeta(req) { /* ... */ },
   onConnect(ctx) { /* ... */ },
-  onMessage(ctx, frame) { /* ... */ },
   onDisconnect(ctx) { /* ... */ },
   onError(error, ctx) { /* ... */ }
+});
+
+// Register event handlers (socket.io-like, recommended)
+room.on("chat.message", (ctx, data) => {
+  ctx.actor.emit.to("default").emit("chat.message", data);
 });
 ```
 
@@ -118,8 +122,8 @@ Called when a new WebSocket connection is established.
 ```typescript
 onConnect(ctx) {
   console.log(`User ${ctx.meta.userId} connected`);
-  ctx.actor.broadcast("default", {
-    type: "user.joined",
+  // Use emit API (socket.io-like)
+  ctx.actor.emit.to("default").emit("user.joined", {
     userId: ctx.meta.userId
   });
 }
@@ -131,7 +135,7 @@ Called when a message is received from a connection.
 
 **Note:** If event handlers are registered via `room.on()` or `room.eventEmitter.on()`, they take priority. This hook is used as a fallback when no matching event handler is found.
 
-**Example:**
+**Example (Traditional - Fallback):**
 
 ```typescript
 onMessage(ctx, frame) {
@@ -145,9 +149,9 @@ onMessage(ctx, frame) {
 }
 ```
 
-**Socket.io-like Alternative:**
+**Recommended: Socket.io-like Event Handlers**
 
-Instead of using `onMessage`, you can register event handlers for a more socket.io-like experience:
+Instead of using `onMessage`, register event handlers for a cleaner, more socket.io-like experience:
 
 ```typescript
 const room = defineRoom({
@@ -181,8 +185,8 @@ Called when a WebSocket connection is closed.
 ```typescript
 onDisconnect(ctx) {
   console.log(`User ${ctx.meta.userId} left`);
-  ctx.actor.broadcast("default", {
-    type: "user.left",
+  // Use emit API (socket.io-like)
+  ctx.actor.emit.to("default").emit("user.left", {
     userId: ctx.meta.userId
   });
 }

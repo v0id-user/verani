@@ -39,28 +39,23 @@ export const presenceRoom = defineRoom({
       // Load all users from storage (source of truth)
       const allUsers = await loadAllPresence(txn);
 
-      // Send presence sync to new user
-      ctx.ws.send(JSON.stringify({
-        type: "presence.sync",
-        data: {
-          users: Array.from(allUsers.values()),
-          totalUsers: allUsers.size
-        }
-      }));
+      // Send presence sync to new user using emit API
+      ctx.emit.emit("presence.sync", {
+        users: Array.from(allUsers.values()),
+        totalUsers: allUsers.size
+      });
 
-      // Notify others
+      // Notify others using emit API
       if (isNewUser) {
-        ctx.actor.broadcast("default", {
-          type: "presence.online",
+        ctx.actor.emit.to("default").emit("presence.online", {
           userId: ctx.meta.userId,
           devices: newDeviceCount
-        }, { except: ctx.ws });
+        });
       } else {
-        ctx.actor.broadcast("default", {
-          type: "presence.update",
+        ctx.actor.emit.to("default").emit("presence.update", {
           userId: ctx.meta.userId,
           devices: newDeviceCount
-        }, { except: ctx.ws });
+        });
       }
     });
   },
@@ -79,8 +74,7 @@ export const presenceRoom = defineRoom({
         // Last device - remove from storage
         await txn.delete(storageKey);
 
-        ctx.actor.broadcast("default", {
-          type: "presence.offline",
+        ctx.actor.emit.to("default").emit("presence.offline", {
           userId: ctx.meta.userId
         });
       } else {
@@ -91,8 +85,7 @@ export const presenceRoom = defineRoom({
           lastSeen: Date.now()
         });
 
-        ctx.actor.broadcast("default", {
-          type: "presence.update",
+        ctx.actor.emit.to("default").emit("presence.update", {
           userId: ctx.meta.userId,
           devices: newDeviceCount
         });
@@ -132,18 +125,67 @@ export const presenceRoom = defineRoom({
 
     // Send sync to all restored sessions
     const reconciledUsers = await loadAllPresence(actor.getStorage());
-    const syncMessage = JSON.stringify({
-      type: "presence.sync",
-      data: {
-        users: Array.from(reconciledUsers.values()),
-        totalUsers: reconciledUsers.size
-      }
-    });
+    const syncData = {
+      users: Array.from(reconciledUsers.values()),
+      totalUsers: reconciledUsers.size
+    };
 
-    for (const session of actor.sessions.values()) {
-      session.ws.send(syncMessage);
-    }
+    // Broadcast sync to all restored sessions
+    actor.emit.to("default").emit("presence.sync", syncData);
   }
+});
+
+// Register event handlers for status updates (socket.io-like)
+presenceRoom.on("presence.status", async (ctx, data) => {
+  const { status } = data;
+
+  // Validate status
+  if (!["online", "away", "busy"].includes(status)) {
+    ctx.emit.emit("error", { message: "Invalid status" });
+    return;
+  }
+
+  // Update status in storage atomically
+  await ctx.actor.getStorage().transaction(async (txn) => {
+    const storageKey = `presence:user:${ctx.meta.userId}`;
+    const existingUser = await txn.get<StoredUserPresence>(storageKey);
+
+    if (existingUser) {
+      await txn.put(storageKey, {
+        ...existingUser,
+        status,
+        lastSeen: Date.now()
+      });
+    }
+  });
+
+  // Broadcast status change using emit API
+  ctx.actor.emit.to("default").emit("presence.status", {
+    userId: ctx.meta.userId,
+    status,
+    timestamp: Date.now()
+  });
+});
+
+presenceRoom.on("presence.list", async (ctx, data) => {
+  // Load presence list from storage (source of truth)
+  const allUsers = await loadAllPresence(ctx.actor.getStorage());
+
+  const presenceList = Array.from(allUsers.entries()).map(([userId, data]) => ({
+    userId,
+    username: data.username,
+    devices: data.deviceCount,
+    status: data.status
+  }));
+
+  const totalConnections = Array.from(allUsers.values())
+    .reduce((sum, user) => sum + user.deviceCount, 0);
+
+  ctx.emit.emit("presence.sync", {
+    users: presenceList,
+    totalUsers: allUsers.size,
+    totalConnections
+  });
 });
 
 // Helper to load all presence from storage or transaction

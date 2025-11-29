@@ -20,42 +20,41 @@ export const rateLimitedRoom = defineRoom<RateLimitMeta>({
       messageCount: 0,
       lastReset: Date.now()
     };
-  },
-
-  onMessage(ctx, frame) {
-    const now = Date.now();
-    const meta = ctx.meta;
-
-    // Reset counter every minute
-    if (now - meta.lastReset > 60000) {
-      meta.messageCount = 0;
-      meta.lastReset = now;
-    }
-
-    // Check rate limit (10 messages per minute)
-    if (meta.messageCount >= 10) {
-      ctx.ws.send(JSON.stringify({
-        type: "error",
-        data: {
-          message: "Rate limit exceeded. Please slow down.",
-          retryAfter: 60 - Math.floor((now - meta.lastReset) / 1000)
-        }
-      }));
-      return;
-    }
-
-    // Increment counter
-    meta.messageCount++;
-
-    // Process message normally
-    if (frame.type === "chat.message") {
-      ctx.actor.broadcast("default", {
-        type: "chat.message",
-        from: ctx.meta.userId,
-        text: frame.data.text
-      });
-    }
   }
+});
+
+// Rate limiting middleware using wildcard handler (socket.io-like)
+rateLimitedRoom.on("*", (ctx, data) => {
+  const now = Date.now();
+  const meta = ctx.meta;
+
+  // Reset counter every minute
+  if (now - meta.lastReset > 60000) {
+    meta.messageCount = 0;
+    meta.lastReset = now;
+  }
+
+  // Check rate limit (10 messages per minute)
+  if (meta.messageCount >= 10) {
+    ctx.emit.emit("error", {
+      message: "Rate limit exceeded. Please slow down.",
+      retryAfter: 60 - Math.floor((now - meta.lastReset) / 1000)
+    });
+    return;
+  }
+
+  // Increment counter
+  meta.messageCount++;
+});
+
+// Register event handlers for specific events
+rateLimitedRoom.on("chat.message", (ctx, data) => {
+  // Rate limit check already done by wildcard handler
+  // Process message using emit API
+  ctx.actor.emit.to("default").emit("chat.message", {
+    from: ctx.meta.userId,
+    text: data.text
+  });
 });
 ```
 
