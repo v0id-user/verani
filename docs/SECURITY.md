@@ -95,7 +95,7 @@ export const secureRoom = defineRoom<AuthMeta>({
 
     // Verify JWT signature and expiration
     const isValid = await jwt.verify(token, SECRET_KEY);
-    
+
     if (!isValid) {
       throw new Error("Invalid token");
     }
@@ -147,7 +147,7 @@ export const sessionRoom = defineRoom({
 
     // Validate session (check Redis, KV, etc.)
     const session = await validateSession(sessionId);
-    
+
     if (!session) {
       throw new Error("Invalid session");
     }
@@ -176,7 +176,7 @@ export const apiKeyRoom = defineRoom({
 
     // Verify API key (check against database/KV)
     const client = await verifyApiKey(apiKey);
-    
+
     if (!client) {
       throw new Error("Invalid API key");
     }
@@ -263,7 +263,7 @@ export const permissionRoom = defineRoom<PermissionMeta>({
   extractMeta(req) {
     // ... authenticate ...
     const permissions = new Set(payload.permissions || []);
-    
+
     return {
       userId: payload.sub,
       clientId: crypto.randomUUID(),
@@ -410,7 +410,7 @@ export const zodRoom = defineRoom({
       if (!result.success) {
         ctx.ws.send(JSON.stringify({
           type: "error",
-          data: { 
+          data: {
             message: "Invalid message",
             errors: result.error.issues
           }
@@ -472,7 +472,7 @@ export const rateLimitedRoom = defineRoom<RateLimitMeta>({
     if (meta.messageCount > RATE_LIMIT.MAX_MESSAGES) {
       ctx.ws.send(JSON.stringify({
         type: "error",
-        data: { 
+        data: {
           message: "Rate limit exceeded",
           retryAfter: Math.ceil(
             (RATE_LIMIT.WINDOW_MS - (now - meta.windowStart)) / 1000
@@ -679,5 +679,5 @@ Before deploying to production:
 
 - See [Examples](./EXAMPLES.md) for implementation patterns
 - See [API Reference](./API.md) for full API documentation
-- Check [GitHub Discussions](https://github.com/your-org/verani/discussions) for community help
+- Check [GitHub Discussions](https://github.com/v0id-user/verani/discussions) for community help
 

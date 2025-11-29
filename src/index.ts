@@ -114,7 +114,7 @@ function getInfoPage(): string {
 
 	<h2>📚 Documentation</h2>
 	<ul>
-		<li><a href="https://github.com/your-org/verani">GitHub Repository</a></li>
+		<li><a href="https://github.com/v0id-user/verani">GitHub Repository</a></li>
 		<li>Examples README: <code>examples/README.md</code></li>
 		<li>API Documentation: <code>docs/API.md</code></li>
 	</ul>

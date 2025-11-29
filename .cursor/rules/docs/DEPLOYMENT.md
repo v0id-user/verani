@@ -424,7 +424,7 @@ Before going to production:
 
 ## Support
 
-- GitHub Issues: [Report bugs](https://github.com/your-org/verani/issues)
-- Discussions: [Ask questions](https://github.com/your-org/verani/discussions)
+- GitHub Issues: [Report bugs](https://github.com/v0id-user/verani/issues)
+- Discussions: [Ask questions](https://github.com/v0id-user/verani/discussions)
 - Discord: [Join community](#) (coming soon)
 

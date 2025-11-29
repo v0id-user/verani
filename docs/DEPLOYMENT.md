@@ -361,9 +361,9 @@ try {
 } catch (error) {
   console.error("RPC call failed:", error);
   // Actor might be hibernating - retry or return error
-  return Response.json({ 
-    success: false, 
-    error: "Failed to send message" 
+  return Response.json({
+    success: false,
+    error: "Failed to send message"
   }, { status: 503 });
 }
 ```
@@ -598,7 +598,7 @@ Before going to production:
 
 ## Support
 
-- GitHub Issues: [Report bugs](https://github.com/your-org/verani/issues)
-- Discussions: [Ask questions](https://github.com/your-org/verani/discussions)
+- GitHub Issues: [Report bugs](https://github.com/v0id-user/verani/issues)
+- Discussions: [Ask questions](https://github.com/v0id-user/verani/discussions)
 - Discord: [Join community](#) (coming soon)
 

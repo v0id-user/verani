@@ -187,7 +187,7 @@ Try out Verani with working examples:
 
 ```bash
 # Clone and run
-git clone https://github.com/your-org/verani
+git clone https://github.com/v0id-user/verani
 cd verani
 bun install  # or npm install
 bun run dev  # or npm run dev

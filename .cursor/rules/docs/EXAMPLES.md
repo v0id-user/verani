@@ -784,5 +784,5 @@ onDisconnect(ctx) {
 
 ---
 
-For more examples, check the [GitHub repository](https://github.com/your-org/verani).
+For more examples, check the [GitHub repository](https://github.com/v0id-user/verani).
 
