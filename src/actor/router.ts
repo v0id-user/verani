@@ -1,4 +1,4 @@
-import type { RoomDefinition, ConnectionMeta } from "./types";
+import type { RoomDefinition, ConnectionMeta, EventHandler } from "./types";
 import { createRoomEventEmitter } from "./runtime/eventEmitter";
 
 
@@ -38,14 +38,14 @@ export interface RoomDefinitionWithHandlers<TMeta extends ConnectionMeta = Conne
    * @param event - Event name
    * @param handler - Handler function
    */
-  on(event: string, handler: (ctx: any, data: any) => void | Promise<void>): void;
+  on(event: string, handler: EventHandler<TMeta, E>): void;
 
   /**
    * Remove an event handler (socket.io-like API)
    * @param event - Event name
    * @param handler - Optional specific handler to remove
    */
-  off(event: string, handler?: (ctx: any, data: any) => void | Promise<void>): void;
+  off(event: string, handler?: EventHandler<TMeta, E>): void;
 }
 
 /**
@@ -62,7 +62,7 @@ export function defineRoom<TMeta extends ConnectionMeta = ConnectionMeta, E = un
   const room: RoomDefinitionWithHandlers<TMeta, E> = {
     name: def.name,
     websocketPath: def.websocketPath,
-    extractMeta: def.extractMeta || (defaultExtractMeta as any),
+    extractMeta: def.extractMeta || ((req: Request) => defaultExtractMeta(req) as TMeta),
     onConnect: def.onConnect,
     onDisconnect: def.onDisconnect,
     onMessage: def.onMessage,
@@ -70,10 +70,10 @@ export function defineRoom<TMeta extends ConnectionMeta = ConnectionMeta, E = un
     onHibernationRestore: def.onHibernationRestore,
     eventEmitter,
     // Socket.io-like convenience methods
-    on(event: string, handler: (ctx: any, data: any) => void | Promise<void>): void {
+    on(event: string, handler: EventHandler<TMeta, E>): void {
       eventEmitter.on(event, handler);
     },
-    off(event: string, handler?: (ctx: any, data: any) => void | Promise<void>): void {
+    off(event: string, handler?: EventHandler<TMeta, E>): void {
       eventEmitter.off(event, handler);
     }
   };

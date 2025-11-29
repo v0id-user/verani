@@ -2,17 +2,18 @@
 
 Complete server-side API documentation for Verani.
 
-## `defineRoom<TMeta>(definition)`
+## `defineRoom<TMeta, E>(definition)`
 
 Defines a room with lifecycle hooks and metadata extraction.
 
 **Type Parameters:**
 - `TMeta extends ConnectionMeta` - Custom metadata type
+- `E` - Actor environment type (default: `unknown`)
 
 **Parameters:**
-- `definition: RoomDefinition<TMeta>` - Room configuration object
+- `definition: RoomDefinition<TMeta, E>` - Room configuration object
 
-**Returns:** `RoomDefinition<TMeta>`
+**Returns:** `RoomDefinitionWithHandlers<TMeta, E>` - Extended room definition with socket.io-like event handler methods (`on`, `off`)
 
 **Example:**
 
@@ -348,6 +349,8 @@ onMessage(ctx, frame) {
 ## Event Handlers (Socket.io-like API)
 
 Verani supports socket.io-like event handlers for a more familiar developer experience. Event handlers take priority over the `onMessage` hook when registered.
+
+**Type Safety:** All event handlers are fully type-safe. The `ctx` parameter is typed as `MessageContext<TMeta, E>`, ensuring full IntelliSense support and type checking for metadata and actor methods.
 
 ### Registering Event Handlers
 
@@ -726,26 +729,37 @@ async function getAllUsers(storage: DurableObjectStorage) {
 
 ---
 
-## `RoomDefinitionWithHandlers<TMeta>`
+## `RoomDefinitionWithHandlers<TMeta, E>`
 
 Extended room definition returned by `defineRoom()` with socket.io-like convenience methods.
 
+**Type Parameters:**
+- `TMeta extends ConnectionMeta` - Custom metadata type
+- `E` - Actor environment type (default: `unknown`)
+
 **Methods:**
 
-### `on(event: string, handler: EventHandler): void`
+### `on(event: string, handler: EventHandler<TMeta, E>): void`
 
 Register an event handler (socket.io-like API).
+
+**Type Parameters:**
+- `handler: EventHandler<TMeta, E>` - Event handler function with properly typed context
 
 ```typescript
 const room = defineRoom({ /* ... */ });
 room.on("chat.message", (ctx, data) => {
+  // ctx is typed as MessageContext<TMeta, E>
   // Handler logic
 });
 ```
 
-### `off(event: string, handler?: EventHandler): void`
+### `off(event: string, handler?: EventHandler<TMeta, E>): void`
 
 Remove an event handler.
+
+**Type Parameters:**
+- `handler?: EventHandler<TMeta, E>` - Optional specific handler to remove
 
 ```typescript
 // Remove specific handler

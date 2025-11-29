@@ -10,6 +10,7 @@ All types are exported from the main package:
 import type {
   // Server types
   RoomDefinition,
+  RoomDefinitionWithHandlers,
   RoomContext,
   MessageContext,
   ConnectionMeta,
@@ -19,6 +20,8 @@ import type {
   VeraniActor,
   ActorStub,
   ActorHandlerClass,
+  EventHandler,
+  RoomEventEmitter,
 
   // Client types
   VeraniClientOptions,
@@ -81,6 +84,78 @@ interface BroadcastOptions {
 ```
 
 **Note:** For RPC calls, use `RpcBroadcastOptions` instead, which excludes the `except` option.
+
+### `EventHandler<TMeta, E>`
+
+Event handler function type for socket.io-like event handling. Used with `room.on()` and `room.off()` methods.
+
+**Type Parameters:**
+- `TMeta extends ConnectionMeta` - Custom metadata type
+- `E` - Actor environment type (default: `unknown`)
+
+```typescript
+type EventHandler<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> = (
+  ctx: MessageContext<TMeta, E>,
+  data: any
+) => void | Promise<void>;
+```
+
+**Example:**
+
+```typescript
+const room = defineRoom<CustomMeta>({ /* ... */ });
+
+// Handler receives properly typed context
+room.on("chat.message", (ctx, data) => {
+  // ctx is typed as MessageContext<CustomMeta, E>
+  // ctx.meta has type CustomMeta with all custom properties
+  console.log(ctx.meta.username); // ✅ Type-safe access
+});
+```
+
+### `RoomEventEmitter<TMeta, E>`
+
+Event emitter interface for room-level event handling. Provides socket.io-like event registration and removal.
+
+**Type Parameters:**
+- `TMeta extends ConnectionMeta` - Custom metadata type
+- `E` - Actor environment type (default: `unknown`)
+
+```typescript
+interface RoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> {
+  on(event: string, handler: EventHandler<TMeta, E>): void;
+  off(event: string, handler?: EventHandler<TMeta, E>): void;
+  emit(event: string, ctx: MessageContext<TMeta, E>, data: any): Promise<void>;
+}
+```
+
+**Example:**
+
+```typescript
+import { createRoomEventEmitter } from "verani";
+
+const customEmitter = createRoomEventEmitter<CustomMeta>();
+
+const room = defineRoom({
+  eventEmitter: customEmitter,
+  // ... other config
+});
+```
+
+### `RoomDefinitionWithHandlers<TMeta, E>`
+
+Extended room definition returned by `defineRoom()` with socket.io-like convenience methods.
+
+**Type Parameters:**
+- `TMeta extends ConnectionMeta` - Custom metadata type
+- `E` - Actor environment type (default: `unknown`)
+
+Extends `RoomDefinition<TMeta, E>` and adds:
+- `on(event: string, handler: EventHandler<TMeta, E>): void`
+- `off(event: string, handler?: EventHandler<TMeta, E>): void`
+- `eventEmitter: RoomEventEmitter<TMeta, E>`
+
+See [Server API](./server.md#roomdefinitionwithhandlerstmeta-e) for complete documentation.
 
 ### `RpcBroadcastOptions`
 
