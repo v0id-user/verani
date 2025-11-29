@@ -10,6 +10,14 @@
 
 ```typescript
 import { defineRoom } from "verani";
+import type { ConnectionMeta } from "verani";
+
+interface PresenceMeta extends ConnectionMeta {
+  username: string;
+  status: "online" | "away" | "busy";
+  deviceInfo: string;
+  connectedAt: number;
+}
 
 interface StoredUserPresence {
   username: string;
@@ -18,129 +26,230 @@ interface StoredUserPresence {
   lastSeen: number;
 }
 
-export const presenceRoom = defineRoom({
+function validateToken(token: string): { userId: string; username: string } | null {
+  const parts = token.split(":");
+  if (parts.length === 2 && parts[0] === "user") {
+    return {
+      userId: parts[1],
+      username: parts[1]
+    };
+  }
+  return null;
+}
+
+function getDeviceInfo(req: Request): string {
+  const ua = req.headers.get("User-Agent") || "";
+  if (ua.includes("Mobile")) return "mobile";
+  if (ua.includes("Tablet")) return "tablet";
+  return "desktop";
+}
+
+export const presenceRoom = defineRoom<PresenceMeta>({
+  name: "presence-example",
+  websocketPath: "/ws/presence",
+
+  extractMeta(req) {
+    const url = new URL(req.url);
+    const token = url.searchParams.get("token");
+
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const user = validateToken(token);
+    if (!user) {
+      throw new Error("Invalid token");
+    }
+
+    return {
+      userId: user.userId,
+      clientId: crypto.randomUUID(),
+      channels: ["default"],
+      username: user.username,
+      status: "online",
+      deviceInfo: getDeviceInfo(req),
+      connectedAt: Date.now()
+    };
+  },
+
   async onConnect(ctx) {
-    // Use transactions for atomic updates
+    console.log(`[Presence] User ${ctx.meta.username} connected from device ${ctx.meta.deviceInfo}`);
+
+    // Use transaction for atomic state updates
     await ctx.actor.getStorage().transaction(async (txn) => {
       const storageKey = `presence:user:${ctx.meta.userId}`;
-      const existing = await txn.get<StoredUserPresence>(storageKey);
+      const existingUser = await txn.get<StoredUserPresence>(storageKey);
 
-      const isNewUser = !existing;
-      const newDeviceCount = (existing?.deviceCount || 0) + 1;
+      const isNewUser = !existingUser;
+      const newDeviceCount = (existingUser?.deviceCount || 0) + 1;
 
-      // Store presence atomically
+      // Update user presence atomically
       await txn.put(storageKey, {
-        username: ctx.meta.userId,
-        status: "online",
+        username: ctx.meta.username,
+        status: ctx.meta.status,
         deviceCount: newDeviceCount,
         lastSeen: Date.now()
-      });
+      } as StoredUserPresence);
 
-      // Load all users from storage (source of truth)
-      const allUsers = await loadAllPresence(txn);
+      // Load all users from storage for presence sync
+      const allUsers = await loadAllPresenceFromTransaction(txn);
+      const presenceList = Array.from(allUsers.entries()).map(([userId, data]) => ({
+        userId,
+        username: data.username,
+        devices: data.deviceCount,
+        status: data.status
+      }));
 
-      // Send presence sync to new user using emit API
+      const totalConnections = Array.from(allUsers.values())
+        .reduce((sum, user) => sum + user.deviceCount, 0);
+
+      // Send full presence list to new user using emit API
       ctx.emit.emit("presence.sync", {
-        users: Array.from(allUsers.values()),
-        totalUsers: allUsers.size
+        users: presenceList,
+        totalUsers: allUsers.size,
+        totalConnections
       });
 
-      // Notify others using emit API
+      // Broadcast to others based on whether this is first device using emit API
       if (isNewUser) {
         ctx.actor.emit.to("default").emit("presence.online", {
           userId: ctx.meta.userId,
-          devices: newDeviceCount
+          username: ctx.meta.username,
+          status: ctx.meta.status,
+          devices: newDeviceCount,
+          timestamp: Date.now()
         });
       } else {
         ctx.actor.emit.to("default").emit("presence.update", {
           userId: ctx.meta.userId,
-          devices: newDeviceCount
+          username: ctx.meta.username,
+          devices: newDeviceCount,
+          timestamp: Date.now()
         });
       }
     });
   },
 
   async onDisconnect(ctx) {
-    // Atomic disconnect handling
+    console.log(`[Presence] ${ctx.meta.username} disconnected from ${ctx.meta.deviceInfo}`);
+
+    // Use transaction for atomic state updates
     await ctx.actor.getStorage().transaction(async (txn) => {
       const storageKey = `presence:user:${ctx.meta.userId}`;
-      const user = await txn.get<StoredUserPresence>(storageKey);
+      const existingUser = await txn.get<StoredUserPresence>(storageKey);
 
-      if (!user) return;
+      if (!existingUser) return;
 
-      const newDeviceCount = Math.max(0, user.deviceCount - 1);
+      const newDeviceCount = Math.max(0, existingUser.deviceCount - 1);
 
       if (newDeviceCount === 0) {
-        // Last device - remove from storage
+        // User's last device disconnected - remove from storage
         await txn.delete(storageKey);
 
+        // Broadcast offline using emit API
         ctx.actor.emit.to("default").emit("presence.offline", {
-          userId: ctx.meta.userId
+          userId: ctx.meta.userId,
+          username: ctx.meta.username,
+          timestamp: Date.now()
         });
       } else {
-        // Update device count
+        // Update device count in storage
         await txn.put(storageKey, {
-          ...user,
+          ...existingUser,
           deviceCount: newDeviceCount,
           lastSeen: Date.now()
         });
 
+        // Broadcast update using emit API
         ctx.actor.emit.to("default").emit("presence.update", {
           userId: ctx.meta.userId,
-          devices: newDeviceCount
+          username: ctx.meta.username,
+          devices: newDeviceCount,
+          timestamp: Date.now()
         });
       }
     });
   },
 
   async onHibernationRestore(actor) {
-    // Reconcile storage with restored sessions after hibernation
-    const allUsers = await loadAllPresence(actor.getStorage());
+    console.log("[Presence] Restoring presence state after hibernation");
 
+    // Load all presence data from storage
+    const allUsers = await loadAllPresenceFromStorage(actor.getStorage());
+
+    // Reconcile storage with actual connected sessions
     await actor.getStorage().transaction(async (txn) => {
-      // Count actual connected devices
-      const actualDeviceCounts = new Map<string, number>();
+      const connectedUserIds = new Set<string>();
+      const userDeviceCounts = new Map<string, number>();
+
       for (const session of actor.sessions.values()) {
-        const count = actualDeviceCounts.get(session.meta.userId) || 0;
-        actualDeviceCounts.set(session.meta.userId, count + 1);
+        const userId = session.meta.userId;
+        connectedUserIds.add(userId);
+        userDeviceCounts.set(userId, (userDeviceCounts.get(userId) || 0) + 1);
       }
 
-      // Sync storage with reality
+      // Clean up stale entries and sync device counts
       for (const [userId, storedUser] of allUsers.entries()) {
-        const actualCount = actualDeviceCounts.get(userId) || 0;
+        const actualDeviceCount = userDeviceCounts.get(userId) || 0;
+        const storageKey = `presence:user:${userId}`;
 
-        if (actualCount === 0) {
-          // Stale entry - remove
-          await txn.delete(`presence:user:${userId}`);
-        } else if (actualCount !== storedUser.deviceCount) {
-          // Sync count
-          await txn.put(`presence:user:${userId}`, {
+        if (actualDeviceCount === 0) {
+          await txn.delete(storageKey);
+        } else if (actualDeviceCount !== storedUser.deviceCount) {
+          await txn.put(storageKey, {
             ...storedUser,
-            deviceCount: actualCount,
+            deviceCount: actualDeviceCount,
             lastSeen: Date.now()
           });
         }
       }
+
+      // Add any users that are in sessions but not in storage
+      for (const [userId, deviceCount] of userDeviceCounts.entries()) {
+        if (!allUsers.has(userId)) {
+          for (const session of actor.sessions.values()) {
+            if (session.meta.userId === userId) {
+              await txn.put(`presence:user:${userId}`, {
+                username: session.meta.username,
+                status: session.meta.status,
+                deviceCount,
+                lastSeen: Date.now()
+              } as StoredUserPresence);
+              break;
+            }
+          }
+        }
+      }
     });
 
-    // Send sync to all restored sessions
-    const reconciledUsers = await loadAllPresence(actor.getStorage());
-    const syncData = {
-      users: Array.from(reconciledUsers.values()),
-      totalUsers: reconciledUsers.size
-    };
+    // Send presence sync to all restored connections using emit API
+    const reconciledUsers = await loadAllPresenceFromStorage(actor.getStorage());
+    const presenceList = Array.from(reconciledUsers.entries()).map(([userId, data]) => ({
+      userId,
+      username: data.username,
+      devices: data.deviceCount,
+      status: data.status
+    }));
 
-    // Broadcast sync to all restored sessions
-    actor.emit.to("default").emit("presence.sync", syncData);
+    const totalConnections = Array.from(reconciledUsers.values())
+      .reduce((sum, user) => sum + user.deviceCount, 0);
+
+    // Broadcast sync to all restored sessions using emit API
+    actor.emit.to("default").emit("presence.sync", {
+      users: presenceList,
+      totalUsers: reconciledUsers.size,
+      totalConnections
+    });
   }
 });
 
-// Register event handlers for status updates (socket.io-like)
+// Register event handlers (socket.io-like)
 presenceRoom.on("presence.status", async (ctx, data) => {
   const { status } = data;
 
   // Validate status
   if (!["online", "away", "busy"].includes(status)) {
+    console.warn(`[Presence] Invalid status received: ${status} from ${ctx.meta.username}`);
     ctx.emit.emit("error", { message: "Invalid status" });
     return;
   }
@@ -159,9 +268,13 @@ presenceRoom.on("presence.status", async (ctx, data) => {
     }
   });
 
+  // Update local metadata
+  ctx.meta.status = status;
+
   // Broadcast status change using emit API
   ctx.actor.emit.to("default").emit("presence.status", {
     userId: ctx.meta.userId,
+    username: ctx.meta.username,
     status,
     timestamp: Date.now()
   });
@@ -169,7 +282,7 @@ presenceRoom.on("presence.status", async (ctx, data) => {
 
 presenceRoom.on("presence.list", async (ctx, data) => {
   // Load presence list from storage (source of truth)
-  const allUsers = await loadAllPresence(ctx.actor.getStorage());
+  const allUsers = await loadAllPresenceFromStorage(ctx.actor.getStorage());
 
   const presenceList = Array.from(allUsers.entries()).map(([userId, data]) => ({
     userId,
@@ -181,6 +294,7 @@ presenceRoom.on("presence.list", async (ctx, data) => {
   const totalConnections = Array.from(allUsers.values())
     .reduce((sum, user) => sum + user.deviceCount, 0);
 
+  // Send sync using emit API
   ctx.emit.emit("presence.sync", {
     users: presenceList,
     totalUsers: allUsers.size,
@@ -188,14 +302,26 @@ presenceRoom.on("presence.list", async (ctx, data) => {
   });
 });
 
-// Helper to load all presence from storage or transaction
-async function loadAllPresence(
-  storageOrTxn: DurableObjectStorage | DurableObjectTransaction
+// Helper functions
+async function loadAllPresenceFromStorage(
+  storage: DurableObjectStorage
 ): Promise<Map<string, StoredUserPresence>> {
-  const users = new Map();
-  const list = await storageOrTxn.list<StoredUserPresence>({
-    prefix: "presence:user:"
-  });
+  const users = new Map<string, StoredUserPresence>();
+  const list = await storage.list<StoredUserPresence>({ prefix: "presence:user:" });
+
+  for (const [key, value] of list.entries()) {
+    const userId = key.replace("presence:user:", "");
+    users.set(userId, value);
+  }
+
+  return users;
+}
+
+async function loadAllPresenceFromTransaction(
+  txn: DurableObjectTransaction
+): Promise<Map<string, StoredUserPresence>> {
+  const users = new Map<string, StoredUserPresence>();
+  const list = await txn.list<StoredUserPresence>({ prefix: "presence:user:" });
 
   for (const [key, value] of list.entries()) {
     const userId = key.replace("presence:user:", "");
@@ -209,33 +335,52 @@ async function loadAllPresence(
 **Client:**
 
 ```typescript
+const token = "user:alice"; // In production, get from auth service
+const client = new VeraniClient(`wss://example.com/ws/presence?token=${encodeURIComponent(token)}`);
+
 const onlineUsers = new Map();
 
 // Presence sync is always authoritative (from storage)
-client.on("presence.sync", ({ users, totalUsers }) => {
+client.on("presence.sync", ({ users, totalUsers, totalConnections }) => {
   onlineUsers.clear();
   users.forEach(u => onlineUsers.set(u.userId, u));
   updateOnlineList(Array.from(onlineUsers.values()));
+  console.log(`Total users: ${totalUsers}, Total connections: ${totalConnections}`);
 });
 
-client.on("presence.online", ({ userId, devices }) => {
-  onlineUsers.set(userId, { userId, devices, status: "online" });
+client.on("presence.online", ({ userId, username, status, devices, timestamp }) => {
+  onlineUsers.set(userId, { userId, username, status, devices });
   updateOnlineList(Array.from(onlineUsers.values()));
-  showNotification(`${userId} came online`);
+  showNotification(`${username} came online`);
 });
 
-client.on("presence.offline", ({ userId }) => {
+client.on("presence.offline", ({ userId, username, timestamp }) => {
   onlineUsers.delete(userId);
   updateOnlineList(Array.from(onlineUsers.values()));
+  showNotification(`${username} went offline`);
 });
 
-client.on("presence.update", ({ userId, devices }) => {
+client.on("presence.update", ({ userId, username, devices, timestamp }) => {
   const user = onlineUsers.get(userId);
   if (user) {
     user.devices = devices;
     updateOnlineList(Array.from(onlineUsers.values()));
   }
 });
+
+client.on("presence.status", ({ userId, username, status, timestamp }) => {
+  const user = onlineUsers.get(userId);
+  if (user) {
+    user.status = status;
+    updateOnlineList(Array.from(onlineUsers.values()));
+  }
+});
+
+// Change status
+client.emit("presence.status", { status: "away" });
+
+// Request presence list
+client.emit("presence.list", {});
 ```
 
 **Why Transactions?**

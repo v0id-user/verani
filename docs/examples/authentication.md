@@ -80,10 +80,7 @@ secureRoom.on("mod.kick", (ctx, data) => {
   onError(error, ctx) {
     console.error(`Auth error for ${ctx.meta.userId}:`, error);
     // Don't expose error details to client
-    ctx.ws.send(JSON.stringify({
-      type: "error",
-      data: { message: "An error occurred" }
-    }));
+    ctx.emit.emit("error", { message: "An error occurred" });
   }
 });
 ```
