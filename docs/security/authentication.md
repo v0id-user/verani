@@ -10,6 +10,8 @@ Authentication verifies **who the user is**. Verani handles authentication in th
 
 ```typescript
 export const publicRoom = defineRoom({
+  name: "public-room",
+  websocketPath: "/ws"
   // Uses default extractMeta
   // userId comes from query param, completely untrusted
 });
@@ -112,6 +114,11 @@ export const secureRoom = defineRoom<AuthMeta>({
   onConnect(ctx) {
     // Now you can trust ctx.meta.userId
     console.log(`Verified user ${ctx.meta.userId} connected`);
+    
+    // Send welcome message using emit API
+    ctx.emit.emit("welcome", {
+      message: `Welcome, ${ctx.meta.email}!`
+    });
   }
 });
 ```
@@ -122,6 +129,9 @@ If you have session cookies:
 
 ```typescript
 export const sessionRoom = defineRoom({
+  name: "session-room",
+  websocketPath: "/ws",
+  
   async extractMeta(req) {
     const sessionId = req.headers.get("Cookie")
       ?.split(";")
@@ -144,6 +154,10 @@ export const sessionRoom = defineRoom({
       clientId: crypto.randomUUID(),
       channels: ["default"]
     };
+  },
+
+  onConnect(ctx) {
+    console.log(`User ${ctx.meta.userId} connected via session`);
   }
 });
 ```
@@ -154,7 +168,10 @@ For server-to-server or mobile apps:
 
 ```typescript
 export const apiKeyRoom = defineRoom({
-  extractMeta(req) {
+  name: "api-key-room",
+  websocketPath: "/ws",
+  
+  async extractMeta(req) {
     const apiKey = req.headers.get("X-API-Key");
 
     if (!apiKey) {
@@ -173,6 +190,10 @@ export const apiKeyRoom = defineRoom({
       clientId: crypto.randomUUID(),
       channels: client.allowedChannels
     };
+  },
+
+  onConnect(ctx) {
+    console.log(`API client ${ctx.meta.userId} connected`);
   }
 });
 ```

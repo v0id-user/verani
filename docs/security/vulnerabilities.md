@@ -10,6 +10,9 @@ Common security vulnerabilities and how to prevent them.
 
 ```typescript
 export const secureRoom = defineRoom({
+  name: "secure-room",
+  websocketPath: "/ws",
+  
   extractMeta(req) {
     const origin = req.headers.get("Origin");
     const allowedOrigins = [
@@ -22,6 +25,11 @@ export const secureRoom = defineRoom({
     }
 
     // Continue with auth...
+    return {
+      userId: "user-id",
+      clientId: crypto.randomUUID(),
+      channels: ["default"]
+    };
   }
 });
 ```
@@ -33,6 +41,11 @@ export const secureRoom = defineRoom({
 **Solution**: Always sanitize before broadcasting:
 
 ```typescript
+export const secureRoom = defineRoom({
+  name: "secure-chat",
+  websocketPath: "/ws"
+});
+
 function sanitize(text: string): string {
   return text
     .replace(/</g, "&lt;")
@@ -41,9 +54,15 @@ function sanitize(text: string): string {
     .trim();
 }
 
-ctx.actor.broadcast("default", {
-  type: "chat.message",
-  text: sanitize(frame.data.text)
+// Register event handler (socket.io-like)
+secureRoom.on("chat.message", (ctx, data) => {
+  const sanitized = sanitize(data.text);
+  
+  // Broadcast sanitized message using emit API
+  ctx.actor.emit.to("default").emit("chat.message", {
+    from: ctx.meta.userId,
+    text: sanitized
+  });
 });
 ```
 
@@ -78,11 +97,8 @@ onError(error, ctx) {
   // Log detailed error server-side
   console.error("Internal error:", error);
 
-  // Send generic message to client
-  ctx.ws.send(JSON.stringify({
-    type: "error",
-    data: { message: "An error occurred" }
-  }));
+  // Send generic message to client using emit API
+  ctx.emit.emit("error", { message: "An error occurred" });
 }
 ```
 

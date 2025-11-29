@@ -16,7 +16,10 @@ const RATE_LIMIT = {
 };
 
 export const rateLimitedRoom = defineRoom<RateLimitMeta>({
-  extractMeta(req) {
+  name: "rate-limited",
+  websocketPath: "/ws",
+
+  async extractMeta(req) {
     // ... auth ...
     return {
       userId: payload.sub,
@@ -25,36 +28,38 @@ export const rateLimitedRoom = defineRoom<RateLimitMeta>({
       messageCount: 0,
       windowStart: Date.now()
     };
-  },
-
-  onMessage(ctx, frame) {
-    const now = Date.now();
-    const meta = ctx.meta;
-
-    // Reset window if expired
-    if (now - meta.windowStart > RATE_LIMIT.WINDOW_MS) {
-      meta.messageCount = 0;
-      meta.windowStart = now;
-    }
-
-    // Increment and check limit
-    meta.messageCount++;
-
-    if (meta.messageCount > RATE_LIMIT.MAX_MESSAGES) {
-      ctx.ws.send(JSON.stringify({
-        type: "error",
-        data: {
-          message: "Rate limit exceeded",
-          retryAfter: Math.ceil(
-            (RATE_LIMIT.WINDOW_MS - (now - meta.windowStart)) / 1000
-          )
-        }
-      }));
-      return;
-    }
-
-    // Process message...
   }
+});
+
+// Register event handlers (socket.io-like)
+rateLimitedRoom.on("chat.message", (ctx, data) => {
+  const now = Date.now();
+  const meta = ctx.meta;
+
+  // Reset window if expired
+  if (now - meta.windowStart > RATE_LIMIT.WINDOW_MS) {
+    meta.messageCount = 0;
+    meta.windowStart = now;
+  }
+
+  // Increment and check limit
+  meta.messageCount++;
+
+  if (meta.messageCount > RATE_LIMIT.MAX_MESSAGES) {
+    ctx.emit.emit("error", {
+      message: "Rate limit exceeded",
+      retryAfter: Math.ceil(
+        (RATE_LIMIT.WINDOW_MS - (now - meta.windowStart)) / 1000
+      )
+    });
+    return;
+  }
+
+  // Process message...
+  ctx.actor.emit.to("default").emit("chat.message", {
+    from: ctx.meta.userId,
+    text: data.text
+  });
 });
 ```
 
@@ -64,29 +69,42 @@ Use Cloudflare KV or Durable Object storage:
 
 ```typescript
 export const globalRateLimitRoom = defineRoom({
-  async onMessage(ctx, frame) {
-    const userId = ctx.meta.userId;
-    const key = `ratelimit:${userId}`;
+  name: "global-rate-limited",
+  websocketPath: "/ws"
+});
 
-    // Get current count from KV
-    const current = await env.KV.get(key);
-    const count = current ? parseInt(current) : 0;
+// Register event handlers (socket.io-like)
+// Note: For KV access, you'll need to store env reference in the Actor state
+// or pass it through extractMeta. This is a simplified example.
+globalRateLimitRoom.on("chat.message", async (ctx, data) => {
+  const userId = ctx.meta.userId;
+  const key = `ratelimit:${userId}`;
 
-    if (count >= 100) {
-      ctx.ws.send(JSON.stringify({
-        type: "error",
-        data: { message: "Daily limit exceeded" }
-      }));
-      return;
-    }
+  // Get current count from KV (requires env access - see configuration guide)
+  // const current = await env.KV.get(key);
+  // const count = current ? parseInt(current) : 0;
 
-    // Increment with TTL
-    await env.KV.put(key, (count + 1).toString(), {
-      expirationTtl: 86400 // 24 hours
-    });
+  // For this example, using a simplified in-memory approach
+  // In production, use KV or Durable Object storage
+  const storage = ctx.actor.getStorage();
+  const current = await storage.get(key);
+  const count = current ? parseInt(current as string) : 0;
 
-    // Process message...
+  if (count >= 100) {
+    ctx.emit.emit("error", { message: "Daily limit exceeded" });
+    return;
   }
+
+  // Increment with TTL (using Durable Object storage)
+  await storage.put(key, (count + 1).toString(), {
+    expirationTtl: 86400 // 24 hours
+  });
+
+  // Process message...
+  ctx.actor.emit.to("default").emit("chat.message", {
+    from: ctx.meta.userId,
+    text: data.text
+  });
 });
 ```
 
