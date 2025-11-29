@@ -77,15 +77,21 @@ if (url.pathname === "/api/notify") {
 **From inside a lifecycle hook (direct call):**
 
 ```typescript
-onMessage(ctx, frame) {
-  // Direct call - synchronous, full access
-  const count = ctx.actor.sendToUser("alice", "default", {
-    type: "message",
-    text: frame.data.text
+room.on("chat.message", (ctx, data) => {
+  // Direct call - synchronous, full access to emit API
+  ctx.actor.emit.to("default").emit("chat.message", {
+    from: ctx.meta.userId,
+    text: data.text
   });
   
-  // Can use except option
-  ctx.actor.broadcast("default", data, { except: ctx.ws });
+  // Or use sendToUser for direct user messaging
+  ctx.actor.sendToUser("alice", "default", {
+    type: "message",
+    text: data.text
+  });
+  
+  // Legacy broadcast API with except option
+  // ctx.actor.broadcast("default", data, { except: ctx.ws });
 }
 ```
 
@@ -95,6 +101,7 @@ onMessage(ctx, frame) {
 2. **Promise Wrapping**: All RPC methods return Promises, even if underlying method is sync
 3. **Serialization**: Only serializable types can be passed/returned over RPC
 4. **Actor ID Consistency**: Use same `idFromName()` value for WebSocket connections and RPC calls
+5. **Emit API Not Available**: The emit API (`ctx.emit`, `ctx.actor.emit`) is only available inside lifecycle hooks. RPC uses `broadcast()` and `sendToUser()` methods directly.
 
 ## RPC Limitations
 
@@ -118,6 +125,7 @@ const userIds = await stub.getConnectedUserIds();
 
 **Broadcast from external events:**
 ```typescript
+// RPC uses broadcast() method (emit API not available over RPC)
 await stub.broadcast("announcements", data, { userIds: ["admin"] });
 ```
 

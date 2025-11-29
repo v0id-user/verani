@@ -29,15 +29,21 @@ Verani provides **three levels of isolation**.
 
 ## Level 3: User-Level Filtering
 
-**Mechanism**: Broadcast filters by `userId` or `clientId`
+**Mechanism**: Send to specific user via emit API or broadcast filters
 
 **Use case**: Direct messages within a room
 
 ```typescript
-// Send only to specific user
-ctx.actor.broadcast("default", data, {
-  userIds: ["alice"]
+// Send to specific user using emit API (preferred)
+ctx.emit.to("alice").emit("message", {
+  text: "Hello Alice!",
+  from: ctx.meta.userId
 });
+
+// Alternative: Broadcast with user filter (legacy API)
+// ctx.actor.broadcast("default", data, {
+//   userIds: ["alice"]
+// });
 ```
 
 ## Related Documentation

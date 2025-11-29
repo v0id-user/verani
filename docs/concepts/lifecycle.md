@@ -69,6 +69,15 @@ const room = defineRoom({
 
 **Note:** The traditional `onMessage` hook is still supported as a fallback when no event handlers match.
 
+**Sending Messages:** Verani provides a socket.io-like emit API for sending messages:
+- `ctx.emit.emit("event", data)` - Send to current socket
+- `ctx.emit.to(userId).emit("event", data)` - Send to specific user (all their sessions)
+- `ctx.emit.to(channel).emit("event", data)` - Broadcast to channel (excluding sender)
+- `ctx.actor.emit.emit("event", data)` - Broadcast to default channel
+- `ctx.actor.emit.to(channel).emit("event", data)` - Broadcast to specific channel
+
+The legacy `ctx.actor.broadcast()` method is still available but the emit API is preferred for a more Socket.io-like experience.
+
 ## Client Side
 
 ```

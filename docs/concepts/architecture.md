@@ -69,8 +69,29 @@ Call onMessage(ctx, frame)
 
 ### Server → Client(s)
 
+**Using Emit API (Preferred):**
+
 ```
-Call actor.broadcast(channel, data)
+Call ctx.actor.emit.to(channel).emit("event", data)
+         ↓
+Filter sessions by:
+  - channel subscription
+  - userIds (optional, via broadcast options)
+  - clientIds (optional, via broadcast options)
+         ↓
+For each matching session:
+  - Encode to JSON frame
+  - ws.send(json)
+         ↓
+Client receives message
+         ↓
+Decode and dispatch to listeners
+```
+
+**Alternative: Legacy Broadcast API**
+
+```
+Call ctx.actor.broadcast(channel, data, options)
          ↓
 Filter sessions by:
   - channel subscription
@@ -86,6 +107,8 @@ Client receives message
          ↓
 Decode and dispatch to listeners
 ```
+
+**Note:** The emit API (`ctx.emit` and `ctx.actor.emit`) is preferred for a Socket.io-like experience. The `broadcast()` method is still available for direct control.
 
 ## Error Handling Philosophy
 

@@ -47,8 +47,11 @@ Actor: "game-room-123"
 When you broadcast to a channel, only connections subscribed to that channel receive the message:
 
 ```typescript
-// Only users in "game-state" channel receive this
-ctx.actor.broadcast("game-state", { score: 100 });
+// Only users in "game-state" channel receive this (using emit API)
+ctx.actor.emit.to("game-state").emit("score", { score: 100 });
+
+// Alternative: Legacy broadcast API (still supported)
+// ctx.actor.broadcast("game-state", { score: 100 });
 ```
 
 **Default behavior**: Every connection starts in the `["default"]` channel.
