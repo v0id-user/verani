@@ -123,9 +123,8 @@ export default {
 
     // Route WebSocket connections to the Durable Object
     if (url.pathname.startsWith("/ws")) {
-      // Get or create a Durable Object instance
-      const id = env.ChatRoom.idFromName("chat-room");
-      const stub = env.ChatRoom.get(id);
+      // Get or create a Durable Object instance using the class's static get() method
+      const stub = ChatRoom.get("chat-room");
       return stub.fetch(request);
     }
 
@@ -135,6 +134,113 @@ export default {
 ```
 
 **Important**: The export name `ChatRoom` MUST match the `class_name` in your Wrangler configuration.
+
+## Step 3.5: Calling Actor Methods via RPC
+
+Since Actors are Durable Objects, you can call their methods remotely using RPC (Remote Procedure Calls). This is useful when you want to send messages to users from HTTP endpoints or other Workers.
+
+### Understanding RPC vs Direct Methods
+
+- **Inside lifecycle hooks** (`onConnect`, `onMessage`, etc.): Use `ctx.actor.method()` directly
+- **From Workers or other Actors**: Use RPC via the stub: `await stub.method()`
+
+### Example: Sending Notifications from an HTTP Endpoint
+
+Update your `src/index.ts` to add an HTTP endpoint that sends messages via RPC:
+
+```typescript
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
+
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
+
+interface Env {
+  // No namespace binding needed - use ChatRoom.get() directly
+}
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Route WebSocket connections to the Durable Object
+    if (url.pathname.startsWith("/ws")) {
+      // Get Actor stub using the class's static get() method
+      const stub = ChatRoom.get("chat-room");
+      return stub.fetch(request);
+    }
+
+    // NEW: HTTP endpoint to send notifications via RPC
+    if (url.pathname === "/api/notify" && request.method === "POST") {
+      const { userId, message } = await request.json();
+
+      // Get the Actor stub using the class's static get() method
+      const stub = ChatRoom.get("chat-room");
+
+      // Call RPC method - note: returns Promise even though method is sync
+      const sentCount = await stub.sendToUser(userId, "default", {
+        type: "notification",
+        message,
+        timestamp: Date.now()
+      });
+
+      return Response.json({
+        success: true,
+        sentTo: sentCount,
+        message: `Notification sent to ${sentCount} session(s)`
+      });
+    }
+
+    return new Response("Not Found", { status: 404 });
+  }
+};
+```
+
+### Available RPC Methods
+
+The Actor stub exposes these methods for remote calls:
+
+- `sendToUser(userId, channel, data?)` - Send message to a specific user
+- `broadcast(channel, data, opts?)` - Broadcast to channel (use `RpcBroadcastOptions`)
+- `getSessionCount()` - Get number of active connections
+- `getConnectedUserIds()` - Get list of connected user IDs
+- `cleanupStaleSessions()` - Remove stale connections
+
+**Important Notes:**
+- RPC methods always return `Promise<T>` even if the underlying method is synchronous
+- Use `RpcBroadcastOptions` for broadcast options (excludes `except` WebSocket option)
+- Methods that return non-serializable types (like `getUserSessions()`, `getStorage()`) are not available via RPC
+
+### Complete RPC Example
+
+```typescript
+// In your Worker fetch handler
+// Get Actor stub using the class's static get() method
+const stub = ChatRoom.get("chat-room");
+
+// Send to specific user
+await stub.sendToUser("alice", "notifications", {
+  type: "alert",
+  text: "You have a new message"
+});
+
+// Broadcast to channel with filters
+await stub.broadcast("general", {
+  type: "announcement",
+  text: "Server maintenance in 5 minutes"
+}, {
+  userIds: ["admin", "moderator"] // Only send to these users
+});
+
+// Query actor state
+const count = await stub.getSessionCount();
+const userIds = await stub.getConnectedUserIds();
+console.log(`${count} users online: ${userIds.join(", ")}`);
+
+// Clean up stale sessions
+const cleaned = await stub.cleanupStaleSessions();
+console.log(`Cleaned up ${cleaned} stale sessions`);
+```
 
 ## Step 4: Configure Wrangler
 
@@ -164,10 +270,11 @@ Update your `wrangler.jsonc`:
 }
 ```
 
-**Three-way relationship** - these must all align:
+**Two-way relationship** - these must align:
 1. Export in `src/index.ts`: `export { ChatRoom }`
 2. Class name in config: `"class_name": "ChatRoom"`
-3. Environment binding: Access via `env.ChatRoom`
+
+**Note**: You access the Actor via `ChatRoom.get(id)` - no namespace binding needed in your code!
 
 ## Step 5: Deploy
 
@@ -565,7 +672,8 @@ export const chatRoom = defineRoom<ChatMeta>({
 1. Check your Worker URL is correct
 2. Use `wss://` not `ws://` for production
 3. Check browser console for errors
-4. Verify your Durable Object binding is correct in `wrangler.toml`
+4. Verify your Durable Object binding is correct in `wrangler.jsonc`
+5. Ensure the export name matches `class_name` in wrangler config
 
 ### Messages not reaching clients
 
@@ -573,6 +681,23 @@ export const chatRoom = defineRoom<ChatMeta>({
 2. Verify clients are subscribed to that channel
 3. Check server logs with `npx wrangler tail`
 4. Use browser DevTools → Network → WS to inspect WebSocket frames
+5. Ensure the Actor instance ID matches (same `idFromName()` value)
+
+### RPC calls not working
+
+1. **"Method not found"**: Ensure you're using the stub from `ChatRoom.get(id)`, not calling methods directly on the class
+2. **"Promise not awaited"**: RPC methods always return Promises - use `await`
+3. **"Cannot serialize"**: Don't pass WebSocket objects or DurableObjectStorage in RPC calls
+4. **"Actor not found"**: Ensure the Actor ID matches what you used for WebSocket connections
+
+```typescript
+// ✅ Correct: Get stub using class's static get() method
+const stub = ChatRoom.get("chat-room");
+await stub.sendToUser("alice", "default", data);
+
+// ❌ Wrong: Can't call methods directly on the class
+await ChatRoom.sendToUser(...); // This won't work! Use stub instead.
+```
 
 ### Reconnection not working
 
@@ -590,11 +715,56 @@ const client = new VeraniClient(url, {
 });
 ```
 
+## Quick Reference
+
+### Common Patterns
+
+**Send message to user from lifecycle hook:**
+```typescript
+ctx.actor.sendToUser("alice", "default", { type: "message", text: "Hello" });
+```
+
+**Send message to user via RPC (from Worker):**
+```typescript
+const stub = ChatRoom.get("chat-room");
+await stub.sendToUser("alice", "default", { type: "message", text: "Hello" });
+```
+
+**Broadcast to channel:**
+```typescript
+// Inside lifecycle hook - can use except option
+ctx.actor.broadcast("default", data, { except: ctx.ws });
+
+// Via RPC - use RpcBroadcastOptions (no except option)
+await stub.broadcast("default", data, { userIds: ["alice", "bob"] });
+```
+
+**Get actor state:**
+```typescript
+// Inside lifecycle hook
+const count = ctx.actor.getSessionCount();
+const userIds = ctx.actor.getConnectedUserIds();
+
+// Via RPC
+const count = await stub.getSessionCount();
+const userIds = await stub.getConnectedUserIds();
+```
+
+### Key Differences: Direct vs RPC
+
+| Feature | Direct (`ctx.actor`) | RPC (`stub`) |
+|---------|---------------------|--------------|
+| **Where** | Inside lifecycle hooks | From Workers/other Actors |
+| **Returns** | Synchronous value | Always `Promise<T>` |
+| **Broadcast options** | `BroadcastOptions` (includes `except`) | `RpcBroadcastOptions` (no `except`) |
+| **Available methods** | All methods | Only serializable return types |
+
 ## What's Next?
 
-- **[Mental Model](./MENTAL_MODEL.md)** - Understand the architecture
-- **[API Reference](./API.md)** - Complete API docs
-- **[Examples](./EXAMPLES.md)** - More usage patterns
+- **[Mental Model](./MENTAL_MODEL.md)** - Understand the architecture and RPC concepts
+- **[API Reference](./API.md)** - Complete API docs including RPC methods
+- **[Examples](./EXAMPLES.md)** - More usage patterns including RPC examples
+- **[Security Guide](./SECURITY.md)** - Authentication and authorization
 
 Congratulations! You've built your first Verani application. 🎉
 

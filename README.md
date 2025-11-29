@@ -161,6 +161,7 @@ Verani handles Cloudflare's hibernation automatically:
 - WebSocket attachment management for hibernation
 - Selective broadcasting with filters
 - User and client ID tracking
+- **RPC methods** - Call Actor methods remotely from Workers or other Actors
 - Error boundaries and logging
 - Flexible metadata extraction from requests
 
@@ -172,6 +173,13 @@ Verani handles Cloudflare's hibernation automatically:
 - Event-based API (on/off/once/emit)
 - Promise-based connection waiting
 - Lifecycle callbacks
+
+### RPC Support
+
+- Send messages to users from HTTP endpoints
+- Query actor state remotely
+- Broadcast from external events or scheduled tasks
+- Coordinate between multiple Actors
 
 ## Live Examples
 

@@ -416,6 +416,205 @@ async function getAllUsers(storage: DurableObjectStorage) {
 
 ---
 
+### `ActorStub` - RPC Methods
+
+The Actor stub interface provides remote access to Actor methods from Workers or other Actors. These methods are called via RPC (Remote Procedure Calls) and always return Promises.
+
+**Getting a stub:**
+```typescript
+const id = env.CHAT.idFromName("room-id");
+const stub = env.CHAT.get(id); // Returns ActorStub
+```
+
+**Important differences from direct Actor methods:**
+- RPC methods always return `Promise<T>` even if the underlying method is synchronous
+- Use `RpcBroadcastOptions` instead of `BroadcastOptions` (excludes `except` WebSocket option)
+- Only methods with serializable return types are available via RPC
+- Methods like `getUserSessions()` and `getStorage()` are not available via RPC
+
+#### `stub.fetch(request: Request): Promise<Response>`
+
+Standard fetch method for handling HTTP requests and WebSocket upgrades.
+
+**Example:**
+```typescript
+const stub = env.CHAT.get(id);
+const response = await stub.fetch(request);
+```
+
+#### `stub.sendToUser(userId: string, channel: string, data?: any): Promise<number>`
+
+Sends a message to a specific user (all their sessions) via RPC.
+
+**Parameters:**
+- `userId: string` - User ID to send to
+- `channel: string` - Channel to send to
+- `data?: any` - Optional message data
+
+**Returns:** Promise resolving to the number of sessions that received the message
+
+**Example:**
+```typescript
+const stub = env.CHAT.get(id);
+const sentCount = await stub.sendToUser("alice", "notifications", {
+  type: "alert",
+  message: "You have a new message"
+});
+console.log(`Sent to ${sentCount} session(s)`);
+```
+
+#### `stub.broadcast(channel: string, data: any, opts?: RpcBroadcastOptions): Promise<number>`
+
+Broadcasts a message to all connections in a channel via RPC.
+
+**Parameters:**
+- `channel: string` - Channel to broadcast to
+- `data: any` - Data to send
+- `opts?: RpcBroadcastOptions` - Filtering options (userIds, clientIds)
+
+**Returns:** Promise resolving to the number of connections that received the message
+
+**Note:** The `except` option from `BroadcastOptions` is not available over RPC since WebSocket cannot be serialized.
+
+**Example:**
+```typescript
+const stub = env.CHAT.get(id);
+
+// Broadcast to all in channel
+await stub.broadcast("default", { type: "announcement", text: "Hello!" });
+
+// Broadcast only to specific users
+await stub.broadcast("general", { type: "update" }, {
+  userIds: ["alice", "bob"]
+});
+
+// Broadcast only to specific clients
+await stub.broadcast("notifications", { type: "alert" }, {
+  clientIds: ["client-123", "client-456"]
+});
+```
+
+#### `stub.getSessionCount(): Promise<number>`
+
+Gets the total number of active sessions via RPC.
+
+**Returns:** Promise resolving to the number of connected WebSockets
+
+**Example:**
+```typescript
+const stub = env.CHAT.get(id);
+const count = await stub.getSessionCount();
+console.log(`${count} users online`);
+```
+
+#### `stub.getConnectedUserIds(): Promise<string[]>`
+
+Gets all unique user IDs currently connected via RPC.
+
+**Returns:** Promise resolving to an array of unique user IDs
+
+**Example:**
+```typescript
+const stub = env.CHAT.get(id);
+const userIds = await stub.getConnectedUserIds();
+console.log(`Online users: ${userIds.join(", ")}`);
+```
+
+#### `stub.cleanupStaleSessions(): Promise<number>`
+
+Removes all WebSocket sessions that are not in OPEN state via RPC.
+
+**Returns:** Promise resolving to the number of sessions cleaned up
+
+**Example:**
+```typescript
+const stub = env.CHAT.get(id);
+const cleaned = await stub.cleanupStaleSessions();
+console.log(`Cleaned up ${cleaned} stale sessions`);
+```
+
+**Complete RPC Example:**
+
+```typescript
+// In your Worker fetch handler
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    
+    if (url.pathname === "/api/send-notification") {
+      const { userId, message } = await request.json();
+      
+      // Get Actor stub
+      const id = env.CHAT.idFromName("chat-room");
+      const stub = env.CHAT.get(id);
+      
+      // Send notification via RPC
+      const sentCount = await stub.sendToUser(userId, "notifications", {
+        type: "notification",
+        message,
+        timestamp: Date.now()
+      });
+      
+      return Response.json({ 
+        success: true, 
+        sentTo: sentCount 
+      });
+    }
+    
+    if (url.pathname === "/api/stats") {
+      const id = env.CHAT.idFromName("chat-room");
+      const stub = env.CHAT.get(id);
+      
+      // Query actor state via RPC
+      const [count, userIds] = await Promise.all([
+        stub.getSessionCount(),
+        stub.getConnectedUserIds()
+      ]);
+      
+      return Response.json({
+        onlineUsers: count,
+        userIds
+      });
+    }
+    
+    return new Response("Not Found", { status: 404 });
+  }
+};
+```
+
+---
+
+### `RpcBroadcastOptions`
+
+RPC-safe version of `BroadcastOptions` for use over RPC calls. Excludes the `except` field since WebSocket cannot be serialized.
+
+```typescript
+interface RpcBroadcastOptions {
+  /** Only send to specific user IDs */
+  userIds?: string[];
+  /** Only send to specific client IDs */
+  clientIds?: string[];
+}
+```
+
+**Comparison:**
+
+```typescript
+// Inside lifecycle hook - can use except
+ctx.actor.broadcast("default", data, { 
+  except: ctx.ws,           // ✅ Available
+  userIds: ["alice", "bob"] 
+});
+
+// Via RPC - use RpcBroadcastOptions
+await stub.broadcast("default", data, { 
+  except: ctx.ws,           // ❌ Not available - WebSocket can't be serialized
+  userIds: ["alice", "bob"] // ✅ Available
+});
+```
+
+---
+
 ### `ConnectionMeta`
 
 Base metadata structure for connections.
@@ -456,15 +655,17 @@ interface MessageFrame {
 
 ### `BroadcastOptions`
 
-Options for filtering broadcast recipients.
+Options for filtering broadcast recipients. Use this when calling `broadcast()` directly on the Actor instance (inside lifecycle hooks).
 
 ```typescript
 interface BroadcastOptions {
-  except?: WebSocket;        // Exclude this connection
+  except?: WebSocket;        // Exclude this connection (not available via RPC)
   userIds?: string[];        // Only send to these users
   clientIds?: string[];      // Only send to these clients
 }
 ```
+
+**Note:** For RPC calls, use `RpcBroadcastOptions` instead, which excludes the `except` option.
 
 ---
 
@@ -804,7 +1005,10 @@ import type {
   ConnectionMeta,
   MessageFrame,
   BroadcastOptions,
+  RpcBroadcastOptions,
   VeraniActor,
+  ActorStub,
+  ActorHandlerClass,
 
   // Client types
   VeraniClientOptions,
