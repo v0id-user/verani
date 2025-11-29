@@ -1,5 +1,11 @@
 # Verani
 
+<div align="center">
+
+[![MADE BY #V0ID](https://img.shields.io/badge/MADE%20BY%20%23V0ID-F3EEE1.svg?style=for-the-badge)](https://github.com/v0id-user)
+
+</div>
+
 > A simple, focused realtime SDK for Cloudflare Actors with Socket.io-like semantics
 
 Verani brings the familiar developer experience of Socket.io to Cloudflare's Durable Objects (Actors), with proper hibernation support and minimal overhead.
