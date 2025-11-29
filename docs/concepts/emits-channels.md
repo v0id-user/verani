@@ -100,6 +100,85 @@ room.on("private.message", (ctx, data) => {
 
 **How it works**: If the target doesn't match any of the current user's channels, it's treated as a userId and sent to all sessions of that user. The message is sent to sessions that are subscribed to the default channel (first channel in `meta.channels`).
 
+#### 1-to-1 Messaging
+
+For direct messaging between two users, both users must:
+1. **Be connected to the same Actor instance** (same room/context)
+2. **Be subscribed to at least one common channel** (typically `"default"`)
+
+This requirement ensures that users are in the same logical space before they can exchange messages. Channels act as the delivery mechanism - if users aren't subscribed to a common channel, messages won't be delivered.
+
+**Example: Direct Messaging**
+
+**Server:**
+```typescript
+room.on("direct.message", (ctx, data) => {
+  // Send to specific user (all their sessions)
+  // Uses default channel - recipient must be subscribed to it
+  const sentCount = ctx.emit.to(data.targetUserId).emit("direct.message", {
+    from: ctx.meta.userId,
+    text: data.text,
+    timestamp: Date.now()
+  });
+
+  // Optional: Send acknowledgment to sender
+  if (sentCount === 0) {
+    ctx.emit.emit("error", {
+      message: "User not found or not subscribed to default channel"
+    });
+  }
+});
+```
+
+**Client:**
+```typescript
+const client = new VeraniClient("wss://example.com/ws?userId=alice");
+
+// Send direct message
+client.emit("direct.message", {
+  targetUserId: "bob",
+  text: "Hello Bob!"
+});
+
+// Receive direct messages
+client.on("direct.message", (data) => {
+  console.log(`From ${data.from}: ${data.text}`);
+});
+```
+
+**Alternative: Using sendToUser with explicit channel**
+
+If you want more control over which channel to use for direct messages:
+
+```typescript
+room.on("direct.message", (ctx, data) => {
+  // Send to user on a specific channel
+  const sentCount = ctx.actor.sendToUser(
+    data.targetUserId,
+    "default", // or "direct-messages" if you create a dedicated channel
+    {
+      type: "direct.message",
+      from: ctx.meta.userId,
+      text: data.text
+    }
+  );
+});
+```
+
+**Best Practices for 1-to-1 Messaging:**
+
+1. **Use the default channel**: Most users are subscribed to `"default"` by default, making it the most reliable channel for direct messages
+2. **Handle delivery failures**: Check the return value to see if the message was delivered (returns number of sessions that received it)
+3. **Consider multi-device users**: Messages are sent to all sessions of the target user, which is usually desired behavior
+4. **Same Actor requirement**: Users must be in the same Actor instance - if you need cross-Actor messaging, use RPC or external messaging systems
+
+**Important Notes:**
+
+- If the target user is not subscribed to the channel being used, the message won't be delivered (returns 0)
+- Messages are sent to all active sessions of the target user, not just one session
+- Both users must be connected to the same Actor instance for this to work
+- For cross-Actor messaging (users in different rooms), use RPC calls between Actors or external messaging systems
+
 ### Actor-Level Emits (`actor.emit`)
 
 Available on the Actor instance for broadcasting to channels.
@@ -333,15 +412,30 @@ room.on("chat.message", (ctx, data) => {
 });
 ```
 
-#### Socket Emit to User
+#### Socket Emit to User (1-to-1 Messaging)
 
 ```typescript
 room.on("private.message", (ctx, data) => {
   // Send to specific user (all their sessions)
-  ctx.emit.to(data.targetUserId).emit("private.message", {
+  // Both users must be in same Actor and subscribed to common channel
+  const sentCount = ctx.emit.to(data.targetUserId).emit("private.message", {
     from: ctx.meta.userId,
-    text: data.text
+    text: data.text,
+    timestamp: Date.now()
   });
+
+  // Optional: Notify sender if message wasn't delivered
+  if (sentCount === 0) {
+    ctx.emit.emit("error", {
+      message: "User not available or not in same channel"
+    });
+  } else {
+    // Confirm delivery to sender
+    ctx.emit.emit("message.sent", {
+      to: data.targetUserId,
+      timestamp: Date.now()
+    });
+  }
 });
 ```
 
@@ -423,6 +517,44 @@ client.once("welcome", (data) => {
   console.log("Welcome:", data.message);
 });
 ```
+
+#### 1-to-1 Messaging
+
+```typescript
+const client = new VeraniClient("wss://example.com/ws?userId=alice");
+
+// Send a direct message to another user
+function sendDirectMessage(targetUserId, text) {
+  client.emit("private.message", {
+    targetUserId: targetUserId,
+    text: text
+  });
+}
+
+// Listen for incoming direct messages
+client.on("private.message", (data) => {
+  console.log(`Direct message from ${data.from}: ${data.text}`);
+  // Display in UI
+  displayDirectMessage(data.from, data.text, data.timestamp);
+});
+
+// Handle message delivery confirmation
+client.on("message.sent", (data) => {
+  console.log(`Message delivered to ${data.to}`);
+});
+
+// Handle delivery errors
+client.on("error", (data) => {
+  console.error("Message error:", data.message);
+});
+
+// Example usage
+sendDirectMessage("bob", "Hello Bob! How are you?");
+```
+
+**Important**: For 1-to-1 messaging to work, both users must:
+- Be connected to the same Actor instance (same room)
+- Be subscribed to a common channel (usually "default")
 
 #### Channel-Based Message Handling
 
