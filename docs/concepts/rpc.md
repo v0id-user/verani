@@ -30,7 +30,7 @@ Since Actors are Durable Objects, you can call their methods remotely from Worke
 |                      |                                       |
 |                      v                                       |
 |              Get Actor Stub                                 |
-|              env.ACTOR.get(id)                              |
+|              ActorClass.get("id")                              |
 |                      |                                       |
 |                      v                                       |
 |              RPC Call (stub.sendToUser(...))                |
@@ -56,20 +56,25 @@ Since Actors are Durable Objects, you can call their methods remotely from Worke
 **From a Worker HTTP endpoint:**
 
 ```typescript
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
+
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
+
 // In your Worker fetch handler
 if (url.pathname === "/api/notify") {
   const { userId, message } = await request.json();
-  
-  // Get Actor stub
-  const id = env.CHAT.idFromName("chat-room");
-  const stub = env.CHAT.get(id);
-  
+
+  // Get Actor stub (simple - just pass the ID string)
+  const stub = ChatRoom.get("chat-room");
+
   // Call via RPC - returns Promise
   const sentCount = await stub.sendToUser(userId, "default", {
     type: "notification",
     message
   });
-  
+
   return Response.json({ sentTo: sentCount });
 }
 ```
@@ -83,13 +88,13 @@ room.on("chat.message", (ctx, data) => {
     from: ctx.meta.userId,
     text: data.text
   });
-  
+
   // Or use sendToUser for direct user messaging
   ctx.actor.sendToUser("alice", "default", {
     type: "message",
     text: data.text
   });
-  
+
   // Legacy broadcast API with except option
   // ctx.actor.broadcast("default", data, { except: ctx.ws });
 }
@@ -97,10 +102,12 @@ room.on("chat.message", (ctx, data) => {
 
 ## Key RPC Concepts
 
-1. **Actor Stub**: Obtained via `env.NAMESPACE.get(id)` - provides RPC interface
+1. **Actor Stub**: Obtained via `ActorHandlerClass.get(id)` - provides RPC interface
+   - Export: `export const ChatRoom = createActorHandler(chatRoom);` (variable name must match wrangler.jsonc `class_name`)
+   - Usage: `const stub = ChatRoom.get("room-id");`
 2. **Promise Wrapping**: All RPC methods return Promises, even if underlying method is sync
 3. **Serialization**: Only serializable types can be passed/returned over RPC
-4. **Actor ID Consistency**: Use same `idFromName()` value for WebSocket connections and RPC calls
+4. **Actor ID Consistency**: Use the same ID string for WebSocket connections and RPC calls to reach the same Actor instance
 5. **Emit API Not Available**: The emit API (`ctx.emit`, `ctx.actor.emit`) is only available inside lifecycle hooks. RPC uses `broadcast()` and `sendToUser()` methods directly.
 
 ## RPC Limitations
@@ -132,7 +139,7 @@ await stub.broadcast("announcements", data, { userIds: ["admin"] });
 **Coordinate between Actors:**
 ```typescript
 // From Actor A, call Actor B
-const otherStub = env.OTHER_ACTOR.get(otherId);
+const otherStub = OtherRoom.get("other-room-id");
 await otherStub.sendToUser(userId, "default", message);
 ```
 

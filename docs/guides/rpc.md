@@ -8,20 +8,24 @@ When using RPC methods (calling Actor methods from Workers or other Actors), kee
 
 ### Actor ID Consistency
 
-**Critical**: Use the same `idFromName()` value for WebSocket connections and RPC calls to the same Actor instance.
+**Critical**: Use the same ID string for WebSocket connections and RPC calls to reach the same Actor instance.
 
 ```typescript
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
+
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
+
 // ✅ Correct: Same ID for WebSocket and RPC
 const actorId = "chat-room-123";
 
 // WebSocket connection
-const id = env.CHAT.idFromName(actorId);
-const stub = env.CHAT.get(id);
+const stub = ChatRoom.get(actorId);
 await stub.fetch(wsRequest);
 
 // RPC call (must use same ID)
-const id = env.CHAT.idFromName(actorId); // Same value!
-const stub = env.CHAT.get(id);
+const stub = ChatRoom.get(actorId); // Same value!
 await stub.sendToUser("alice", "default", data);
 ```
 
@@ -71,7 +75,7 @@ const userIds = await stub.getConnectedUserIds();
 1. Ensure you're using the stub, not the class directly:
 ```typescript
 // ✅ Correct
-const stub = env.CHAT.get(id);
+const stub = ChatRoom.get("room-id");
 await stub.sendToUser(...);
 
 // ❌ Wrong

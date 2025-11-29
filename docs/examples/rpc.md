@@ -35,18 +35,13 @@ import { notificationsRoom } from "./rooms/notifications";
 const NotificationsRoom = createActorHandler(notificationsRoom);
 export { NotificationsRoom };
 
-interface Env {
-  NOTIFICATIONS: DurableObjectNamespace;
-}
-
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
     // WebSocket connections
     if (url.pathname.startsWith("/notifications")) {
-      const id = env.NOTIFICATIONS.idFromName("notifications");
-      const stub = env.NOTIFICATIONS.get(id);
+      const stub = NotificationsRoom.get("notifications");
       return stub.fetch(request);
     }
 
@@ -60,9 +55,8 @@ export default {
 
       const { userId, message, type = "info" } = await request.json();
 
-      // Get Actor stub
-      const id = env.NOTIFICATIONS.idFromName(`notifications:${userId}`);
-      const stub = env.NOTIFICATIONS.get(id);
+      // Get Actor stub (variable name must match wrangler.jsonc class_name)
+      const stub = NotificationsRoom.get(`notifications:${userId}`);
 
       // Send notification via RPC
       const sentCount = await stub.sendToUser(userId, "default", {
@@ -105,8 +99,7 @@ Get real-time statistics about connected users:
 ```typescript
 // In your Worker fetch handler
 if (url.pathname === "/api/stats") {
-  const id = env.NOTIFICATIONS.idFromName("notifications");
-  const stub = env.NOTIFICATIONS.get(id);
+  const stub = NotificationsRoom.get("notifications");
 
   // Query actor state via RPC
   const [count, userIds] = await Promise.all([
@@ -127,12 +120,17 @@ if (url.pathname === "/api/stats") {
 Send announcements to all users in a channel:
 
 ```typescript
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
+
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
+
 // Webhook handler for external events
 if (url.pathname === "/webhook/announcement" && request.method === "POST") {
   const { announcement, channel = "default", targetUsers } = await request.json();
 
-  const id = env.CHAT.idFromName("chat-room");
-  const stub = env.CHAT.get(id);
+  const stub = ChatRoom.get("chat-room");
 
   // Broadcast via RPC with optional user filtering
   const opts = targetUsers ? { userIds: targetUsers } : undefined;
@@ -169,8 +167,7 @@ export default {
 
     // Send to each user's notification Actor
     for (const userId of usersToNotify) {
-      const id = env.NOTIFICATIONS.idFromName(`notifications:${userId}`);
-      const stub = env.NOTIFICATIONS.get(id);
+      const stub = NotificationsRoom.get(`notifications:${userId}`);
 
       await stub.sendToUser(userId, "default", {
         type: "daily-digest",
@@ -187,13 +184,18 @@ export default {
 Call Actor methods from other Actors:
 
 ```typescript
+import { createActorHandler } from "verani";
+import { otherRoom } from "./rooms/other";
+
+const OtherRoom = createActorHandler(otherRoom);
+export { OtherRoom };
+
 // In one Actor's event handler (socket.io-like)
 room.on("cross-room-message", async (ctx, data) => {
   const { targetRoom, targetUser, message } = data;
 
   // Get another Actor's stub
-  const targetId = env.OTHER_ROOM.idFromName(targetRoom);
-  const targetStub = env.OTHER_ROOM.get(targetId);
+  const targetStub = OtherRoom.get(targetRoom);
 
   // Send message via RPC
   await targetStub.sendToUser(targetUser, "default", {
@@ -208,9 +210,10 @@ room.on("cross-room-message", async (ctx, data) => {
 
 1. **Always use `await`**: RPC methods return Promises even if the underlying method is synchronous
 2. **Use `RpcBroadcastOptions`**: For broadcast options, use `RpcBroadcastOptions` (excludes `except` WebSocket option)
-3. **Actor ID consistency**: Use the same `idFromName()` value for WebSocket connections and RPC calls
-4. **Error handling**: RPC calls can fail - wrap in try/catch
-5. **Performance**: RPC calls have network overhead - batch operations when possible
+3. **Actor ID consistency**: Use the same ID string for WebSocket connections and RPC calls to reach the same Actor instance
+4. **Variable name must match wrangler.jsonc**: The exported variable name must match the `class_name` in wrangler.jsonc
+5. **Error handling**: RPC calls can fail - wrap in try/catch
+6. **Performance**: RPC calls have network overhead - batch operations when possible
 
 ## Error Handling
 

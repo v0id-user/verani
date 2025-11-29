@@ -768,8 +768,14 @@ The Actor stub interface provides remote access to Actor methods from Workers or
 
 **Getting a stub:**
 ```typescript
-const id = env.CHAT.idFromName("room-id");
-const stub = env.CHAT.get(id); // Returns ActorStub
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
+
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
+
+// Get Actor stub (variable name must match wrangler.jsonc class_name)
+const stub = ChatRoom.get("room-id"); // Returns ActorStub
 ```
 
 **Important differences from direct Actor methods:**
@@ -784,7 +790,7 @@ Standard fetch method for handling HTTP requests and WebSocket upgrades.
 
 **Example:**
 ```typescript
-const stub = env.CHAT.get(id);
+const stub = ChatRoom.get("room-id");
 const response = await stub.fetch(request);
 ```
 
@@ -801,7 +807,7 @@ Sends a message to a specific user (all their sessions) via RPC.
 
 **Example:**
 ```typescript
-const stub = env.CHAT.get(id);
+const stub = ChatRoom.get("room-id");
 const sentCount = await stub.sendToUser("alice", "notifications", {
   type: "alert",
   message: "You have a new message"
@@ -824,7 +830,7 @@ Broadcasts a message to all connections in a channel via RPC.
 
 **Example:**
 ```typescript
-const stub = env.CHAT.get(id);
+const stub = ChatRoom.get("room-id");
 
 // Broadcast to all in channel
 await stub.broadcast("default", { type: "announcement", text: "Hello!" });
@@ -848,7 +854,7 @@ Gets the total number of active sessions via RPC.
 
 **Example:**
 ```typescript
-const stub = env.CHAT.get(id);
+const stub = ChatRoom.get("room-id");
 const count = await stub.getSessionCount();
 console.log(`${count} users online`);
 ```
@@ -861,7 +867,7 @@ Gets all unique user IDs currently connected via RPC.
 
 **Example:**
 ```typescript
-const stub = env.CHAT.get(id);
+const stub = ChatRoom.get("room-id");
 const userIds = await stub.getConnectedUserIds();
 console.log(`Online users: ${userIds.join(", ")}`);
 ```
@@ -874,7 +880,7 @@ Removes all WebSocket sessions that are not in OPEN state via RPC.
 
 **Example:**
 ```typescript
-const stub = env.CHAT.get(id);
+const stub = ChatRoom.get("room-id");
 const cleaned = await stub.cleanupStaleSessions();
 console.log(`Cleaned up ${cleaned} stale sessions`);
 ```
@@ -882,6 +888,12 @@ console.log(`Cleaned up ${cleaned} stale sessions`);
 **Complete RPC Example:**
 
 ```typescript
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
+
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
+
 // In your Worker fetch handler
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -890,9 +902,8 @@ export default {
     if (url.pathname === "/api/send-notification") {
       const { userId, message } = await request.json();
       
-      // Get Actor stub
-      const id = env.CHAT.idFromName("chat-room");
-      const stub = env.CHAT.get(id);
+      // Get Actor stub (variable name must match wrangler.jsonc class_name)
+      const stub = ChatRoom.get("chat-room");
       
       // Send notification via RPC
       const sentCount = await stub.sendToUser(userId, "notifications", {
@@ -908,8 +919,7 @@ export default {
     }
     
     if (url.pathname === "/api/stats") {
-      const id = env.CHAT.idFromName("chat-room");
-      const stub = env.CHAT.get(id);
+      const stub = ChatRoom.get("chat-room");
       
       // Query actor state via RPC
       const [count, userIds] = await Promise.all([

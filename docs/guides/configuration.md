@@ -34,17 +34,12 @@ export { ChatRoom };
 }
 ```
 
-3. **Environment Binding** - Access in your Worker:
+3. **Usage in your Worker** - Access the Actor directly:
 ```typescript
-interface Env {
-  CHAT: DurableObjectNamespace;  // From wrangler.jsonc "name"
-}
-
 export default {
   async fetch(request: Request, env: Env) {
-    // Use the binding to get a Durable Object instance
-    const id = env.ChatRoom.idFromName("room-123");
-    const stub = env.ChatRoom.get(id);
+    // Use the exported class directly (variable name must match wrangler.jsonc class_name)
+    const stub = ChatRoom.get("room-123");
     return stub.fetch(request);
   }
 };
@@ -56,9 +51,9 @@ export default {
 - **Cause**: Export name doesn't match `class_name` in wrangler.jsonc
 - **Fix**: Ensure `export { ChatRoom }` matches `"class_name": "ChatRoom"`
 
-**Error**: `Property 'CHAT' does not exist on type 'Env'`
-- **Cause**: Missing TypeScript interface for environment bindings
-- **Fix**: Define the `Env` interface with your Durable Object namespace
+**Error**: `Cannot find name 'ChatRoom'`
+- **Cause**: Missing export or import of the Actor handler class
+- **Fix**: Ensure you've exported the class: `export { ChatRoom };` and imported it where needed
 
 **Error**: `Generic type 'Actor<E>' requires 1 type argument`
 - **Cause**: Incorrect use of the handler wrapper
@@ -94,8 +89,8 @@ Create or update your `wrangler.jsonc`:
 
 ### Critical Configuration Notes:
 
-1. **class_name**: MUST exactly match the exported class name in `src/index.ts`
-2. **name**: The binding name you'll use in your code (e.g., `env.ChatRoom`)
+1. **class_name**: MUST exactly match the exported variable name in `src/index.ts`
+2. **name**: Optional binding name (not needed when using direct class method)
 3. **migrations**: Required for Durable Objects. Increment the tag for schema changes
 
 ## Export Your Durable Object Class
@@ -112,11 +107,6 @@ const ChatRoom = createActorHandler(chatRoom);
 // Export it - name MUST match wrangler.jsonc class_name
 export { ChatRoom };
 
-// Define environment bindings
-interface Env {
-  CHAT: DurableObjectNamespace;
-}
-
 // Export fetch handler for routing
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -124,8 +114,7 @@ export default {
 
     // Route WebSocket connections to the Durable Object
     if (url.pathname.startsWith("/ws")) {
-      const id = env.ChatRoom.idFromName("chat-room");
-      const stub = env.ChatRoom.get(id);
+      const stub = ChatRoom.get("chat-room");
       return stub.fetch(request);
     }
 
