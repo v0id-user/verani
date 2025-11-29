@@ -252,14 +252,17 @@ See `examples/` for chat, presence, and notifications demos!
 
 ## Project Status
 
-Verani is in active development. Current version is an MVP focused on core functionality:
+Verani is in active development. Current version includes:
 
+**Implemented:**
 - Core realtime messaging
 - Hibernation support
 - Client reconnection
-- Presence protocol (coming soon)
-- Persistent storage integration (coming soon)
-- React/framework adapters (coming soon)
+- Presence protocol with multi-device support
+- Persistent storage integration with Durable Object storage
+
+**Coming Soon:**
+- React/framework adapters
 
 ## License
 
