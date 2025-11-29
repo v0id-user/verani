@@ -143,16 +143,58 @@ if (client.isConnected()) {
 
 ---
 
-## `client.waitForConnection(): Promise<void>`
+## `client.getConnectionState(): ConnectionStateInfo`
 
-Returns a promise that resolves when connected.
+Returns detailed connection state information.
+
+**Returns:** An object containing:
+- `state: ConnectionState` - Current connection state (`"connecting" | "connected" | "disconnected" | "reconnecting" | "error"`)
+- `isConnected: boolean` - Whether the client is currently connected
+- `isConnecting: boolean` - Whether the client is currently attempting to connect
+- `reconnectAttempts: number` - Number of reconnection attempts made
+- `connectionId: number` - Unique identifier for the current connection attempt
 
 **Example:**
 
 ```typescript
-await client.waitForConnection();
-console.log("Now connected!");
-client.emit("ready", {});
+const info = client.getConnectionState();
+console.log(`State: ${info.state}`);
+console.log(`Reconnect attempts: ${info.reconnectAttempts}`);
+if (info.isConnecting) {
+  console.log("Connection in progress...");
+}
+```
+
+---
+
+## `client.isConnecting: boolean` (read-only property)
+
+Read-only property indicating whether the client is currently attempting to establish a connection.
+
+**Example:**
+
+```typescript
+if (client.isConnecting) {
+  showLoadingIndicator();
+}
+```
+
+---
+
+## `client.waitForConnection(): Promise<void>`
+
+Returns a promise that resolves when connected. The promise will reject with an error if the connection wait times out (default timeout is 2x the `connectionTimeout` option).
+
+**Example:**
+
+```typescript
+try {
+  await client.waitForConnection();
+  console.log("Now connected!");
+  client.emit("ready", {});
+} catch (error) {
+  console.error("Failed to connect:", error);
+}
 ```
 
 ---

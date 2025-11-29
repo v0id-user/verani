@@ -225,13 +225,13 @@ Use this hook to:
 ```typescript
 async onHibernationRestore(actor) {
   console.log(`Actor restored with ${actor.sessions.size} sessions`);
-  
+
   // Reconcile storage with actual connections
   const storedUsers = await loadUsersFromStorage(actor.getStorage());
   const connectedUserIds = new Set(
     Array.from(actor.sessions.values()).map(s => s.meta.userId)
   );
-  
+
   // Clean up stale entries
   await actor.getStorage().transaction(async (txn) => {
     for (const [userId, userData] of storedUsers.entries()) {
@@ -240,7 +240,7 @@ async onHibernationRestore(actor) {
       }
     }
   });
-  
+
   // Send sync to all restored clients
   const syncData = await buildSyncData(actor.getStorage());
   for (const session of actor.sessions.values()) {
@@ -299,7 +299,7 @@ Context object passed to lifecycle hooks.
 onConnect(ctx) {
   const { actor, ws, meta, emit } = ctx;
   console.log(`Actor has ${actor.getSessionCount()} connections`);
-  
+
   // Send welcome message to this socket
   emit.emit("welcome", { message: "Connected!" });
 }
@@ -427,7 +427,7 @@ Both systems can coexist - handlers take priority, but `onMessage` is called if 
 const room = defineRoom({
   name: "notifications",
   websocketPath: "/ws/notifications",
-  
+
   onConnect(ctx) {
     ctx.emit.emit("welcome", { message: "Connected!" });
   }
@@ -439,7 +439,7 @@ room.on("notification.update", (ctx, data) => {
   if (!userId) {
     throw new Error("Missing userId");
   }
-  
+
   // Send to specific user
   ctx.emit.to(userId).emit("inbox_changed", {
     type: "inbox_changed"
@@ -501,7 +501,7 @@ ctx.emit.to("default").emit("update", { value: 42 });
 onMessage(ctx, frame) {
   if (frame.type === "notification.update") {
     const userId = frame.data.userId;
-    
+
     // Send to specific user
     ctx.emit.to(userId).emit("inbox_changed", {
       type: "inbox_changed"
@@ -684,13 +684,13 @@ Use storage for:
 // Basic storage operations
 async onConnect(ctx) {
   const storage = ctx.actor.getStorage();
-  
+
   // Get value
   const count = await storage.get<number>("connectionCount") || 0;
-  
+
   // Put value
   await storage.put("connectionCount", count + 1);
-  
+
   // Delete value
   await storage.delete("oldKey");
 }
@@ -701,7 +701,7 @@ async onConnect(ctx) {
     // All operations in transaction are atomic
     const user = await txn.get<UserData>(`user:${ctx.meta.userId}`);
     const deviceCount = (user?.deviceCount || 0) + 1;
-    
+
     await txn.put(`user:${ctx.meta.userId}`, {
       ...user,
       deviceCount,
@@ -714,11 +714,11 @@ async onConnect(ctx) {
 async function getAllUsers(storage: DurableObjectStorage) {
   const users = new Map();
   const list = await storage.list<UserData>({ prefix: "user:" });
-  
+
   for (const [key, value] of list.entries()) {
     users.set(key, value);
   }
-  
+
   return users;
 }
 ```
@@ -912,41 +912,41 @@ export { ChatRoom };
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    
+
     if (url.pathname === "/api/send-notification") {
       const { userId, message } = await request.json();
-      
+
       // Get Actor stub (variable name must match wrangler.jsonc class_name)
       const stub = ChatRoom.get("chat-room");
-      
+
       // Send notification via RPC
       const sentCount = await stub.sendToUser(userId, "notifications", {
         type: "notification",
         message,
         timestamp: Date.now()
       });
-      
-      return Response.json({ 
-        success: true, 
-        sentTo: sentCount 
+
+      return Response.json({
+        success: true,
+        sentTo: sentCount
       });
     }
-    
+
     if (url.pathname === "/api/stats") {
       const stub = ChatRoom.get("chat-room");
-      
+
       // Query actor state via RPC
       const [count, userIds] = await Promise.all([
         stub.getSessionCount(),
         stub.getConnectedUserIds()
       ]);
-      
+
       return Response.json({
         onlineUsers: count,
         userIds
       });
     }
-    
+
     return new Response("Not Found", { status: 404 });
   }
 };

@@ -174,13 +174,13 @@ interface RpcBroadcastOptions {
 
 ```typescript
 // Inside lifecycle hook - can use except
-ctx.actor.broadcast("default", data, { 
+ctx.actor.broadcast("default", data, {
   except: ctx.ws,           // ✅ Available
-  userIds: ["alice", "bob"] 
+  userIds: ["alice", "bob"]
 });
 
 // Via RPC - use RpcBroadcastOptions
-await stub.broadcast("default", data, { 
+await stub.broadcast("default", data, {
   except: ctx.ws,           // ❌ Not available - WebSocket can't be serialized
   userIds: ["alice", "bob"] // ✅ Available
 });
