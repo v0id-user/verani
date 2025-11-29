@@ -16,6 +16,17 @@ export interface BroadcastOptions {
 }
 
 /**
+ * RPC-safe version of BroadcastOptions for use over RPC calls.
+ * Excludes the `except` field since WebSocket cannot be serialized over RPC.
+ */
+export interface RpcBroadcastOptions {
+  /** Only send to specific user IDs */
+  userIds?: string[];
+  /** Only send to specific client IDs */
+  clientIds?: string[];
+}
+
+/**
  * Extended Actor interface with Verani-specific methods
  */
 export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> extends Actor<E> {

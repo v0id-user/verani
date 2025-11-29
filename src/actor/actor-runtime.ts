@@ -1,5 +1,5 @@
 import { Actor, ActorConfiguration } from "@cloudflare/actors";
-import type { RoomDefinition, BroadcastOptions, ConnectionMeta } from "./types";
+import type { RoomDefinition, BroadcastOptions, RpcBroadcastOptions, ConnectionMeta } from "./types";
 import { cleanupStaleSessions as cleanupStaleSessionsImpl } from "./runtime/cleanupStaleSessions";
 import { broadcast as broadcastImpl } from "./runtime/broadcast";
 import { sendToUser as sendToUserImpl } from "./runtime/sendToUser";
@@ -13,10 +13,57 @@ import { onWebSocketDisconnect as onWebSocketDisconnectImpl } from "./runtime/on
 
 
 /**
- * Actor stub interface returned by .get() method
+ * Actor stub interface returned by .get() method.
+ * Provides RPC access to actor methods that can be called remotely.
+ *
+ * Note: RPC methods return Promises even if the underlying method is synchronous.
+ * Methods that return non-serializable types (like WebSocket[] or DurableObjectStorage)
+ * are excluded from this interface.
  */
 export interface ActorStub {
+	/**
+	 * Standard fetch method for handling HTTP requests and WebSocket upgrades
+	 */
 	fetch(request: Request): Promise<Response>;
+
+	/**
+	 * Sends a message to a specific user (all their sessions) via RPC.
+	 * @param userId - The user ID to send to
+	 * @param channel - The channel to send to
+	 * @param data - Message data
+	 * @returns Promise resolving to the number of sessions that received the message
+	 */
+	sendToUser(userId: string, channel: string, data?: any): Promise<number>;
+
+	/**
+	 * Broadcasts a message to all connections in a channel via RPC.
+	 * Note: The `except` option from BroadcastOptions is not available over RPC
+	 * since WebSocket cannot be serialized.
+	 * @param channel - The channel to broadcast to
+	 * @param data - The data to send
+	 * @param opts - Broadcast options (filtering by userIds or clientIds)
+	 * @returns Promise resolving to the number of connections that received the message
+	 */
+	broadcast(channel: string, data: any, opts?: RpcBroadcastOptions): Promise<number>;
+
+	/**
+	 * Gets the total number of active sessions via RPC.
+	 * @returns Promise resolving to the number of connected WebSockets
+	 */
+	getSessionCount(): Promise<number>;
+
+	/**
+	 * Gets all unique user IDs currently connected via RPC.
+	 * @returns Promise resolving to an array of unique user IDs
+	 */
+	getConnectedUserIds(): Promise<string[]>;
+
+	/**
+	 * Removes all WebSocket sessions that are not in OPEN state via RPC.
+	 * This prevents stale connections from accumulating in memory.
+	 * @returns Promise resolving to the number of sessions cleaned up
+	 */
+	cleanupStaleSessions(): Promise<number>;
 }
 
 /**

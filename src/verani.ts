@@ -20,6 +20,7 @@ export type {
   ConnectionMeta,
   MessageFrame,
   BroadcastOptions,
+  RpcBroadcastOptions,
   VeraniActor,
   RoomContext,
   MessageContext,
