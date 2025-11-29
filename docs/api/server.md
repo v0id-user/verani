@@ -129,6 +129,8 @@ onConnect(ctx) {
 
 Called when a message is received from a connection.
 
+**Note:** If event handlers are registered via `room.on()` or `room.eventEmitter.on()`, they take priority. This hook is used as a fallback when no matching event handler is found.
+
 **Example:**
 
 ```typescript
@@ -142,6 +144,33 @@ onMessage(ctx, frame) {
   }
 }
 ```
+
+**Socket.io-like Alternative:**
+
+Instead of using `onMessage`, you can register event handlers for a more socket.io-like experience:
+
+```typescript
+const room = defineRoom({
+  name: "chat",
+  websocketPath: "/ws"
+});
+
+// Register event handlers (socket.io-like)
+room.on("chat.message", (ctx, data) => {
+  ctx.actor.emit.to("default").emit("chat.message", {
+    from: ctx.meta.userId,
+    text: data.text
+  });
+});
+
+room.on("notification.update", (ctx, data) => {
+  ctx.emit.to(data.userId).emit("inbox_changed", {
+    type: "inbox_changed"
+  });
+});
+```
+
+See [Event Handlers](#event-handlers) section below for more details.
 
 ### `onDisconnect?(ctx: RoomContext<TMeta>): void | Promise<void>`
 
@@ -229,6 +258,23 @@ Sessions are automatically restored via WebSocket attachments, but application s
 
 **See:** [examples/presence-room.ts](../../examples/presence-room.ts) for a complete implementation.
 
+### `eventEmitter?: RoomEventEmitter<TMeta>`
+
+Optional event emitter for socket.io-like event handling. If not provided, a default event emitter is created automatically.
+
+**Example:**
+
+```typescript
+const room = defineRoom({
+  name: "chat",
+  websocketPath: "/ws",
+  // Custom event emitter (optional)
+  eventEmitter: createRoomEventEmitter()
+});
+```
+
+**See:** [Event Handlers](#event-handlers) section below for usage.
+
 ---
 
 ## `RoomContext<TMeta>`
@@ -240,15 +286,36 @@ Context object passed to lifecycle hooks.
 - `actor: VeraniActor` - The Actor instance
 - `ws: WebSocket` - The WebSocket connection
 - `meta: TMeta` - Connection metadata
+- `emit: SocketEmit` - Socket.io-like emit API for this connection
 
 **Example:**
 
 ```typescript
 onConnect(ctx) {
-  const { actor, ws, meta } = ctx;
+  const { actor, ws, meta, emit } = ctx;
   console.log(`Actor has ${actor.getSessionCount()} connections`);
+  
+  // Send welcome message to this socket
+  emit.emit("welcome", { message: "Connected!" });
 }
 ```
+
+**Emit API:**
+
+The `emit` property provides a socket.io-like API:
+
+```typescript
+// Emit to current socket
+ctx.emit.emit("event", { data: "value" });
+
+// Emit to a specific user (all their sessions)
+ctx.emit.to("userId").emit("notification", { message: "Hello" });
+
+// Emit to a channel (broadcast)
+ctx.emit.to("channel-name").emit("update", { value: 42 });
+```
+
+See [Emit API](#emit-api) section below for complete details.
 
 ---
 
@@ -261,11 +328,252 @@ Context for the `onMessage` hook (extends `RoomContext`).
 - All properties from `RoomContext`
 - `frame: MessageFrame` - The received message frame
 
+**Example:**
+
+```typescript
+onMessage(ctx, frame) {
+  // ctx.emit is available here too
+  if (frame.type === "ping") {
+    ctx.emit.emit("pong", { timestamp: Date.now() });
+  }
+}
+```
+
+---
+
+## Event Handlers (Socket.io-like API)
+
+Verani supports socket.io-like event handlers for a more familiar developer experience. Event handlers take priority over the `onMessage` hook when registered.
+
+### Registering Event Handlers
+
+**Method 1: Using `room.on()` (Recommended)**
+
+```typescript
+const room = defineRoom({
+  name: "chat",
+  websocketPath: "/ws"
+});
+
+// Register handlers after room definition
+room.on("chat.message", (ctx, data) => {
+  ctx.actor.emit.to("default").emit("chat.message", {
+    from: ctx.meta.userId,
+    text: data.text
+  });
+});
+
+room.on("notification.update", (ctx, data) => {
+  const userId = data.userId;
+  if (!userId) {
+    throw new Error("Missing userId");
+  }
+  ctx.emit.to(userId).emit("inbox_changed", { type: "inbox_changed" });
+});
+```
+
+**Method 2: Using `room.eventEmitter.on()`**
+
+```typescript
+const room = defineRoom({
+  name: "chat",
+  websocketPath: "/ws"
+});
+
+room.eventEmitter.on("chat.message", (ctx, data) => {
+  // Handler logic
+});
+```
+
+### Removing Event Handlers
+
+```typescript
+// Remove specific handler
+const handler = (ctx, data) => { /* ... */ };
+room.on("event", handler);
+room.off("event", handler);
+
+// Remove all handlers for an event
+room.off("event");
+```
+
+### Wildcard Handlers
+
+Register a handler for all events:
+
+```typescript
+room.on("*", (ctx, data) => {
+  console.log("Received event:", ctx.frame.type);
+});
+```
+
+### Handler Priority
+
+1. **Event handlers** registered via `room.on()` or `room.eventEmitter.on()`
+2. **`onMessage` hook** (fallback if no handlers match)
+
+Both systems can coexist - handlers take priority, but `onMessage` is called if no handler matches.
+
+### Complete Example
+
+```typescript
+const room = defineRoom({
+  name: "notifications",
+  websocketPath: "/ws/notifications",
+  
+  onConnect(ctx) {
+    ctx.emit.emit("welcome", { message: "Connected!" });
+  }
+});
+
+// Register event handlers
+room.on("notification.update", (ctx, data) => {
+  const userId = data.userId;
+  if (!userId) {
+    throw new Error("Missing userId");
+  }
+  
+  // Send to specific user
+  ctx.emit.to(userId).emit("inbox_changed", {
+    type: "inbox_changed"
+  });
+});
+
+room.on("notification.mark-read", (ctx, data) => {
+  // Broadcast to all in channel
+  ctx.actor.emit.to("notifications").emit("read", {
+    notificationId: data.id,
+    userId: ctx.meta.userId
+  });
+});
+```
+
+---
+
+## Emit API
+
+Verani provides a socket.io-like emit API for sending messages. The emit API is available on both `RoomContext` (socket-level) and `VeraniActor` (actor-level).
+
+### Socket-level Emit (`ctx.emit`)
+
+Available on `RoomContext` and `MessageContext`. Allows emitting to:
+- Current socket
+- Specific user (all their sessions)
+- Channel (broadcast)
+
+**Methods:**
+
+#### `emit(event: string, data?: any): void`
+
+Emit to the current socket.
+
+```typescript
+onConnect(ctx) {
+  ctx.emit.emit("welcome", { message: "Connected!" });
+}
+```
+
+#### `to(target: string): EmitBuilder`
+
+Target a specific user or channel for emitting.
+
+- If `target` matches one of the current user's channels → treated as channel
+- Otherwise → treated as userId
+
+```typescript
+// Emit to a user (all their sessions)
+ctx.emit.to("alice").emit("notification", { message: "Hello Alice" });
+
+// Emit to a channel
+ctx.emit.to("default").emit("update", { value: 42 });
+```
+
+**Complete Example:**
+
+```typescript
+onMessage(ctx, frame) {
+  if (frame.type === "notification.update") {
+    const userId = frame.data.userId;
+    
+    // Send to specific user
+    ctx.emit.to(userId).emit("inbox_changed", {
+      type: "inbox_changed"
+    });
+  }
+}
+```
+
+### Actor-level Emit (`ctx.actor.emit`)
+
+Available on `VeraniActor`. Allows broadcasting to channels.
+
+**Methods:**
+
+#### `emit(event: string, data?: any): number`
+
+Broadcast to default channel.
+
+```typescript
+ctx.actor.emit.emit("announcement", {
+  message: "Server maintenance in 5 minutes"
+});
+```
+
+#### `to(channel: string): EmitBuilder`
+
+Target a specific channel for broadcasting.
+
+```typescript
+// Broadcast to a channel
+ctx.actor.emit.to("default").emit("chat.message", {
+  from: ctx.meta.userId,
+  text: "Hello everyone!"
+});
+
+// Returns number of connections that received the message
+const sentCount = ctx.actor.emit.to("general").emit("update", { value: 42 });
+console.log(`Sent to ${sentCount} connections`);
+```
+
+**Complete Example:**
+
+```typescript
+room.on("chat.message", (ctx, data) => {
+  // Broadcast to all in default channel
+  ctx.actor.emit.to("default").emit("chat.message", {
+    from: ctx.meta.userId,
+    text: data.text,
+    timestamp: Date.now()
+  });
+});
+```
+
+### Message Format
+
+All emit methods wrap messages in the standard Verani frame format:
+
+```typescript
+{
+  type: "event",
+  channel: "default", // or specified channel
+  data: {
+    type: "your-event-name",
+    ...yourData
+  }
+}
+```
+
+The client automatically unwraps these messages and dispatches them as events.
+
 ---
 
 ## `VeraniActor`
 
 The Actor instance with Verani-specific methods.
+
+### `emit: ActorEmit`
+
+Socket.io-like emit API for actor-level broadcasting. See [Emit API](#emit-api) section above.
 
 ### `broadcast(channel: string, data: any, options?): number`
 
@@ -411,6 +719,42 @@ async function getAllUsers(storage: DurableObjectStorage) {
 **Important:** Always use transactions when multiple operations need to be atomic. Without transactions, race conditions can occur during rapid connect/disconnect events.
 
 **See:** [Durable Objects Storage API](https://developers.cloudflare.com/durable-objects/api/storage-api/) for complete documentation.
+
+---
+
+## `RoomDefinitionWithHandlers<TMeta>`
+
+Extended room definition returned by `defineRoom()` with socket.io-like convenience methods.
+
+**Methods:**
+
+### `on(event: string, handler: EventHandler): void`
+
+Register an event handler (socket.io-like API).
+
+```typescript
+const room = defineRoom({ /* ... */ });
+room.on("chat.message", (ctx, data) => {
+  // Handler logic
+});
+```
+
+### `off(event: string, handler?: EventHandler): void`
+
+Remove an event handler.
+
+```typescript
+// Remove specific handler
+room.off("chat.message", handler);
+
+// Remove all handlers for event
+room.off("chat.message");
+```
+
+**Properties:**
+
+All properties from `RoomDefinition`, plus:
+- `eventEmitter: RoomEventEmitter` - The underlying event emitter instance
 
 ---
 

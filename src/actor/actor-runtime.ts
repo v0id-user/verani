@@ -10,6 +10,7 @@ import { onInit as onInitImpl } from "./runtime/onInit";
 import { onWebSocketConnect as onWebSocketConnectImpl } from "./runtime/onWebSocketConnect";
 import { onWebSocketMessage as onWebSocketMessageImpl } from "./runtime/onWebSocketMessage";
 import { onWebSocketDisconnect as onWebSocketDisconnectImpl } from "./runtime/onWebSocketDisconnect";
+import { createActorEmit } from "./runtime/emit";
 
 
 /**
@@ -89,6 +90,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	// Create named class dynamically
 	class NamedActorClass extends Actor<E> {
 		sessions = new Map<WebSocket, { ws: WebSocket; meta: TMeta }>();
+		emit = createActorEmit<TMeta, E>(this as any);
 
 		/**
 		 * Static configuration method for Cloudflare Actors

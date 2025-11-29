@@ -14,6 +14,7 @@ Examples marked with:
 ## Examples
 
 - [Basic Chat Room](./basic-chat.md) 🔓 - Simple chat room example
+- [Socket.io-like API](./socket-io-like.md) 🔓 - Event handlers and emit API
 - [Channels](./channels.md) 🔓 - Custom WebSocket paths and multiple channels
 - [User Presence](./presence.md) 🔓 - Track who is online
 - [Authentication](./authentication.md) 🔒 - JWT token verification

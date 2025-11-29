@@ -1,4 +1,5 @@
-import type { RoomDefinition, RoomContext, ConnectionMeta, VeraniActor } from "../types";
+import type { RoomDefinition, RoomContext, MessageContext, ConnectionMeta, VeraniActor, MessageFrame } from "../types";
+import { createSocketEmit } from "./emit";
 
 /**
  * Called when a WebSocket connection is closed
@@ -22,10 +23,17 @@ export async function onWebSocketDisconnect<TMeta extends ConnectionMeta, E>(
 		// Call user-defined onDisconnect hook
 		if (session && room.onDisconnect) {
 			console.debug("[Verani:ActorRuntime] Calling user onDisconnect hook");
+			const tempMessageCtx: MessageContext<TMeta, E> = {
+				actor,
+				ws,
+				meta: session.meta,
+				frame: { type: "disconnect" }
+			};
 			const ctx: RoomContext<TMeta, E> = {
 				actor,
 				ws,
-				meta: session.meta
+				meta: session.meta,
+				emit: createSocketEmit(tempMessageCtx)
 			};
 			await room.onDisconnect(ctx);
 			console.debug("[Verani:ActorRuntime] User onDisconnect hook completed");

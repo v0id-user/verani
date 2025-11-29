@@ -1,5 +1,6 @@
 import { decodeFrame, encodeFrame } from "../protocol";
 import type { RoomDefinition, MessageContext, MessageFrame, ConnectionMeta, VeraniActor } from "../types";
+import { createSocketEmit } from "./emit";
 
 /**
  * Called when a message is received from a WebSocket
@@ -47,15 +48,32 @@ export async function onWebSocketMessage<TMeta extends ConnectionMeta, E>(
 		}
 		console.debug("[Verani:ActorRuntime] Session found:", { userId: session.meta.userId, clientId: session.meta.clientId });
 
-		// Call user-defined onMessage hook
-		if (room.onMessage) {
-			console.debug("[Verani:ActorRuntime] Calling user onMessage hook");
-			const ctx: MessageContext<TMeta, E> = {
+		// Create context with emit API
+		const ctx: MessageContext<TMeta, E> = {
+			actor,
+			ws,
+			meta: session.meta,
+			frame,
+			emit: createSocketEmit({
 				actor,
 				ws,
 				meta: session.meta,
 				frame
-			};
+			} as MessageContext<TMeta, E>)
+		};
+
+		// Check if event handlers are registered for this event type
+		const eventEmitter = room.eventEmitter;
+		const hasEventHandlers = eventEmitter && (eventEmitter as any).hasHandlers && (eventEmitter as any).hasHandlers(frame.type);
+
+		if (hasEventHandlers) {
+			// Use event handlers (socket.io-like)
+			console.debug("[Verani:ActorRuntime] Using event handlers for event:", frame.type);
+			await eventEmitter!.emit(frame.type, ctx, frame.data || {});
+			console.debug("[Verani:ActorRuntime] Event handlers completed");
+		} else if (room.onMessage) {
+			// Fall back to onMessage hook
+			console.debug("[Verani:ActorRuntime] Calling user onMessage hook");
 			await room.onMessage(ctx, frame);
 			console.debug("[Verani:ActorRuntime] User onMessage hook completed");
 		}
@@ -68,7 +86,13 @@ export async function onWebSocketMessage<TMeta extends ConnectionMeta, E>(
 				await room.onError(error as Error, {
 					actor,
 					ws,
-					meta: session.meta
+					meta: session.meta,
+					emit: createSocketEmit({
+						actor,
+						ws,
+						meta: session.meta,
+						frame: { type: "error" }
+					} as MessageContext<TMeta, E>)
 				});
 			} catch (errorHandlerError) {
 				console.error("[Verani] Error in onError handler:", errorHandlerError);

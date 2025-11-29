@@ -26,6 +26,7 @@ Complete documentation for Verani, a realtime framework for Cloudflare Workers.
 ## Examples
 
 - [Basic Chat](./examples/basic-chat.md) - Simple chat room
+- [Socket.io-like API](./examples/socket-io-like.md) - Event handlers and emit API
 - [Channels](./examples/channels.md) - Custom paths and multiple channels
 - [Presence](./examples/presence.md) - User presence tracking
 - [Authentication](./examples/authentication.md) - JWT authentication

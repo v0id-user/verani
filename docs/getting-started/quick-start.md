@@ -18,13 +18,18 @@ export const chatRoom = defineRoom({
     const { userId, clientId } = ctx.meta;
     console.log(`User ${userId} connected (client: ${clientId})`);
 
-    // Notify others in the room
-    ctx.actor.broadcast("default", {
-      type: "user.joined",
+    // Notify others in the room using emit API
+    ctx.actor.emit.to("default").emit("user.joined", {
       userId
-    }, {
-      except: ctx.ws // Don't send to the user who just joined
     });
+
+    // Or using traditional broadcast (both work!)
+    // ctx.actor.broadcast("default", {
+    //   type: "user.joined",
+    //   userId
+    // }, {
+    //   except: ctx.ws // Don't send to the user who just joined
+    // });
   },
 
   // Called when a user sends a message
@@ -54,15 +59,32 @@ export const chatRoom = defineRoom({
       });
     }
   },
+});
+
+// Alternative: Using socket.io-like event handlers (recommended)
+chatRoom.on("chat.message", (ctx, data) => {
+  // Broadcast to everyone using emit API
+  ctx.actor.emit.to("default").emit("chat.message", {
+    from: ctx.meta.userId,
+    text: data.text,
+    timestamp: Date.now()
+  });
+});
+
+chatRoom.on("chat.typing", (ctx, data) => {
+  // Broadcast typing indicator (excluding sender)
+  ctx.actor.emit.to("default").emit("chat.typing", {
+    from: ctx.meta.userId
+  });
+});
 
   // Called when a user disconnects
   onDisconnect(ctx) {
     const { userId } = ctx.meta;
     console.log(`User ${userId} disconnected`);
 
-    // Notify others
-    ctx.actor.broadcast("default", {
-      type: "user.left",
+    // Notify others using emit API
+    ctx.actor.emit.to("default").emit("user.left", {
       userId
     });
   },

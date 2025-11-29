@@ -1,5 +1,6 @@
 import { storeAttachment } from "../attachment";
-import type { RoomDefinition, RoomContext, ConnectionMeta, VeraniActor } from "../types";
+import type { RoomDefinition, RoomContext, MessageContext, ConnectionMeta, VeraniActor, MessageFrame } from "../types";
+import { createSocketEmit } from "./emit";
 
 /**
  * Called when a new WebSocket connection is established
@@ -30,6 +31,14 @@ export async function onWebSocketConnect<TMeta extends ConnectionMeta, E>(
 		// Store attachment for hibernation survival
 		storeAttachment(ws, meta);
 
+		// Create a temporary message context for emit API creation
+		const tempMessageCtx: MessageContext<TMeta, E> = {
+			actor,
+			ws,
+			meta,
+			frame: { type: "connect" }
+		};
+
 		// Call user-defined onConnect hook BEFORE adding to sessions map
 		// This prevents orphaned sessions if onConnect throws
 		if (room.onConnect) {
@@ -37,7 +46,8 @@ export async function onWebSocketConnect<TMeta extends ConnectionMeta, E>(
 			const ctx: RoomContext<TMeta, E> = {
 				actor,
 				ws,
-				meta
+				meta,
+				emit: createSocketEmit(tempMessageCtx)
 			};
 			await room.onConnect(ctx);
 			console.debug("[Verani:ActorRuntime] User onConnect hook completed");
@@ -52,10 +62,17 @@ export async function onWebSocketConnect<TMeta extends ConnectionMeta, E>(
 		// Call error handler if defined
 		if (room.onError && meta) {
 			try {
+				const tempMessageCtx: MessageContext<TMeta, E> = {
+					actor,
+					ws,
+					meta,
+					frame: { type: "error" }
+				};
 				await room.onError(error as Error, {
 					actor,
 					ws,
-					meta
+					meta,
+					emit: createSocketEmit(tempMessageCtx)
 				});
 			} catch (errorHandlerError) {
 				console.error("[Verani] Error in onError handler:", errorHandlerError);
