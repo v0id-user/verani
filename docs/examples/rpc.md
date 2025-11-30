@@ -58,8 +58,8 @@ export default {
       // Get Actor stub (variable name must match wrangler.jsonc class_name)
       const stub = NotificationsRoom.get(`notifications:${userId}`);
 
-      // Send notification via RPC (Socket.IO-like API)
-      const sentCount = await (await stub.toUser(userId)).emit("notification", {
+      // Send notification via RPC (Socket.IO-like API - direct method call)
+      const sentCount = await stub.emitToUser(userId, "notification", {
         notificationType: type,
         message,
         timestamp: Date.now()
@@ -131,7 +131,7 @@ if (url.pathname === "/webhook/announcement" && request.method === "POST") {
 
   const stub = ChatRoom.get("chat-room");
 
-  // Broadcast via RPC (Socket.IO-like API)
+  // Broadcast via RPC (Socket.IO-like API - direct method call)
   // Note: For user filtering, use legacy broadcast() API
   let sentCount: number;
   if (targetUsers) {
@@ -143,8 +143,8 @@ if (url.pathname === "/webhook/announcement" && request.method === "POST") {
       timestamp: Date.now()
     }, opts);
   } else {
-    // Socket.IO-like API
-    sentCount = await (await stub.toChannel(channel)).emit("announcement", {
+    // Socket.IO-like API - direct method call
+    sentCount = await stub.emitToChannel(channel, "announcement", {
       text: announcement,
       timestamp: Date.now()
     });
@@ -179,8 +179,8 @@ export default {
     for (const userId of usersToNotify) {
       const stub = NotificationsRoom.get(`notifications:${userId}`);
 
-      // Socket.IO-like API
-      await (await stub.toUser(userId)).emit("daily-digest", {
+      // Socket.IO-like API - direct method call
+      await stub.emitToUser(userId, "daily-digest", {
         date: new Date().toISOString(),
         summary: await getDailySummary(userId)
       });
@@ -207,8 +207,8 @@ room.on("cross-room-message", async (ctx, data) => {
   // Get another Actor's stub
   const targetStub = OtherRoom.get(targetRoom);
 
-  // Send message via RPC (Socket.IO-like API)
-  await (await targetStub.toUser(targetUser)).emit("cross-room", {
+  // Send message via RPC (Socket.IO-like API - direct method call)
+  await targetStub.emitToUser(targetUser, "cross-room", {
     from: ctx.meta.userId,
     message
   });
@@ -217,9 +217,9 @@ room.on("cross-room-message", async (ctx, data) => {
 
 ## Key Points
 
-1. **Socket.IO-like API**: Use `stub.toChannel().emit()` and `stub.toUser().emit()` for a unified, familiar API
+1. **Socket.IO-like API**: Use `stub.emitToChannel()` and `stub.emitToUser()` for a unified, familiar API with direct method calls
 2. **Always use `await`**: RPC methods return Promises even if the underlying method is synchronous
-3. **Builder pattern**: `toChannel()` and `toUser()` return builders that must be awaited before calling `emit()`
+3. **Direct method calls**: Simple, type-safe API without complex builder patterns
 4. **Legacy API still available**: `sendToUser()` and `broadcast()` are deprecated but still work for backward compatibility
 5. **Use legacy API for filtering**: If you need `userIds` or `clientIds` filtering, use the legacy `broadcast()` method
 6. **Actor ID consistency**: Use the same ID string for WebSocket connections and RPC calls to reach the same Actor instance
@@ -231,8 +231,8 @@ room.on("cross-room-message", async (ctx, data) => {
 
 ```typescript
 try {
-  // Socket.IO-like API
-  const sentCount = await (await stub.toUser(userId)).emit("message", data);
+  // Socket.IO-like API - direct method call
+  const sentCount = await stub.emitToUser(userId, "message", data);
   console.log(`Sent to ${sentCount} sessions`);
 } catch (error) {
   console.error("RPC call failed:", error);

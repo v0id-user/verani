@@ -69,8 +69,8 @@ if (url.pathname === "/api/notify") {
   // Get Actor stub (simple - just pass the ID string)
   const stub = ChatRoom.get("chat-room");
 
-  // Socket.IO-like RPC API - returns Promise
-  const sentCount = await (await stub.toUser(userId)).emit("notification", {
+  // Socket.IO-like RPC API - direct method call
+  const sentCount = await stub.emitToUser(userId, "notification", {
     message
   });
 
@@ -117,7 +117,7 @@ room.on("chat.message", (ctx, data) => {
 2. **Promise Wrapping**: All RPC methods return Promises, even if underlying method is sync
 3. **Serialization**: Only serializable types can be passed/returned over RPC
 4. **Actor ID Consistency**: Use the same ID string for WebSocket connections and RPC calls to reach the same Actor instance
-5. **Socket.IO-like API**: RPC now provides a Socket.IO-like emit API (`stub.toChannel().emit()`, `stub.toUser().emit()`) for unified developer experience. Legacy methods (`broadcast()`, `sendToUser()`) are still available but deprecated.
+5. **Socket.IO-like API**: RPC provides a Socket.IO-like emit API (`stub.emitToChannel()`, `stub.emitToUser()`) for unified developer experience. Legacy methods (`broadcast()`, `sendToUser()`) are still available but deprecated.
 
 ## RPC Limitations
 
@@ -130,8 +130,8 @@ room.on("chat.message", (ctx, data) => {
 
 **Send notifications from HTTP endpoints (Socket.IO-like API):**
 ```typescript
-// Recommended: Socket.IO-like API
-await (await stub.toUser(userId)).emit("notification", notificationData);
+// Recommended: Socket.IO-like API - direct method call
+await stub.emitToUser(userId, "notification", notificationData);
 
 // Legacy API (deprecated)
 // await stub.sendToUser(userId, "notifications", notificationData);
@@ -145,8 +145,8 @@ const userIds = await stub.getConnectedUserIds();
 
 **Broadcast from external events (Socket.IO-like API):**
 ```typescript
-// Recommended: Socket.IO-like API
-await (await stub.toChannel("announcements")).emit("update", data);
+// Recommended: Socket.IO-like API - direct method call
+await stub.emitToChannel("announcements", "update", data);
 
 // Legacy API with filtering (still needed for userIds/clientIds filtering)
 await stub.broadcast("announcements", data, { userIds: ["admin"] });
@@ -154,8 +154,8 @@ await stub.broadcast("announcements", data, { userIds: ["admin"] });
 
 **Emit to default channel:**
 ```typescript
-// Socket.IO-like API
-await (await stub.toChannel("default")).emit("announcement", {
+// Socket.IO-like API - direct method call
+await stub.emitToChannel("default", "announcement", {
   message: "Server maintenance in 5 minutes"
 });
 ```
@@ -164,7 +164,7 @@ await (await stub.toChannel("default")).emit("announcement", {
 ```typescript
 // From Actor A, call Actor B using Socket.IO-like API
 const otherStub = OtherRoom.get("other-room-id");
-await (await otherStub.toUser(userId)).emit("message", message);
+await otherStub.emitToUser(userId, "message", message);
 
 // Legacy API
 // await otherStub.sendToUser(userId, "default", message);

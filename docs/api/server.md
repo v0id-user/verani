@@ -800,69 +800,55 @@ const stub = ChatRoom.get("room-id"); // Returns ActorStub
 
 ## Socket.IO-like RPC API (Recommended)
 
-Verani provides a Socket.IO-like emit API for RPC calls, offering a unified and familiar developer experience.
+Verani provides a Socket.IO-like emit API for RPC calls with direct method calls, offering a unified and familiar developer experience.
 
-### `stub.toChannel(channel: string): Promise<RpcEmitBuilder>`
+### `stub.emitToChannel(channel: string, event: string, data?: any): Promise<number>`
 
-Get a builder for emitting to a specific channel. Returns a builder object with an `emit()` method.
+Emit an event to a specific channel via RPC.
 
 **Parameters:**
-- `channel: string` - Channel name to target
+- `channel: string` - Channel name to emit to
+- `event: string` - Event name
+- `data?: any` - Event data
 
-**Returns:** Promise resolving to an `RpcEmitBuilder` with an `emit()` method
+**Returns:** Promise resolving to the number of connections that received the message
 
 **Example:**
 ```typescript
 const stub = ChatRoom.get("room-id");
 
 // Emit to default channel
-const sentCount = await (await stub.toChannel("default")).emit("chat.message", {
+const sentCount = await stub.emitToChannel("default", "chat.message", {
   from: "server",
   text: "Hello everyone!"
 });
 
 // Emit to a specific channel
-await (await stub.toChannel("announcements")).emit("server.update", {
+await stub.emitToChannel("announcements", "server.update", {
   message: "Server maintenance in 5 minutes"
 });
 ```
 
-### `stub.toUser(userId: string): Promise<RpcEmitBuilder>`
+### `stub.emitToUser(userId: string, event: string, data?: any): Promise<number>`
 
-Get a builder for emitting to a specific user (all their sessions). Returns a builder object with an `emit()` method.
+Emit an event to a specific user (all their sessions) via RPC.
 
 **Parameters:**
-- `userId: string` - User ID to target
+- `userId: string` - User ID to emit to
+- `event: string` - Event name
+- `data?: any` - Event data
 
-**Returns:** Promise resolving to an `RpcEmitBuilder` with an `emit()` method
+**Returns:** Promise resolving to the number of sessions that received the message
 
 **Example:**
 ```typescript
 const stub = ChatRoom.get("room-id");
 
 // Send notification to a specific user
-const sentCount = await (await stub.toUser("alice")).emit("notification", {
+const sentCount = await stub.emitToUser("alice", "notification", {
   title: "New Message",
   body: "You have 3 unread messages"
 });
-```
-
-### `stub.to(target: string): Promise<RpcEmitBuilder>`
-
-Get a builder with smart routing. Automatically determines if `target` is a channel or user ID based on connected sessions.
-
-**Parameters:**
-- `target: string` - Channel name or user ID
-
-**Returns:** Promise resolving to an `RpcEmitBuilder` with an `emit()` method
-
-**Example:**
-```typescript
-const stub = ChatRoom.get("room-id");
-
-// Smart routing - will route to channel if it exists, otherwise treats as userId
-await (await stub.to("general")).emit("update", { value: 42 });
-await (await stub.to("alice")).emit("notification", { message: "Hello" });
 ```
 
 ### Complete Socket.IO-like RPC Example
@@ -883,9 +869,8 @@ export default {
       const { userId, message } = await request.json();
       const stub = ChatRoom.get("chat-room");
 
-      // Socket.IO-like API - emit to user
-      const sentCount = await (await stub.toUser(userId)).emit("notification", {
-        type: "notification",
+      // Socket.IO-like API - direct method call
+      const sentCount = await stub.emitToUser(userId, "notification", {
         message,
         timestamp: Date.now()
       });
@@ -900,8 +885,8 @@ export default {
       const { channel, event, data } = await request.json();
       const stub = ChatRoom.get("chat-room");
 
-      // Socket.IO-like API - emit to channel
-      const sentCount = await (await stub.toChannel(channel)).emit(event, data);
+      // Socket.IO-like API - direct method call
+      const sentCount = await stub.emitToChannel(channel, event, data);
 
       return Response.json({
         success: true,
@@ -930,7 +915,7 @@ const response = await stub.fetch(request);
 
 ### `stub.sendToUser(userId: string, channel: string, data?: any): Promise<number>`
 
-**Deprecated:** Use `stub.toUser(userId).emit(event, data)` instead for Socket.IO-like API.
+**Deprecated:** Use `stub.emitToUser(userId, event, data)` instead for Socket.IO-like API.
 
 Sends a message to a specific user (all their sessions) via RPC.
 
@@ -950,15 +935,15 @@ const sentCount = await stub.sendToUser("alice", "notifications", {
   message: "You have a new message"
 });
 
-// Recommended: Socket.IO-like API
-const sentCount = await (await stub.toUser("alice")).emit("alert", {
+// Recommended: Socket.IO-like API - direct method call
+const sentCount = await stub.emitToUser("alice", "alert", {
   message: "You have a new message"
 });
 ```
 
 ### `stub.broadcast(channel: string, data: any, opts?: RpcBroadcastOptions): Promise<number>`
 
-**Deprecated:** Use `stub.toChannel(channel).emit(event, data)` instead for Socket.IO-like API.
+**Deprecated:** Use `stub.emitToChannel(channel, event, data)` instead for Socket.IO-like API.
 
 Broadcasts a message to all connections in a channel via RPC.
 
@@ -978,8 +963,8 @@ const stub = ChatRoom.get("room-id");
 // Legacy API
 await stub.broadcast("default", { type: "announcement", text: "Hello!" });
 
-// Recommended: Socket.IO-like API
-await (await stub.toChannel("default")).emit("announcement", { text: "Hello!" });
+// Recommended: Socket.IO-like API - direct method call
+await stub.emitToChannel("default", "announcement", { text: "Hello!" });
 
 // Legacy API with filtering
 await stub.broadcast("general", { type: "update" }, {

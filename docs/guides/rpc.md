@@ -26,7 +26,7 @@ await stub.fetch(wsRequest);
 
 // RPC call (must use same ID) - Socket.IO-like API
 const stub = ChatRoom.get(actorId); // Same value!
-await (await stub.toUser("alice")).emit("message", data);
+await stub.emitToUser("alice", "message", data);
 ```
 
 ### Error Handling
@@ -35,8 +35,8 @@ RPC calls can fail due to network issues or Actor hibernation. Always wrap in tr
 
 ```typescript
 try {
-  // Socket.IO-like API
-  const sentCount = await (await stub.toUser(userId)).emit("message", data);
+  // Socket.IO-like API - direct method call
+  const sentCount = await stub.emitToUser(userId, "message", data);
   return Response.json({ success: true, sentTo: sentCount });
 } catch (error) {
   console.error("RPC call failed:", error);
@@ -82,8 +82,8 @@ const sentCount = await stub.sendToUser(userId, "default", {
   message: "Hello"
 });
 
-// New Socket.IO-like API (recommended)
-const sentCount = await (await stub.toUser(userId)).emit("notification", {
+// New Socket.IO-like API (recommended) - direct method call
+const sentCount = await stub.emitToUser(userId, "notification", {
   message: "Hello"
 });
 ```
@@ -97,8 +97,8 @@ await stub.broadcast("announcements", {
   text: "Server maintenance"
 });
 
-// New Socket.IO-like API (recommended)
-await (await stub.toChannel("announcements")).emit("update", {
+// New Socket.IO-like API (recommended) - direct method call
+await stub.emitToChannel("announcements", "update", {
   text: "Server maintenance"
 });
 ```
@@ -112,18 +112,10 @@ await stub.broadcast("default", {
   message: "Hello everyone"
 });
 
-// New Socket.IO-like API (recommended)
-await (await stub.toChannel("default")).emit("announcement", {
+// New Socket.IO-like API (recommended) - direct method call
+await stub.emitToChannel("default", "announcement", {
   message: "Hello everyone"
 });
-```
-
-**Smart routing (channel or user):**
-
-```typescript
-// New Socket.IO-like API - automatically detects if target is channel or user
-await (await stub.to("general")).emit("update", { value: 42 });
-await (await stub.to("alice")).emit("notification", { message: "Hello" });
 ```
 
 ### When to Use Legacy API
@@ -136,16 +128,17 @@ await stub.broadcast("announcements", data, {
   userIds: ["admin", "moderator"]
 });
 
-// Socket.IO-like API doesn't support filtering yet
+// Socket.IO-like API doesn't support filtering
 // Use legacy API if you need this feature
 ```
 
 ### Benefits of Socket.IO-like API
 
-1. **Unified API**: Same pattern as direct actor methods (`ctx.actor.emit.to()`)
-2. **Familiar**: Matches Socket.IO server-side API patterns
-3. **Type-safe**: Better TypeScript support with builder pattern
+1. **Unified API**: Same event-based pattern as direct actor methods
+2. **Familiar**: Matches Socket.IO server-side API naming conventions
+3. **Type-safe**: Proper TypeScript support with clear method signatures
 4. **Consistent**: Event-based messaging aligns with Socket.IO conventions
+5. **Direct**: Simple, direct method calls without complex builder patterns
 
 ## Common RPC Issues
 
@@ -155,15 +148,15 @@ await stub.broadcast("announcements", data, {
 
 1. Ensure you're using the stub, not the class directly:
 ```typescript
-// ✅ Correct - Socket.IO-like API
+// ✅ Correct - Socket.IO-like API (direct method call)
 const stub = ChatRoom.get("room-id");
-await (await stub.toUser("alice")).emit("message", data);
+await stub.emitToUser("alice", "message", data);
 
 // ✅ Correct - Legacy API
 await stub.sendToUser("alice", "default", data);
 
 // ❌ Wrong
-await ChatRoom.sendToUser(...);
+await ChatRoom.emitToUser(...);
 ```
 
 2. Check that you're awaiting the Promise:

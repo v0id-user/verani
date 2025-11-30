@@ -1,5 +1,5 @@
 import { Actor, ActorConfiguration } from "@cloudflare/actors";
-import type { RoomDefinition, BroadcastOptions, RpcBroadcastOptions, ConnectionMeta, RpcEmitBuilder } from "./types";
+import type { RoomDefinition, BroadcastOptions, RpcBroadcastOptions, ConnectionMeta } from "./types";
 import { cleanupStaleSessions as cleanupStaleSessionsImpl } from "./runtime/cleanupStaleSessions";
 import { broadcast as broadcastImpl } from "./runtime/broadcast";
 import { sendToUser as sendToUserImpl } from "./runtime/sendToUser";
@@ -12,7 +12,6 @@ import { onWebSocketMessage as onWebSocketMessageImpl } from "./runtime/onWebSoc
 import { onWebSocketDisconnect as onWebSocketDisconnectImpl } from "./runtime/onWebSocketDisconnect";
 import { createActorEmit } from "./runtime/emit";
 import { createFetch, type ActorInstanceWithFetchMethods } from "./runtime/fetch";
-import { createRpcChannelEmitBuilder, createRpcUserEmitBuilder, createRpcEmitBuilder } from "./runtime/rpc-emit";
 
 
 /**
@@ -30,29 +29,33 @@ export interface ActorStub {
 	fetch(request: Request): Promise<Response>;
 
 	/**
-	 * Socket.IO-like emit API: Get a builder for emitting to a specific channel.
-	 * Use `toChannel("default").emit(event, data)` to emit to the default channel.
-	 * @param channel - Channel name
-	 * @returns Promise resolving to an emit builder
+	 * Socket.IO-like emit API: Emit an event to a specific channel via RPC.
+	 * @param channel - Channel name to emit to
+	 * @param event - Event name
+	 * @param data - Event data
+	 * @returns Promise resolving to the number of connections that received the message
+	 * @example
+	 * ```typescript
+	 * await stub.emitToChannel("default", "announcement", { text: "Hello!" });
+	 * ```
 	 */
-	toChannel(channel: string): Promise<RpcEmitBuilder>;
+	emitToChannel(channel: string, event: string, data?: any): Promise<number>;
 
 	/**
-	 * Socket.IO-like emit API: Get a builder for emitting to a specific user.
-	 * @param userId - User ID
-	 * @returns Promise resolving to an emit builder
+	 * Socket.IO-like emit API: Emit an event to a specific user (all their sessions) via RPC.
+	 * @param userId - User ID to emit to
+	 * @param event - Event name
+	 * @param data - Event data
+	 * @returns Promise resolving to the number of sessions that received the message
+	 * @example
+	 * ```typescript
+	 * await stub.emitToUser("alice", "notification", { message: "Hello!" });
+	 * ```
 	 */
-	toUser(userId: string): Promise<RpcEmitBuilder>;
+	emitToUser(userId: string, event: string, data?: any): Promise<number>;
 
 	/**
-	 * Socket.IO-like emit API: Get a builder with smart routing (channel or user).
-	 * @param target - Channel name or user ID
-	 * @returns Promise resolving to an emit builder
-	 */
-	to(target: string): Promise<RpcEmitBuilder>;
-
-	/**
-	 * @deprecated Use `emit()` or `toChannel().emit()` instead for Socket.IO-like API.
+	 * @deprecated Use `emitToUser()` instead for Socket.IO-like API.
 	 * Sends a message to a specific user (all their sessions) via RPC.
 	 * @param userId - The user ID to send to
 	 * @param channel - The channel to send to
@@ -62,7 +65,7 @@ export interface ActorStub {
 	sendToUser(userId: string, channel: string, data?: any): Promise<number>;
 
 	/**
-	 * @deprecated Use `emit()` or `toChannel().emit()` instead for Socket.IO-like API.
+	 * @deprecated Use `emitToChannel()` instead for Socket.IO-like API.
 	 * Broadcasts a message to all connections in a channel via RPC.
 	 * Note: The `except` option from BroadcastOptions is not available over RPC
 	 * since WebSocket cannot be serialized.
@@ -222,11 +225,19 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 
 	/**
 	 * Socket.IO-like emit API: Emit an event to a specific channel.
-	 * Available via RPC. Used internally by toChannel() builder.
+	 * Available via RPC.
 	 * @param channel - Channel name
 	 * @param event - Event name
 	 * @param data - Event data
 	 * @returns Number of connections that received the message
+	 * @example
+	 * ```typescript
+	 * // Direct call (inside lifecycle hooks)
+	 * const sent = actor.emitToChannel("default", "announcement", { text: "Hello!" });
+	 * 
+	 * // RPC call (from Worker)
+	 * const sent = await stub.emitToChannel("default", "announcement", { text: "Hello!" });
+	 * ```
 	 */
 	emitToChannel(channel: string, event: string, data?: any): number {
 		const eventData = { type: event, ...data };
@@ -234,46 +245,24 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	}
 
 	/**
-	 * Socket.IO-like emit API: Emit an event to a specific user.
-	 * Available via RPC. Used internally by toUser() builder.
+	 * Socket.IO-like emit API: Emit an event to a specific user (all their sessions).
+	 * Available via RPC.
 	 * @param userId - User ID
 	 * @param event - Event name
 	 * @param data - Event data
 	 * @returns Number of sessions that received the message
+	 * @example
+	 * ```typescript
+	 * // Direct call (inside lifecycle hooks)
+	 * const sent = actor.emitToUser("alice", "notification", { message: "Hello!" });
+	 * 
+	 * // RPC call (from Worker)
+	 * const sent = await stub.emitToUser("alice", "notification", { message: "Hello!" });
+	 * ```
 	 */
 	emitToUser(userId: string, event: string, data?: any): number {
 		const eventData = { type: event, ...data };
 		return sendToUserImpl(this.sessions, userId, "default", eventData);
-	}
-
-	/**
-	 * Socket.IO-like emit API: Get a builder for emitting to a specific channel.
-	 * Available via RPC.
-	 * @param channel - Channel name
-	 * @returns Emit builder for the channel
-	 */
-	toChannel(channel: string): RpcEmitBuilder {
-		return createRpcChannelEmitBuilder(this as any, channel);
-	}
-
-	/**
-	 * Socket.IO-like emit API: Get a builder for emitting to a specific user.
-	 * Available via RPC.
-	 * @param userId - User ID
-	 * @returns Emit builder for the user
-	 */
-	toUser(userId: string): RpcEmitBuilder {
-		return createRpcUserEmitBuilder(this as any, userId);
-	}
-
-	/**
-	 * Socket.IO-like emit API: Get a builder with smart routing (channel or user).
-	 * Available via RPC.
-	 * @param target - Channel name or user ID
-	 * @returns Emit builder for the target
-	 */
-	to(target: string): RpcEmitBuilder {
-		return createRpcEmitBuilder(this as any, target);
 	}
 
 	/**
