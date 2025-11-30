@@ -12,6 +12,7 @@ import { onWebSocketMessage as onWebSocketMessageImpl } from "./runtime/onWebSoc
 import { onWebSocketDisconnect as onWebSocketDisconnectImpl } from "./runtime/onWebSocketDisconnect";
 import { createActorEmit } from "./runtime/emit";
 import { createFetch, type ActorInstanceWithFetchMethods } from "./runtime/fetch";
+import { encodeFrame } from "./protocol";
 
 
 /**
@@ -247,6 +248,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	/**
 	 * Socket.IO-like emit API: Emit an event to a specific user (all their sessions).
 	 * Available via RPC.
+	 * Sends to ALL sessions of the user, regardless of which channels they're subscribed to.
 	 * @param userId - User ID
 	 * @param event - Event name
 	 * @param data - Event data
@@ -262,7 +264,36 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 */
 	emitToUser(userId: string, event: string, data?: any): number {
 		const eventData = { type: event, ...data };
-		return sendToUserImpl(this.sessions, userId, "default", eventData);
+		const frame = { type: "event" as const, channel: "default", data: eventData };
+		const encoded = encodeFrame(frame);
+
+		let sentCount = 0;
+		const failedSessions: WebSocket[] = [];
+
+		// Send to ALL sessions of this user, regardless of channel
+		for (const { ws, meta } of this.sessions.values()) {
+			if (meta.userId === userId) {
+				if (ws.readyState !== WebSocket.OPEN) {
+					failedSessions.push(ws);
+					continue;
+				}
+
+				try {
+					ws.send(encoded);
+					sentCount++;
+				} catch (error) {
+					console.error("[Verani] Failed to send to user:", error);
+					failedSessions.push(ws);
+				}
+			}
+		}
+
+		// Clean up failed sessions
+		for (const ws of failedSessions) {
+			this.sessions.delete(ws);
+		}
+
+		return sentCount;
 	}
 
 	/**
