@@ -11,6 +11,7 @@ import { onWebSocketConnect as onWebSocketConnectImpl } from "./runtime/onWebSoc
 import { onWebSocketMessage as onWebSocketMessageImpl } from "./runtime/onWebSocketMessage";
 import { onWebSocketDisconnect as onWebSocketDisconnectImpl } from "./runtime/onWebSocketDisconnect";
 import { createActorEmit } from "./runtime/emit";
+import { createFetch, type ActorInstanceWithFetchMethods } from "./runtime/fetch";
 
 
 /**
@@ -102,20 +103,9 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 			return true;
 		}
 
+
 		// https://github.com/cloudflare/actors/issues/92
-		async fetch(request: Request): Promise<Response> {
-			const url = new URL(request.url);
-			const upgradeHeader = request.headers.get("Upgrade");
-
-			if (url.pathname === room.websocketPath && upgradeHeader === 'websocket') {
-				const shouldUpgrade = await this.shouldUpgradeWebSocket(request);
-				if (shouldUpgrade) {
-					return this.onWebSocketUpgrade(request);
-				}
-			}
-
-			return this.onRequest(request);
-		}
+		fetch = createFetch(room, this as unknown as ActorInstanceWithFetchMethods);
 
 
 	/**
