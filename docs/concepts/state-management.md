@@ -28,7 +28,24 @@ class MyActor extends Actor {
 
 **Use case**: Temporary counters, rate limits, cached computed values.
 
-## 3. Durable State (Optional)
+## 3. Handler Definitions (Survives Hibernation)
+
+Event handlers registered via `room.on()` are stored statically at module scope, not in the Actor instance.
+
+```typescript
+const room = defineRoom({ /* ... */ });
+
+// These handlers persist across hibernation automatically
+room.on("chat.message", (ctx, data) => {
+  // Handler logic
+});
+```
+
+**Use case**: Event handlers, message routing, business logic.
+
+**Important**: Handlers are automatically rebuilt when the Actor wakes from hibernation. You don't need to do anything - just define them statically in your code.
+
+## 4. Durable State (Optional)
 
 Stored in Durable Object storage or external database.
 
@@ -41,7 +58,7 @@ await ctx.actor.getStorage().put("lastMessage", message);
 
 ## Related Documentation
 
-- [Hibernation](./hibernation.md) - How hibernation affects state
+- [Hibernation](./hibernation.md) - How hibernation affects state and handlers
 - [Server API - getStorage](../api/server.md#getstorage-durableobjectstorage) - Storage API
 - [Examples - Presence](../examples/presence.md) - Example using durable storage
 

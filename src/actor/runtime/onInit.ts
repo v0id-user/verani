@@ -11,6 +11,18 @@ export async function onInit<TMeta extends ConnectionMeta, E>(
 ): Promise<void> {
 	console.debug("[Verani:ActorRuntime] onInit called");
 
+	// Rebuild event handlers from static storage (survives hibernation)
+	// This MUST happen every time the Actor wakes up to restore handlers
+	// We rebuild even if staticHandlers is empty to ensure a clean state
+	if (room.eventEmitter && room._staticHandlers) {
+		try {
+			room.eventEmitter.rebuildHandlers(room._staticHandlers);
+			console.debug("[Verani:ActorRuntime] Event handlers rebuilt from static storage");
+		} catch (error) {
+			console.error("[Verani] Failed to rebuild event handlers:", error);
+		}
+	}
+
 	// Restore sessions with separate error handling
 	let restoreError: Error | undefined;
 	try {

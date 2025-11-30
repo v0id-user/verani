@@ -125,6 +125,14 @@ export interface RoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta,
    * @param data - Event data
    */
   emit(event: string, ctx: MessageContext<TMeta, E>, data: any): Promise<void>;
+
+  /**
+   * Rebuild handlers from static storage.
+   * Called after hibernation to restore handlers from the room definition.
+   * This method MUST be implemented by all event emitter implementations.
+   * @param staticHandlers - Map of event names to handler sets from static storage
+   */
+  rebuildHandlers(staticHandlers: Map<string, Set<EventHandler<TMeta, E>>>): void;
 }
 
 /**
@@ -243,7 +251,7 @@ export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E
    * Called when a message is received from a connection.
    * This hook is awaited if it returns a Promise. The actor will not process
    * other messages from this connection until this hook completes.
-   * 
+   *
    * **Note:** If event handlers are registered via `eventEmitter`, they take priority.
    * This hook is used as a fallback when no matching event handler is found.
    */
@@ -268,4 +276,11 @@ export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E
    * If not provided, a default event emitter will be created.
    */
   eventEmitter?: RoomEventEmitter<TMeta, E>;
+
+  /**
+   * Static handler storage that persists across hibernation.
+   * Handlers registered via room.on() are stored here and rebuilt in onInit.
+   * @internal
+   */
+  _staticHandlers?: Map<string, Set<EventHandler<TMeta, E>>>;
 }

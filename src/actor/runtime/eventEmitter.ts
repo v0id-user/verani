@@ -106,6 +106,22 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 	getEventNames(): string[] {
 		return Array.from(this.handlers.keys());
 	}
+
+	/**
+	 * Rebuild handlers from static storage.
+	 * Called after hibernation to restore handlers from the room definition.
+	 * @param staticHandlers - Map of event names to handler sets from static storage
+	 */
+	rebuildHandlers(staticHandlers: Map<string, Set<EventHandler<TMeta, E>>>): void {
+		console.debug(`[Verani:EventEmitter] Rebuilding handlers from static storage, ${staticHandlers.size} event types`);
+		// Clear existing handlers
+		this.handlers.clear();
+		// Copy all handlers from static storage
+		for (const [event, handlers] of staticHandlers.entries()) {
+			this.handlers.set(event, new Set(handlers));
+		}
+		console.debug(`[Verani:EventEmitter] Rebuilt ${this.handlers.size} event types`);
+	}
 }
 
 /**

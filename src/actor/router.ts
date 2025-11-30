@@ -59,6 +59,10 @@ export function defineRoom<TMeta extends ConnectionMeta = ConnectionMeta, E = un
   // Create default event emitter if not provided
   const eventEmitter = def.eventEmitter || createRoomEventEmitter<TMeta, E>();
 
+  // Initialize static handlers storage if not already present
+  // This persists across hibernation because it's stored in the room definition at module scope
+  const staticHandlers = def._staticHandlers || new Map<string, Set<EventHandler<TMeta, E>>>();
+
   const room: RoomDefinitionWithHandlers<TMeta, E> = {
     name: def.name,
     websocketPath: def.websocketPath,
@@ -69,12 +73,37 @@ export function defineRoom<TMeta extends ConnectionMeta = ConnectionMeta, E = un
     onError: def.onError,
     onHibernationRestore: def.onHibernationRestore,
     eventEmitter,
+    _staticHandlers: staticHandlers,
     // Socket.io-like convenience methods
     on(event: string, handler: EventHandler<TMeta, E>): void {
+      // Store in both eventEmitter (for current instance) and static storage (for persistence)
       eventEmitter.on(event, handler);
+
+      // Add to static storage
+      if (!staticHandlers.has(event)) {
+        staticHandlers.set(event, new Set());
+      }
+      staticHandlers.get(event)!.add(handler);
+      console.debug(`[Verani:Router] Registered handler for event: ${event} (stored statically)`);
     },
     off(event: string, handler?: EventHandler<TMeta, E>): void {
+      // Remove from both eventEmitter and static storage
       eventEmitter.off(event, handler);
+
+      // Remove from static storage
+      const eventHandlers = staticHandlers.get(event);
+      if (eventHandlers) {
+        if (handler) {
+          eventHandlers.delete(handler);
+          console.debug(`[Verani:Router] Removed specific handler for event: ${event} (from static storage)`);
+          if (eventHandlers.size === 0) {
+            staticHandlers.delete(event);
+          }
+        } else {
+          staticHandlers.delete(event);
+          console.debug(`[Verani:Router] Removed all handlers for event: ${event} (from static storage)`);
+        }
+      }
     }
   };
 
