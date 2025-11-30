@@ -798,6 +798,126 @@ const stub = ChatRoom.get("room-id"); // Returns ActorStub
 - Only methods with serializable return types are available via RPC
 - Methods like `getUserSessions()` and `getStorage()` are not available via RPC
 
+## Socket.IO-like RPC API (Recommended)
+
+Verani provides a Socket.IO-like emit API for RPC calls, offering a unified and familiar developer experience.
+
+### `stub.toChannel(channel: string): Promise<RpcEmitBuilder>`
+
+Get a builder for emitting to a specific channel. Returns a builder object with an `emit()` method.
+
+**Parameters:**
+- `channel: string` - Channel name to target
+
+**Returns:** Promise resolving to an `RpcEmitBuilder` with an `emit()` method
+
+**Example:**
+```typescript
+const stub = ChatRoom.get("room-id");
+
+// Emit to default channel
+const sentCount = await (await stub.toChannel("default")).emit("chat.message", {
+  from: "server",
+  text: "Hello everyone!"
+});
+
+// Emit to a specific channel
+await (await stub.toChannel("announcements")).emit("server.update", {
+  message: "Server maintenance in 5 minutes"
+});
+```
+
+### `stub.toUser(userId: string): Promise<RpcEmitBuilder>`
+
+Get a builder for emitting to a specific user (all their sessions). Returns a builder object with an `emit()` method.
+
+**Parameters:**
+- `userId: string` - User ID to target
+
+**Returns:** Promise resolving to an `RpcEmitBuilder` with an `emit()` method
+
+**Example:**
+```typescript
+const stub = ChatRoom.get("room-id");
+
+// Send notification to a specific user
+const sentCount = await (await stub.toUser("alice")).emit("notification", {
+  title: "New Message",
+  body: "You have 3 unread messages"
+});
+```
+
+### `stub.to(target: string): Promise<RpcEmitBuilder>`
+
+Get a builder with smart routing. Automatically determines if `target` is a channel or user ID based on connected sessions.
+
+**Parameters:**
+- `target: string` - Channel name or user ID
+
+**Returns:** Promise resolving to an `RpcEmitBuilder` with an `emit()` method
+
+**Example:**
+```typescript
+const stub = ChatRoom.get("room-id");
+
+// Smart routing - will route to channel if it exists, otherwise treats as userId
+await (await stub.to("general")).emit("update", { value: 42 });
+await (await stub.to("alice")).emit("notification", { message: "Hello" });
+```
+
+### Complete Socket.IO-like RPC Example
+
+```typescript
+import { createActorHandler } from "verani";
+import { chatRoom } from "./rooms/chat";
+
+const ChatRoom = createActorHandler(chatRoom);
+export { ChatRoom };
+
+// In your Worker fetch handler
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/api/send-notification") {
+      const { userId, message } = await request.json();
+      const stub = ChatRoom.get("chat-room");
+
+      // Socket.IO-like API - emit to user
+      const sentCount = await (await stub.toUser(userId)).emit("notification", {
+        type: "notification",
+        message,
+        timestamp: Date.now()
+      });
+
+      return Response.json({
+        success: true,
+        sentTo: sentCount
+      });
+    }
+
+    if (url.pathname === "/api/broadcast") {
+      const { channel, event, data } = await request.json();
+      const stub = ChatRoom.get("chat-room");
+
+      // Socket.IO-like API - emit to channel
+      const sentCount = await (await stub.toChannel(channel)).emit(event, data);
+
+      return Response.json({
+        success: true,
+        sentTo: sentCount
+      });
+    }
+
+    return new Response("Not Found", { status: 404 });
+  }
+};
+```
+
+## Legacy RPC Methods (Deprecated)
+
+The following methods are still available for backward compatibility but are deprecated in favor of the Socket.IO-like API above.
+
 ### `stub.fetch(request: Request): Promise<Response>`
 
 Standard fetch method for handling HTTP requests and WebSocket upgrades.
@@ -809,6 +929,8 @@ const response = await stub.fetch(request);
 ```
 
 ### `stub.sendToUser(userId: string, channel: string, data?: any): Promise<number>`
+
+**Deprecated:** Use `stub.toUser(userId).emit(event, data)` instead for Socket.IO-like API.
 
 Sends a message to a specific user (all their sessions) via RPC.
 
@@ -822,14 +944,21 @@ Sends a message to a specific user (all their sessions) via RPC.
 **Example:**
 ```typescript
 const stub = ChatRoom.get("room-id");
+// Legacy API
 const sentCount = await stub.sendToUser("alice", "notifications", {
   type: "alert",
   message: "You have a new message"
 });
-console.log(`Sent to ${sentCount} session(s)`);
+
+// Recommended: Socket.IO-like API
+const sentCount = await (await stub.toUser("alice")).emit("alert", {
+  message: "You have a new message"
+});
 ```
 
 ### `stub.broadcast(channel: string, data: any, opts?: RpcBroadcastOptions): Promise<number>`
+
+**Deprecated:** Use `stub.toChannel(channel).emit(event, data)` instead for Socket.IO-like API.
 
 Broadcasts a message to all connections in a channel via RPC.
 
@@ -846,18 +975,19 @@ Broadcasts a message to all connections in a channel via RPC.
 ```typescript
 const stub = ChatRoom.get("room-id");
 
-// Broadcast to all in channel
+// Legacy API
 await stub.broadcast("default", { type: "announcement", text: "Hello!" });
 
-// Broadcast only to specific users
+// Recommended: Socket.IO-like API
+await (await stub.toChannel("default")).emit("announcement", { text: "Hello!" });
+
+// Legacy API with filtering
 await stub.broadcast("general", { type: "update" }, {
   userIds: ["alice", "bob"]
 });
 
-// Broadcast only to specific clients
-await stub.broadcast("notifications", { type: "alert" }, {
-  clientIds: ["client-123", "client-456"]
-});
+// Note: Filtering options are not available in the Socket.IO-like API
+// Use the legacy API if you need userIds/clientIds filtering
 ```
 
 ### `stub.getSessionCount(): Promise<number>`
@@ -899,7 +1029,7 @@ const cleaned = await stub.cleanupStaleSessions();
 console.log(`Cleaned up ${cleaned} stale sessions`);
 ```
 
-**Complete RPC Example:**
+**Legacy RPC Example:**
 
 ```typescript
 import { createActorHandler } from "verani";
@@ -915,11 +1045,9 @@ export default {
 
     if (url.pathname === "/api/send-notification") {
       const { userId, message } = await request.json();
-
-      // Get Actor stub (variable name must match wrangler.jsonc class_name)
       const stub = ChatRoom.get("chat-room");
 
-      // Send notification via RPC
+      // Legacy API - use Socket.IO-like API instead
       const sentCount = await stub.sendToUser(userId, "notifications", {
         type: "notification",
         message,

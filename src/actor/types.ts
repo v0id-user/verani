@@ -190,6 +190,20 @@ export interface ActorEmit<TMeta extends ConnectionMeta = ConnectionMeta, E = un
 }
 
 /**
+ * RPC-safe emit builder interface for use over RPC calls.
+ * Used by ActorStub to provide Socket.IO-like emit API over RPC.
+ */
+export interface RpcEmitBuilder {
+  /**
+   * Emit an event to the targeted scope (channel or user)
+   * @param event - Event name
+   * @param data - Event data
+   * @returns Promise resolving to the number of connections that received the message
+   */
+  emit(event: string, data?: any): Promise<number>;
+}
+
+/**
  * Context provided to room lifecycle hooks
  */
 export interface RoomContext<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> {

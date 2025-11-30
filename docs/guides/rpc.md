@@ -24,9 +24,9 @@ const actorId = "chat-room-123";
 const stub = ChatRoom.get(actorId);
 await stub.fetch(wsRequest);
 
-// RPC call (must use same ID)
+// RPC call (must use same ID) - Socket.IO-like API
 const stub = ChatRoom.get(actorId); // Same value!
-await stub.sendToUser("alice", "default", data);
+await (await stub.toUser("alice")).emit("message", data);
 ```
 
 ### Error Handling
@@ -35,7 +35,8 @@ RPC calls can fail due to network issues or Actor hibernation. Always wrap in tr
 
 ```typescript
 try {
-  const sentCount = await stub.sendToUser(userId, "default", data);
+  // Socket.IO-like API
+  const sentCount = await (await stub.toUser(userId)).emit("message", data);
   return Response.json({ success: true, sentTo: sentCount });
 } catch (error) {
   console.error("RPC call failed:", error);
@@ -66,6 +67,86 @@ const count = await stub.getSessionCount();
 const userIds = await stub.getConnectedUserIds();
 ```
 
+## Migrating from Legacy API to Socket.IO-like API
+
+Verani now provides a Socket.IO-like emit API for RPC calls, offering a unified and familiar developer experience. The legacy methods (`sendToUser`, `broadcast`) are still available but deprecated.
+
+### Migration Examples
+
+**Sending to a user:**
+
+```typescript
+// Legacy API (deprecated)
+const sentCount = await stub.sendToUser(userId, "default", {
+  type: "notification",
+  message: "Hello"
+});
+
+// New Socket.IO-like API (recommended)
+const sentCount = await (await stub.toUser(userId)).emit("notification", {
+  message: "Hello"
+});
+```
+
+**Broadcasting to a channel:**
+
+```typescript
+// Legacy API (deprecated)
+await stub.broadcast("announcements", {
+  type: "update",
+  text: "Server maintenance"
+});
+
+// New Socket.IO-like API (recommended)
+await (await stub.toChannel("announcements")).emit("update", {
+  text: "Server maintenance"
+});
+```
+
+**Emitting to default channel:**
+
+```typescript
+// Legacy API (deprecated)
+await stub.broadcast("default", {
+  type: "announcement",
+  message: "Hello everyone"
+});
+
+// New Socket.IO-like API (recommended)
+await (await stub.toChannel("default")).emit("announcement", {
+  message: "Hello everyone"
+});
+```
+
+**Smart routing (channel or user):**
+
+```typescript
+// New Socket.IO-like API - automatically detects if target is channel or user
+await (await stub.to("general")).emit("update", { value: 42 });
+await (await stub.to("alice")).emit("notification", { message: "Hello" });
+```
+
+### When to Use Legacy API
+
+The legacy API is still needed when you require advanced filtering options:
+
+```typescript
+// Legacy API supports userIds/clientIds filtering
+await stub.broadcast("announcements", data, {
+  userIds: ["admin", "moderator"]
+});
+
+// Socket.IO-like API doesn't support filtering yet
+// Use legacy API if you need this feature
+```
+
+### Benefits of Socket.IO-like API
+
+1. **Unified API**: Same pattern as direct actor methods (`ctx.actor.emit.to()`)
+2. **Familiar**: Matches Socket.IO server-side API patterns
+3. **Type-safe**: Better TypeScript support with builder pattern
+4. **Consistent**: Event-based messaging aligns with Socket.IO conventions
+
 ## Common RPC Issues
 
 ### Issue: RPC calls failing with "Method not found"
@@ -74,9 +155,12 @@ const userIds = await stub.getConnectedUserIds();
 
 1. Ensure you're using the stub, not the class directly:
 ```typescript
-// ✅ Correct
+// ✅ Correct - Socket.IO-like API
 const stub = ChatRoom.get("room-id");
-await stub.sendToUser(...);
+await (await stub.toUser("alice")).emit("message", data);
+
+// ✅ Correct - Legacy API
+await stub.sendToUser("alice", "default", data);
 
 // ❌ Wrong
 await ChatRoom.sendToUser(...);

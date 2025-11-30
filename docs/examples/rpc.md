@@ -58,9 +58,8 @@ export default {
       // Get Actor stub (variable name must match wrangler.jsonc class_name)
       const stub = NotificationsRoom.get(`notifications:${userId}`);
 
-      // Send notification via RPC
-      const sentCount = await stub.sendToUser(userId, "default", {
-        type: "notification",
+      // Send notification via RPC (Socket.IO-like API)
+      const sentCount = await (await stub.toUser(userId)).emit("notification", {
         notificationType: type,
         message,
         timestamp: Date.now()
@@ -132,13 +131,24 @@ if (url.pathname === "/webhook/announcement" && request.method === "POST") {
 
   const stub = ChatRoom.get("chat-room");
 
-  // Broadcast via RPC with optional user filtering
-  const opts = targetUsers ? { userIds: targetUsers } : undefined;
-  const sentCount = await stub.broadcast(channel, {
-    type: "announcement",
-    text: announcement,
-    timestamp: Date.now()
-  }, opts);
+  // Broadcast via RPC (Socket.IO-like API)
+  // Note: For user filtering, use legacy broadcast() API
+  let sentCount: number;
+  if (targetUsers) {
+    // Legacy API needed for filtering
+    const opts = { userIds: targetUsers };
+    sentCount = await stub.broadcast(channel, {
+      type: "announcement",
+      text: announcement,
+      timestamp: Date.now()
+    }, opts);
+  } else {
+    // Socket.IO-like API
+    sentCount = await (await stub.toChannel(channel)).emit("announcement", {
+      text: announcement,
+      timestamp: Date.now()
+    });
+  }
 
   return Response.json({
     success: true,
@@ -169,8 +179,8 @@ export default {
     for (const userId of usersToNotify) {
       const stub = NotificationsRoom.get(`notifications:${userId}`);
 
-      await stub.sendToUser(userId, "default", {
-        type: "daily-digest",
+      // Socket.IO-like API
+      await (await stub.toUser(userId)).emit("daily-digest", {
         date: new Date().toISOString(),
         summary: await getDailySummary(userId)
       });
@@ -197,9 +207,8 @@ room.on("cross-room-message", async (ctx, data) => {
   // Get another Actor's stub
   const targetStub = OtherRoom.get(targetRoom);
 
-  // Send message via RPC
-  await targetStub.sendToUser(targetUser, "default", {
-    type: "cross-room",
+  // Send message via RPC (Socket.IO-like API)
+  await (await targetStub.toUser(targetUser)).emit("cross-room", {
     from: ctx.meta.userId,
     message
   });
@@ -208,18 +217,22 @@ room.on("cross-room-message", async (ctx, data) => {
 
 ## Key Points
 
-1. **Always use `await`**: RPC methods return Promises even if the underlying method is synchronous
-2. **Use `RpcBroadcastOptions`**: For broadcast options, use `RpcBroadcastOptions` (excludes `except` WebSocket option)
-3. **Actor ID consistency**: Use the same ID string for WebSocket connections and RPC calls to reach the same Actor instance
-4. **Variable name must match wrangler.jsonc**: The exported variable name must match the `class_name` in wrangler.jsonc
-5. **Error handling**: RPC calls can fail - wrap in try/catch
-6. **Performance**: RPC calls have network overhead - batch operations when possible
+1. **Socket.IO-like API**: Use `stub.toChannel().emit()` and `stub.toUser().emit()` for a unified, familiar API
+2. **Always use `await`**: RPC methods return Promises even if the underlying method is synchronous
+3. **Builder pattern**: `toChannel()` and `toUser()` return builders that must be awaited before calling `emit()`
+4. **Legacy API still available**: `sendToUser()` and `broadcast()` are deprecated but still work for backward compatibility
+5. **Use legacy API for filtering**: If you need `userIds` or `clientIds` filtering, use the legacy `broadcast()` method
+6. **Actor ID consistency**: Use the same ID string for WebSocket connections and RPC calls to reach the same Actor instance
+7. **Variable name must match wrangler.jsonc**: The exported variable name must match the `class_name` in wrangler.jsonc
+8. **Error handling**: RPC calls can fail - wrap in try/catch
+9. **Performance**: RPC calls have network overhead - batch operations when possible
 
 ## Error Handling
 
 ```typescript
 try {
-  const sentCount = await stub.sendToUser(userId, "default", data);
+  // Socket.IO-like API
+  const sentCount = await (await stub.toUser(userId)).emit("message", data);
   console.log(`Sent to ${sentCount} sessions`);
 } catch (error) {
   console.error("RPC call failed:", error);

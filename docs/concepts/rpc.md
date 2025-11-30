@@ -53,7 +53,7 @@ Since Actors are Durable Objects, you can call their methods remotely from Worke
 
 ## RPC Example
 
-**From a Worker HTTP endpoint:**
+**From a Worker HTTP endpoint (Socket.IO-like API - Recommended):**
 
 ```typescript
 import { createActorHandler } from "verani";
@@ -69,14 +69,23 @@ if (url.pathname === "/api/notify") {
   // Get Actor stub (simple - just pass the ID string)
   const stub = ChatRoom.get("chat-room");
 
-  // Call via RPC - returns Promise
-  const sentCount = await stub.sendToUser(userId, "default", {
-    type: "notification",
+  // Socket.IO-like RPC API - returns Promise
+  const sentCount = await (await stub.toUser(userId)).emit("notification", {
     message
   });
 
   return Response.json({ sentTo: sentCount });
 }
+```
+
+**Legacy API (still supported but deprecated):**
+
+```typescript
+// Legacy RPC call
+const sentCount = await stub.sendToUser(userId, "default", {
+  type: "notification",
+  message
+});
 ```
 
 **From inside a lifecycle hook (direct call):**
@@ -108,7 +117,7 @@ room.on("chat.message", (ctx, data) => {
 2. **Promise Wrapping**: All RPC methods return Promises, even if underlying method is sync
 3. **Serialization**: Only serializable types can be passed/returned over RPC
 4. **Actor ID Consistency**: Use the same ID string for WebSocket connections and RPC calls to reach the same Actor instance
-5. **Emit API Not Available**: The emit API (`ctx.emit`, `ctx.actor.emit`) is only available inside lifecycle hooks. RPC uses `broadcast()` and `sendToUser()` methods directly.
+5. **Socket.IO-like API**: RPC now provides a Socket.IO-like emit API (`stub.toChannel().emit()`, `stub.toUser().emit()`) for unified developer experience. Legacy methods (`broadcast()`, `sendToUser()`) are still available but deprecated.
 
 ## RPC Limitations
 
@@ -119,9 +128,13 @@ room.on("chat.message", (ctx, data) => {
 
 ## Common RPC Patterns
 
-**Send notifications from HTTP endpoints:**
+**Send notifications from HTTP endpoints (Socket.IO-like API):**
 ```typescript
-await stub.sendToUser(userId, "notifications", notificationData);
+// Recommended: Socket.IO-like API
+await (await stub.toUser(userId)).emit("notification", notificationData);
+
+// Legacy API (deprecated)
+// await stub.sendToUser(userId, "notifications", notificationData);
 ```
 
 **Query actor state:**
@@ -130,17 +143,31 @@ const count = await stub.getSessionCount();
 const userIds = await stub.getConnectedUserIds();
 ```
 
-**Broadcast from external events:**
+**Broadcast from external events (Socket.IO-like API):**
 ```typescript
-// RPC uses broadcast() method (emit API not available over RPC)
+// Recommended: Socket.IO-like API
+await (await stub.toChannel("announcements")).emit("update", data);
+
+// Legacy API with filtering (still needed for userIds/clientIds filtering)
 await stub.broadcast("announcements", data, { userIds: ["admin"] });
+```
+
+**Emit to default channel:**
+```typescript
+// Socket.IO-like API
+await (await stub.toChannel("default")).emit("announcement", {
+  message: "Server maintenance in 5 minutes"
+});
 ```
 
 **Coordinate between Actors:**
 ```typescript
-// From Actor A, call Actor B
+// From Actor A, call Actor B using Socket.IO-like API
 const otherStub = OtherRoom.get("other-room-id");
-await otherStub.sendToUser(userId, "default", message);
+await (await otherStub.toUser(userId)).emit("message", message);
+
+// Legacy API
+// await otherStub.sendToUser(userId, "default", message);
 ```
 
 ## Related Documentation
