@@ -234,7 +234,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * ```typescript
 	 * // Direct call (inside lifecycle hooks)
 	 * const sent = actor.emitToChannel("default", "announcement", { text: "Hello!" });
-	 * 
+	 *
 	 * // RPC call (from Worker)
 	 * const sent = await stub.emitToChannel("default", "announcement", { text: "Hello!" });
 	 * ```
@@ -255,7 +255,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * ```typescript
 	 * // Direct call (inside lifecycle hooks)
 	 * const sent = actor.emitToUser("alice", "notification", { message: "Hello!" });
-	 * 
+	 *
 	 * // RPC call (from Worker)
 	 * const sent = await stub.emitToUser("alice", "notification", { message: "Hello!" });
 	 * ```
