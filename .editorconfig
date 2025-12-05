@@ -8,5 +8,15 @@ charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
 
-[*.yml]
+[*.{json,jsonc}]
+indent_style = tab
+
+[*.{yml,yaml}]
 indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{ts,tsx,js,jsx}]
+indent_style = tab
