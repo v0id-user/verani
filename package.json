@@ -52,6 +52,7 @@
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.8.19",
+		"@nyron/cli": "^0.7.8",
 		"esbuild-fix-imports-plugin": "^1.0.23",
 		"tsdown": "^0.16.7",
 		"typescript": "^5",
