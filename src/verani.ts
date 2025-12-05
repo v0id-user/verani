@@ -24,12 +24,12 @@ export type {
   VeraniActor,
   RoomContext,
   MessageContext,
-  RoomDefinition
+  RoomDefinition,
+  ActorStub
 } from "./actor/types";
 
 export type {
-  ActorHandlerClass,
-  ActorStub
+  ActorHandlerClass
 } from "./actor/actor-runtime";
 
 // ============================================================================
