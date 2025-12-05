@@ -16,7 +16,7 @@ Verani brings the familiar developer experience of Socket.io to Cloudflare's Dur
 - **Hibernation Support**: Properly handles Cloudflare Actor hibernation out of the box
 - **Type Safe**: Built with TypeScript, full type safety throughout
 - **Simple Mental Model**: Rooms, channels, and broadcast semantics that just make sense
-- **Production Ready**: Automatic reconnection, error handling, and connection lifecycle management
+- **Modern DX**: Automatic reconnection, error handling, and connection lifecycle management
 
 ## Quick Start
 
@@ -252,7 +252,7 @@ See `examples/` for chat, presence, and notifications demos!
 
 ## Project Status
 
-Verani is in active development. Current version includes:
+Verani is in early stages and active development. Current version includes:
 
 **Implemented:**
 - Core realtime messaging
