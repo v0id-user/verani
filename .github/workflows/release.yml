@@ -1,0 +1,26 @@
+name: Publish Github Release Using Nyron
+
+on:
+  push:
+    tags:
+      - 'nyron-release@*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history to ensure latest tag is available
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install
+      - run: bun x @nyron/cli release -n
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
