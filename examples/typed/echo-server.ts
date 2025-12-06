@@ -42,8 +42,8 @@ const echoRoom = createTypedRoom<typeof echoContract, EchoMeta>(echoContract, {
   },
 });
 
-// Handle client events with full type safety
-echoRoom.handle("echo.send", (ctx, data) => {
+// Handle client events with full type safety (Socket.io-like API)
+echoRoom.on("echo.send", (ctx, data) => {
   // data is typed as { message: string }
   console.log(`[Echo] Received from ${ctx.meta.userId}: ${data.message}`);
 

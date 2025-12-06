@@ -88,10 +88,10 @@ const echoContract = defineContract({
 });
 ```
 
-**Server handlers are typed:**
+**Server handlers are typed (Socket.io-like):**
 
 ```typescript
-echoRoom.handle("echo.send", (ctx, data) => {
+echoRoom.on("echo.send", (ctx, data) => {
   // data: { message: string } - inferred!
   ctx.emit("echo.response", { message: data.message, timestamp: Date.now() });
 });

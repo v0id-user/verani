@@ -99,7 +99,7 @@ const room = createTypedRoom<typeof chatContract, ChatMeta>(chatContract, {
 });
 
 // Handle client events with fully typed data
-room.handle("message.send", (ctx, data) => {
+room.on("message.send", (ctx, data) => {
   // data: { text: string } - inferred from contract!
   ctx.actor.emit.to("default").emit("chat.message", {
     from: ctx.meta.userId,
@@ -108,7 +108,7 @@ room.handle("message.send", (ctx, data) => {
   });
 });
 
-room.handle("typing.start", (ctx, data) => {
+room.on("typing.start", (ctx, data) => {
   // data: { conversationId: string }
   console.log(`${ctx.meta.userId} started typing in ${data.conversationId}`);
 });
@@ -250,12 +250,12 @@ interface TypedRoomConfig<C, TMeta, E> {
 
 **Returns:** `TypedRoom<C, TMeta, E>`
 
-### `room.handle(event, handler)`
+### `room.on(event, handler)`
 
-Registers a typed event handler for a client event.
+Registers a typed event handler for a client event (Socket.io-like API).
 
 ```typescript
-room.handle("message.send", (ctx, data) => {
+room.on("message.send", (ctx, data) => {
   // data is typed as { text: string }
   // ctx.emit only accepts serverEvents
   ctx.emit("chat.message", {

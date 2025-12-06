@@ -30,7 +30,7 @@
  *   },
  * });
  *
- * room.handle("message.send", (ctx, data) => {
+ * room.on("message.send", (ctx, data) => {
  *   ctx.emit("chat.message", { from: ctx.meta.userId, text: data.text });
  * });
  *

@@ -16,7 +16,7 @@
  *   },
  * });
  *
- * room.handle("message.send", (ctx, data) => {
+ * room.on("message.send", (ctx, data) => {
  *   ctx.emit("chat.message", { from: ctx.meta.userId, text: data.text });
  * });
  * ```
@@ -205,7 +205,7 @@ export type TypedEventHandler<
 ) => void | Promise<void>;
 
 /**
- * Typed room with contract-aware handle method.
+ * Typed room with contract-aware event handling (Socket.io-like API).
  */
 export interface TypedRoom<
   C extends Contract,
@@ -221,13 +221,13 @@ export interface TypedRoom<
    *
    * @example
    * ```typescript
-   * room.handle("message.send", (ctx, data) => {
+   * room.on("message.send", (ctx, data) => {
    *   // data: { text: string } - inferred from contract!
    *   ctx.emit("chat.message", { from: ctx.meta.userId, text: data.text });
    * });
    * ```
    */
-  handle<TEvent extends ClientEventNames<C>>(
+  on<TEvent extends ClientEventNames<C>>(
     event: TEvent,
     handler: TypedEventHandler<C, TEvent, TMeta, E>,
   ): void;
@@ -334,7 +334,7 @@ function wrapMessageContext<C extends Contract, TMeta extends ConnectionMeta, E>
  * Creates a type-safe room based on a contract definition.
  *
  * This wraps the base `defineRoom()` function and adds:
- * - Typed `handle()` method for registering event handlers
+ * - Typed `on()` method for registering event handlers
  * - Typed `emit` on context for sending server events
  * - Compile-time validation of event names and payloads
  *
@@ -360,7 +360,7 @@ function wrapMessageContext<C extends Contract, TMeta extends ConnectionMeta, E>
  *   },
  * });
  *
- * room.handle("message.send", (ctx, data) => {
+ * room.on("message.send", (ctx, data) => {
  *   ctx.emit("chat.message", { from: ctx.meta.userId, text: data.text });
  * });
  *
@@ -398,7 +398,7 @@ export function createTypedRoom<
 
   // Create the typed room wrapper
   const typedRoom: TypedRoom<C, TMeta, E> = {
-    handle<TEvent extends ClientEventNames<C>>(
+    on<TEvent extends ClientEventNames<C>>(
       event: TEvent,
       handler: TypedEventHandler<C, TEvent, TMeta, E>,
     ): void {

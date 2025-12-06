@@ -33,7 +33,7 @@ Think about event names from the **perspective of who SENDS the event**:
 | Event Type | Who Sends | Who Receives | Server Does | Client Does |
 |------------|-----------|--------------|-------------|-------------|
 | `serverEvents` | Server | Client | `emit()` | `on()` |
-| `clientEvents` | Client | Server | `handle()` | `emit()` |
+| `clientEvents` | Client | Server | `on()` | `emit()` |
 
 ### serverEvents = "Events the Server Sends"
 
@@ -63,7 +63,7 @@ clientEvents: {
 ```
 
 - **Client**: Calls `client.emit("message.send", { text: "Hello" })` to send
-- **Server**: Calls `room.handle("message.send", (ctx, data) => { ... })` to receive
+- **Server**: Calls `room.on("message.send", (ctx, data) => { ... })` to receive
 
 ## Why This Naming?
 
@@ -99,16 +99,16 @@ const room = createTypedRoom(chatContract, { ... });
 // ✅ Server can emit serverEvents
 ctx.emit("chat.message", { from: "alice", text: "Hello" });
 
-// ✅ Server can handle clientEvents
-room.handle("message.send", (ctx, data) => {
+// ✅ Server can listen to clientEvents
+room.on("message.send", (ctx, data) => {
   // data.text is typed as string
 });
 
 // ❌ TypeScript Error: Server can't emit clientEvents
 ctx.emit("message.send", { text: "Hello" });
 
-// ❌ TypeScript Error: Server can't handle serverEvents
-room.handle("chat.message", (ctx, data) => { });
+// ❌ TypeScript Error: Server can't listen to serverEvents
+room.on("chat.message", (ctx, data) => { });
 ```
 
 ### Client Side
@@ -192,7 +192,7 @@ const chatContract = defineContract({
 | Server sends data to client | `serverEvents` | `ctx.emit()` |
 | Client receives data from server | `serverEvents` | `client.on()` |
 | Client sends data to server | `clientEvents` | `client.emit()` |
-| Server receives data from client | `clientEvents` | `room.handle()` |
+| Server receives data from client | `clientEvents` | `room.on()` |
 
 ## Related Documentation
 
