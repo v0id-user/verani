@@ -17,6 +17,7 @@ Examples marked with:
 - [Socket.io-like API](./socket-io-like.md) 🔓 - Event handlers and emit API
 - [Channels](./channels.md) 🔓 - Custom WebSocket paths and multiple channels
 - [User Presence](./presence.md) 🔓 - Track who is online
+- [State Persistence](./persistence.md) 🔓 - Persist room state across hibernation
 - [Authentication](./authentication.md) 🔒 - JWT token verification
 - [Rate Limiting](./rate-limiting.md) 🔓 - Prevent spam with rate limits
 - [RPC](./rpc.md) 🔒 - Send messages via Remote Procedure Calls
