@@ -617,6 +617,7 @@ See the typed examples in `examples/typed/`:
 
 ## Related Documentation
 
+- [Typed Contracts Concept](../concepts/typed-contracts.md) - Understanding serverEvents vs clientEvents
 - [Server API](./server.md) - Core server-side API
 - [Client API](./client.md) - Core client-side API
 - [Types](./types.md) - Type definitions
