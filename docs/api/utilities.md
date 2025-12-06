@@ -46,5 +46,6 @@ Restores sessions from WebSocket attachments after hibernation.
 
 - [Server API](./server.md) - Server-side API reference
 - [Client API](./client.md) - Client-side API reference
+- [Typed API](./typed.md) - Type-safe contracts (tRPC-like)
 - [Types](./types.md) - Type definitions
 

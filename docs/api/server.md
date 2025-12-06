@@ -2,6 +2,8 @@
 
 Complete server-side API documentation for Verani.
 
+> **Looking for type safety?** See the [Typed API](./typed.md) for tRPC-like type-safe contracts with `createTypedRoom()`. Import from `verani/typed`.
+
 ## `defineRoom<TMeta, E>(definition)`
 
 Defines a room with lifecycle hooks and metadata extraction.

@@ -204,9 +204,57 @@ See [Client API](./client.md#veraniclientoptions) for details.
 
 See [Client API](./client.md#reconnectionconfig) for details.
 
+## Typed API Types
+
+For type-safe contracts with full TypeScript inference, see the [Typed API](./typed.md).
+
+**Contract Types (from `verani/typed/shared`):**
+
+```typescript
+import type {
+  // Contract definition
+  Contract,
+  ContractDefinition,
+  EventMap,
+  PayloadMarker,
+  
+  // Type inference
+  ServerEventNames,
+  ClientEventNames,
+  ServerPayload,
+  ClientPayload,
+  InferChannels,
+  
+  // Validation
+  Validator,
+  ValidatedContract,
+} from "verani/typed/shared";
+```
+
+**Server Types (from `verani/typed`):**
+
+```typescript
+import type {
+  TypedRoom,
+  TypedRoomConfig,
+  TypedRoomContext,
+  TypedMessageContext,
+  TypedEventHandler,
+} from "verani/typed";
+```
+
+**Client Types (from `verani/typed/client`):**
+
+```typescript
+import type {
+  TypedClient,
+} from "verani/typed/client";
+```
+
 ## Related Documentation
 
 - [Server API](./server.md) - Server-side API reference
 - [Client API](./client.md) - Client-side API reference
+- [Typed API](./typed.md) - Type-safe contracts (tRPC-like)
 - [Utilities](./utilities.md) - Utility functions
 

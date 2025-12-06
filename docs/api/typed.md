@@ -2,6 +2,18 @@
 
 Verani Typed provides tRPC-like type safety for WebSocket communication. Define a contract once, get fully typed APIs on both server and client with zero runtime overhead.
 
+## Entry Points
+
+The typed module has **three separate entry points** to prevent dependency leakage:
+
+| Entry Point | Use Case | Dependencies |
+|-------------|----------|--------------|
+| `verani/typed` | Server (Cloudflare Workers) | `@cloudflare/actors` |
+| `verani/typed/client` | Client (Browser, Node.js, React Native) | None |
+| `verani/typed/shared` | Contract definitions only | None |
+
+**Important**: Use the correct entry point for your environment to avoid build errors.
+
 ## Overview
 
 The typed abstraction layer consists of:
@@ -15,11 +27,11 @@ The typed abstraction layer consists of:
 
 ### 1. Define the Contract
 
-Create a shared contract that defines all events:
+Create a shared contract that defines all events. Use `verani/typed/shared` for contract-only imports:
 
 ```typescript
 // contracts/chat.ts
-import { defineContract, payload } from "verani/typed";
+import { defineContract, payload } from "verani/typed/shared";
 
 export const chatContract = defineContract({
   // Events the SERVER sends TO the client
@@ -157,7 +169,7 @@ Creates a typed contract for Verani communication.
 **Example:**
 
 ```typescript
-import { defineContract, payload } from "verani/typed";
+import { defineContract, payload } from "verani/typed/shared";
 
 const contract = defineContract({
   serverEvents: {
@@ -196,7 +208,7 @@ payload<{ required: string; optional?: number }>()
 Type guard to check if a value is a Verani contract.
 
 ```typescript
-import { isContract } from "verani/typed";
+import { isContract } from "verani/typed/shared";
 
 if (isContract(maybeContract)) {
   // maybeContract is Contract
@@ -416,7 +428,7 @@ Enriches a contract with validators.
 
 ```typescript
 import { z } from "zod";
-import { withValidation } from "verani/typed";
+import { withValidation } from "verani/typed/shared";
 
 const validatedContract = withValidation(chatContract, {
   clientEvents: {
@@ -466,7 +478,7 @@ interface Validator<T> {
 Type guard to check if a contract has validation.
 
 ```typescript
-import { isValidatedContract } from "verani/typed";
+import { isValidatedContract } from "verani/typed/shared";
 
 if (isValidatedContract(contract)) {
   // contract has _validation property
@@ -482,7 +494,7 @@ Extract types from contracts for advanced use cases.
 ### Event Names
 
 ```typescript
-import type { ServerEventNames, ClientEventNames } from "verani/typed";
+import type { ServerEventNames, ClientEventNames } from "verani/typed/shared";
 
 type ServerEvents = ServerEventNames<typeof chatContract>;
 // "chat.message" | "user.joined" | "user.left" | "users.sync"
@@ -494,7 +506,7 @@ type ClientEvents = ClientEventNames<typeof chatContract>;
 ### Payload Types
 
 ```typescript
-import type { ServerPayload, ClientPayload } from "verani/typed";
+import type { ServerPayload, ClientPayload } from "verani/typed/shared";
 
 type MessagePayload = ServerPayload<typeof chatContract, "chat.message">;
 // { from: string; text: string; timestamp: number }
@@ -506,7 +518,7 @@ type SendPayload = ClientPayload<typeof chatContract, "message.send">;
 ### Channel Types
 
 ```typescript
-import type { InferChannels } from "verani/typed";
+import type { InferChannels } from "verani/typed/shared";
 
 type Channels = InferChannels<typeof chatContract>;
 // "default" | "announcements"
@@ -515,7 +527,7 @@ type Channels = InferChannels<typeof chatContract>;
 ### Payload Maps
 
 ```typescript
-import type { ServerPayloadMap, ClientPayloadMap } from "verani/typed";
+import type { ServerPayloadMap, ClientPayloadMap } from "verani/typed/shared";
 
 type AllServerPayloads = ServerPayloadMap<typeof chatContract>;
 // { "chat.message": {...}, "user.joined": {...}, ... }
@@ -608,3 +620,4 @@ See the typed examples in `examples/typed/`:
 - [Server API](./server.md) - Core server-side API
 - [Client API](./client.md) - Core client-side API
 - [Types](./types.md) - Type definitions
+- [Utilities](./utilities.md) - Utility functions

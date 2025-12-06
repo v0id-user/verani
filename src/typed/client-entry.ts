@@ -1,13 +1,29 @@
 /**
- * Verani Typed Client - Type-Safe WebSocket Client
+ * Verani Typed - Client Entry Point
  *
- * Client-side entry point for the typed Verani SDK.
- * Import from "verani/typed/client" for browser/client environments.
+ * ✅ CLIENT-SAFE: This module has NO Cloudflare/server dependencies.
+ * Safe for browsers, React Native, Node.js clients, and any JavaScript runtime.
+ *
+ * This module provides:
+ * - `createTypedClient()` - Type-safe WebSocket client
+ * - Contract definitions (shared with server)
+ * - Type utilities for payloads and events
+ * - Optional validation support
  *
  * @example
  * ```typescript
- * import { createTypedClient } from "verani/typed/client";
- * import { chatContract } from "./contracts/chat";
+ * // Client code (browser, React Native, Node.js)
+ * import { createTypedClient, defineContract, payload } from "verani/typed/client";
+ *
+ * // Define contract (or import from shared module)
+ * const chatContract = defineContract({
+ *   serverEvents: {
+ *     "chat.message": payload<{ from: string; text: string }>(),
+ *   },
+ *   clientEvents: {
+ *     "message.send": payload<{ text: string }>(),
+ *   },
+ * });
  *
  * const client = createTypedClient(chatContract, "wss://example.com/ws");
  *
@@ -22,7 +38,7 @@
  */
 
 // ============================================================================
-// Client Integration
+// Client Integration (No Server Dependencies)
 // ============================================================================
 
 export { createTypedClient } from "./client";
@@ -34,7 +50,7 @@ export type {
 } from "./client";
 
 // ============================================================================
-// Contract Definition (for sharing with server)
+// Contract Definition (Shared - Zero Runtime Cost)
 // ============================================================================
 
 export {
@@ -53,7 +69,7 @@ export type {
 } from "./contract";
 
 // ============================================================================
-// Type Inference Utilities
+// Type Inference Utilities (Pure Types)
 // ============================================================================
 
 export type {
@@ -76,7 +92,7 @@ export type {
 } from "./infer";
 
 // ============================================================================
-// Validation (Optional)
+// Validation (Client-Safe Utilities)
 // ============================================================================
 
 export {
@@ -94,4 +110,3 @@ export type {
   ValidationIssue,
   ValidatedContract,
 } from "./validation";
-

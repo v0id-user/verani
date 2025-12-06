@@ -12,6 +12,7 @@ Complete documentation for Verani, a realtime framework for Cloudflare Workers.
 
 - [Server API](./api/server.md) - Server-side API documentation
 - [Client API](./api/client.md) - Client-side API documentation
+- [Typed API](./api/typed.md) - **Type-safe contracts** (tRPC-like)
 - [Types](./api/types.md) - Type definitions
 - [Utilities](./api/utilities.md) - Utility functions
 

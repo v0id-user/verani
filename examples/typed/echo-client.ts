@@ -2,6 +2,7 @@
  * Echo Client - Type-safe client example
  *
  * A simple client that sends messages and receives echoes.
+ * Uses "verani/typed/client" (client entry point, NO server dependencies).
  */
 import { createTypedClient } from "../../src/typed/client-entry";
 import { echoContract } from "./echo-contract";

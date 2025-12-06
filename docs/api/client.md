@@ -2,6 +2,8 @@
 
 Complete client-side API documentation for Verani.
 
+> **Looking for type safety?** See the [Typed API](./typed.md) for tRPC-like type-safe contracts with `createTypedClient()`. Import from `verani/typed/client`.
+
 ## `new VeraniClient(url, options?)`
 
 Creates a new Verani WebSocket client.

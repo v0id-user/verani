@@ -1,32 +1,32 @@
 /**
- * Verani Typed - Type-Safe WebSocket SDK
+ * Verani Typed - Server Entry Point
  *
- * Provides tRPC-like type safety for Verani WebSocket communication.
- * Define a contract once, get fully typed APIs on both server and client.
+ * ⚠️  SERVER-ONLY: This module contains Cloudflare Workers/Actors dependencies.
+ * For client-side code (browsers, React Native, etc.), use "verani/typed/client" instead.
+ *
+ * This module provides:
+ * - `createTypedRoom()` - Type-safe room creation for Cloudflare Actors
+ * - `createActorHandler()` - Actor handler for Cloudflare Workers
+ * - All shared types (contracts, payloads, validation)
  *
  * @example
  * ```typescript
- * // 1. Define the contract (shared between server and client)
- * import { defineContract, payload } from "verani/typed";
+ * // Server code (Cloudflare Workers)
+ * import { defineContract, payload, createTypedRoom, createActorHandler } from "verani/typed";
  *
- * export const chatContract = defineContract({
+ * const chatContract = defineContract({
  *   serverEvents: {
  *     "chat.message": payload<{ from: string; text: string }>(),
- *     "user.joined": payload<{ userId: string }>(),
  *   },
  *   clientEvents: {
  *     "message.send": payload<{ text: string }>(),
  *   },
  * });
  *
- * // 2. Server: Create typed room
- * import { createTypedRoom } from "verani/typed";
- * import { createActorHandler } from "verani";
- *
  * const room = createTypedRoom(chatContract, {
  *   websocketPath: "/ws/chat",
  *   onConnect(ctx) {
- *     ctx.emit("user.joined", { userId: ctx.meta.userId });
+ *     ctx.emit("chat.message", { from: "system", text: "Welcome!" });
  *   },
  * });
  *
@@ -34,27 +34,17 @@
  *   ctx.emit("chat.message", { from: ctx.meta.userId, text: data.text });
  * });
  *
- * export default createActorHandler(room.definition);
- *
- * // 3. Client: Create typed client
- * import { createTypedClient } from "verani/typed/client";
- *
- * const client = createTypedClient(chatContract, "wss://...");
- *
- * client.on("chat.message", (data) => {
- *   console.log(`${data.from}: ${data.text}`);
- * });
- *
- * client.emit("message.send", { text: "Hello!" });
+ * export const ChatRoom = createActorHandler(room.definition);
  * ```
  *
  * @packageDocumentation
  */
 
 // ============================================================================
-// Contract Definition
+// Shared Exports (Safe for both server and client)
 // ============================================================================
 
+// Contract Definition
 export {
   defineContract,
   payload,
@@ -70,37 +60,45 @@ export type {
   EventPayloads,
 } from "./contract";
 
-// ============================================================================
 // Type Inference Utilities
-// ============================================================================
-
 export type {
-  // Event extraction
   InferServerEvents,
   InferClientEvents,
   InferChannels,
-  // Event names
   ServerEventNames,
   ClientEventNames,
   AllEventNames,
-  // Payload extraction
   ServerPayload,
   ClientPayload,
   ServerPayloadMap,
   ClientPayloadMap,
-  // Handler types
   ServerEventHandler,
   ClientEventHandler,
-  // Emit types
   TypedServerEmit,
   TypedClientEmit,
-  // Listener types
   TypedServerListener,
   TypedClientListener,
 } from "./infer";
 
+// Validation (shared utilities)
+export {
+  withValidation,
+  isValidatedContract,
+  validateData,
+} from "./validation";
+
+export type {
+  Validator,
+  ValidationResult,
+  ValidationError,
+  ValidationIssue,
+  ValidatorMap,
+  ValidationConfig,
+  ValidatedContract,
+} from "./validation";
+
 // ============================================================================
-// Server Integration
+// Server-Only Exports (Cloudflare Workers/Actors)
 // ============================================================================
 
 export { createTypedRoom } from "./server";
@@ -116,33 +114,15 @@ export type {
   TypedEmitBuilder,
 } from "./server";
 
-// ============================================================================
-// Validation (Optional)
-// ============================================================================
-
+// Server-side validation helpers
 export {
-  withValidation,
-  isValidatedContract,
-  validateData,
   getClientValidator,
-  getServerValidator,
   getValidationErrorHandler,
   createValidatedHandler,
-  createValidatedListener,
-} from "./validation";
-
-export type {
-  Validator,
-  ValidationResult,
-  ValidationError,
-  ValidationIssue,
-  ValidatorMap,
-  ValidationConfig,
-  ValidatedContract,
 } from "./validation";
 
 // ============================================================================
-// Re-exports from core
+// Re-exports from Verani Core (Cloudflare Workers/Actors)
 // ============================================================================
 
 export { createActorHandler } from "../actor/actor-runtime";
@@ -153,4 +133,3 @@ export type {
   RoomDefinition,
   ActorStub,
 } from "../actor/types";
-

@@ -2,8 +2,9 @@
  * Echo Contract - Shared between server and client
  *
  * Defines the events for a simple echo system.
+ * Import from "verani/typed/shared" for contract-only usage (no server/client deps).
  */
-import { defineContract, payload } from "../../src/typed";
+import { defineContract, payload } from "../../src/typed/shared";
 
 export const echoContract = defineContract({
   // Events the SERVER sends TO the client

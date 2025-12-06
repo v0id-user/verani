@@ -2,6 +2,7 @@
  * Echo Server - Type-safe room example
  *
  * A simple echo server that responds to messages.
+ * Uses "verani/typed" (server entry point with Cloudflare dependencies).
  */
 import { createTypedRoom, createActorHandler } from "../../src/typed";
 import type { ConnectionMeta } from "../../src/typed";

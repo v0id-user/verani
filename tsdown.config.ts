@@ -6,6 +6,7 @@ export default defineConfig({
     client: "./src/client.ts",
     typed: "./src/typed/index.ts",
     "typed-client": "./src/typed/client-entry.ts",
+    "typed-shared": "./src/typed/shared.ts",
   },
   format: ["esm", "cjs"],
   outDir: "dist",
