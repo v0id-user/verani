@@ -3,16 +3,16 @@ import type { RoomEventEmitter, EventHandler, MessageContext, ConnectionMeta } f
 /**
  * Room-level event emitter for socket.io-like event handling
  */
-export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown>
-	implements RoomEventEmitter<TMeta, E> {
-	private handlers = new Map<string, Set<EventHandler<TMeta, E>>>();
+export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>>
+	implements RoomEventEmitter<TMeta, E, TState> {
+	private handlers = new Map<string, Set<EventHandler<TMeta, E, TState>>>();
 
 	/**
 	 * Register an event handler
 	 * @param event - Event name (supports wildcard "*")
 	 * @param handler - Handler function
 	 */
-	on(event: string, handler: EventHandler<TMeta, E>): void {
+	on(event: string, handler: EventHandler<TMeta, E, TState>): void {
 		if (!this.handlers.has(event)) {
 			this.handlers.set(event, new Set());
 		}
@@ -25,7 +25,7 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 	 * @param event - Event name
 	 * @param handler - Optional specific handler to remove, or remove all handlers for event
 	 */
-	off(event: string, handler?: EventHandler<TMeta, E>): void {
+	off(event: string, handler?: EventHandler<TMeta, E, TState>): void {
 		const eventHandlers = this.handlers.get(event);
 		if (!eventHandlers) {
 			return;
@@ -49,7 +49,7 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 	 * @param ctx - Message context
 	 * @param data - Event data
 	 */
-	async emit(event: string, ctx: MessageContext<TMeta, E>, data: any): Promise<void> {
+	async emit(event: string, ctx: MessageContext<TMeta, E, TState>, data: any): Promise<void> {
 		console.debug(`[Verani:EventEmitter] Emitting event: ${event}`);
 
 		// Get handlers for the specific event
@@ -112,7 +112,7 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 	 * Called after hibernation to restore handlers from the room definition.
 	 * @param staticHandlers - Map of event names to handler sets from static storage
 	 */
-	rebuildHandlers(staticHandlers: Map<string, Set<EventHandler<TMeta, E>>>): void {
+	rebuildHandlers(staticHandlers: Map<string, Set<EventHandler<TMeta, E, TState>>>): void {
 		console.debug(`[Verani:EventEmitter] Rebuilding handlers from static storage, ${staticHandlers.size} event types`);
 		// Clear existing handlers
 		this.handlers.clear();
@@ -127,7 +127,7 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 /**
  * Create a new room event emitter instance
  */
-export function createRoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown>(): RoomEventEmitter<TMeta, E> {
-	return new RoomEventEmitterImpl<TMeta, E>();
+export function createRoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>>(): RoomEventEmitter<TMeta, E, TState> {
+	return new RoomEventEmitterImpl<TMeta, E, TState>();
 }
 
