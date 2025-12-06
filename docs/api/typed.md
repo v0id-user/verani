@@ -1,15 +1,15 @@
 # Type-Safe API
 
-Verani Typed provides tRPC-like type safety for WebSocket communication. Define a contract once, get fully typed APIs on both server and client.
+Verani Typed provides tRPC-like type safety for WebSocket communication. Define a contract once, get fully typed APIs on both server and client with zero runtime overhead.
 
 ## Overview
 
 The typed abstraction layer consists of:
 
-- **Contract**: A single source of truth defining all events and their payloads
-- **Typed Server**: `createTypedRoom()` with typed event handlers and emit
-- **Typed Client**: `createTypedClient()` with typed listeners and emit
-- **Validation**: Optional runtime validation with Zod integration
+- **Contract**: Single source of truth defining all events and their payloads
+- **Typed Server**: `createTypedRoom()` with typed `handle()` and `emit`
+- **Typed Client**: `createTypedClient()` with typed `on()` and `emit()`
+- **Validation**: Optional runtime validation with Zod integration (automatic when enabled)
 
 ## Quick Start
 
@@ -35,7 +35,7 @@ export const chatContract = defineContract({
     "typing.start": payload<{ conversationId: string }>(),
     "typing.stop": payload<{ conversationId: string }>(),
   },
-  // Optional: typed channels
+  // Optional: typed channels (use `as const` for literal types)
   channels: ["default", "announcements"] as const,
 });
 ```
@@ -45,16 +45,14 @@ export const chatContract = defineContract({
 ```typescript
 // rooms/chat.ts
 import { createTypedRoom, createActorHandler } from "verani/typed";
+import type { ConnectionMeta } from "verani/typed";
 import { chatContract } from "../contracts/chat";
 
-interface ChatMeta {
-  userId: string;
-  clientId: string;
-  channels: string[];
+interface ChatMeta extends ConnectionMeta {
   username: string;
 }
 
-const room = createTypedRoom(chatContract, {
+const room = createTypedRoom<typeof chatContract, ChatMeta>(chatContract, {
   websocketPath: "/ws/chat",
 
   extractMeta(req) {
@@ -104,7 +102,7 @@ room.handle("typing.start", (ctx, data) => {
 });
 
 // Export for Cloudflare Workers
-export default createActorHandler(room.definition);
+export const ChatRoom = createActorHandler(room.definition);
 ```
 
 ### 3. Create Typed Client
@@ -119,7 +117,8 @@ const client = createTypedClient(chatContract, "wss://example.com/ws/chat", {
 });
 
 // Listening - only serverEvents allowed, data is typed
-client.on("chat.message", (data) => {
+// Returns an unsubscribe function
+const unsubscribe = client.on("chat.message", (data) => {
   // data: { from: string; text: string; timestamp: number }
   console.log(`${data.from}: ${data.text}`);
 });
@@ -134,6 +133,9 @@ client.emit("message.send", { text: "Hello, world!" });
 
 // TypeScript Error: "chat.message" is not a clientEvent!
 // client.emit("chat.message", { ... });
+
+// Later: unsubscribe from events
+unsubscribe();
 ```
 
 ---
@@ -149,6 +151,8 @@ Creates a typed contract for Verani communication.
 - `definition.serverEvents` - Events the server sends to clients
 - `definition.clientEvents` - Events clients send to the server
 - `definition.channels` - Optional array of valid channel names
+
+**Returns:** `Contract<TServerEvents, TClientEvents, TChannels>`
 
 **Example:**
 
@@ -170,7 +174,7 @@ const contract = defineContract({
 
 ### `payload<T>()`
 
-Type marker for defining payload shapes. Zero runtime cost.
+Type marker for defining payload shapes. Zero runtime cost - returns an empty object used only for type inference.
 
 ```typescript
 // Simple payload
@@ -185,6 +189,18 @@ payload<{
 
 // Optional fields
 payload<{ required: string; optional?: number }>()
+```
+
+### `isContract(value)`
+
+Type guard to check if a value is a Verani contract.
+
+```typescript
+import { isContract } from "verani/typed";
+
+if (isContract(maybeContract)) {
+  // maybeContract is Contract
+}
 ```
 
 ---
@@ -238,12 +254,12 @@ room.handle("message.send", (ctx, data) => {
 });
 ```
 
-### `room.off(event, handler?)`
+### `room.off(event)`
 
-Removes event handlers.
+Removes all event handlers for an event.
 
 ```typescript
-room.off("message.send"); // Remove all handlers for this event
+room.off("message.send");
 ```
 
 ### `room.definition`
@@ -251,7 +267,15 @@ room.off("message.send"); // Remove all handlers for this event
 The underlying room definition for use with `createActorHandler()`.
 
 ```typescript
-export default createActorHandler(room.definition);
+export const ChatRoom = createActorHandler(room.definition);
+```
+
+### `room.contract`
+
+Access to the contract this room is based on.
+
+```typescript
+console.log(room.contract.serverEvents);
 ```
 
 ### Typed Context
@@ -278,7 +302,7 @@ ctx.emit("server.event", { data: "value" });
 // Emit to specific user or channel
 ctx.emit.to("userId").emit("notification", { ... });
 
-// Actor-level broadcast
+// Actor-level broadcast to channel
 ctx.actor.emit.to("default").emit("announcement", { ... });
 ```
 
@@ -294,13 +318,13 @@ Creates a type-safe client based on a contract.
 
 - `contract` - The contract defining events
 - `url` - WebSocket URL
-- `options` - Optional client configuration
+- `options` - Optional client configuration (same as `VeraniClientOptions`)
 
 **Returns:** `TypedClient<C>`
 
 ### `client.on(event, callback)`
 
-Registers a typed listener for server events.
+Registers a typed listener for server events. **Returns an unsubscribe function.**
 
 ```typescript
 const unsubscribe = client.on("chat.message", (data) => {
@@ -363,12 +387,20 @@ client.disconnect();
 client.close();
 ```
 
+### `client.contract`
+
+Access to the contract this client is based on.
+
+```typescript
+console.log(client.contract.clientEvents);
+```
+
 ### `client._client`
 
 Access the underlying `VeraniClient` for escape hatches:
 
 ```typescript
-// For advanced scenarios
+// For advanced scenarios (untyped)
 client._client.emit("untyped.event", { raw: "data" });
 ```
 
@@ -376,7 +408,7 @@ client._client.emit("untyped.event", { raw: "data" });
 
 ## Optional Validation
 
-Add runtime validation with Zod or any compatible validator.
+Add runtime validation with Zod or any compatible validator. Validation is **automatic** when using a validated contract.
 
 ### `withValidation(contract, config)`
 
@@ -403,7 +435,19 @@ const validatedContract = withValidation(chatContract, {
     console.error(`Validation failed for ${event}:`, error.issues);
   },
 });
+
+// Use with typed room - validation runs automatically in handlers
+const room = createTypedRoom(validatedContract, { ... });
+
+// Use with typed client - validation runs automatically in listeners
+const client = createTypedClient(validatedContract, url);
 ```
+
+**How it works:**
+
+- **Server side**: Client event validators run before `handle()` receives data
+- **Client side**: Server event validators run before `on()` callbacks receive data
+- If validation fails, the handler/callback is **not called**
 
 **Validator Interface:**
 
@@ -414,6 +458,18 @@ interface Validator<T> {
   safeParse(data: unknown): 
     | { success: true; data: T }
     | { success: false; error: { issues: Array<{ message: string }> } };
+}
+```
+
+### `isValidatedContract(contract)`
+
+Type guard to check if a contract has validation.
+
+```typescript
+import { isValidatedContract } from "verani/typed";
+
+if (isValidatedContract(contract)) {
+  // contract has _validation property
 }
 ```
 
@@ -454,6 +510,15 @@ import type { InferChannels } from "verani/typed";
 
 type Channels = InferChannels<typeof chatContract>;
 // "default" | "announcements"
+```
+
+### Payload Maps
+
+```typescript
+import type { ServerPayloadMap, ClientPayloadMap } from "verani/typed";
+
+type AllServerPayloads = ServerPayloadMap<typeof chatContract>;
+// { "chat.message": {...}, "user.joined": {...}, ... }
 ```
 
 ---
@@ -528,9 +593,18 @@ const contract = withValidation(baseContract, {
 
 ---
 
+## Examples
+
+See the typed examples in `examples/typed/`:
+
+- `echo-contract.ts` - Simple contract definition
+- `echo-server.ts` - Type-safe server room
+- `echo-client.ts` - Type-safe client
+
+---
+
 ## Related Documentation
 
 - [Server API](./server.md) - Core server-side API
 - [Client API](./client.md) - Core client-side API
 - [Types](./types.md) - Type definitions
-
