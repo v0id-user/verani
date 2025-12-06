@@ -1,15 +1,16 @@
 import type { ConnectionManager } from "../connection";
 import type { EventEmitter } from "./eventEmitter";
+import type { ConnectionTimeoutState, PartialConnectionPromiseState, IsConnectingRef } from "../types";
 
 /**
  * Handles WebSocket errors
  */
 export function handleWebSocketError(
   error: Event,
-  connectionTimeout: { value: number | undefined; clear: () => void },
+  connectionTimeout: ConnectionTimeoutState,
   eventEmitter: EventEmitter,
   handleConnectionErrorFn: (error: Error) => void,
-  isConnectingRef?: { value: boolean },
+  isConnectingRef?: IsConnectingRef,
   onErrorCallback?: (error: Event) => void
 ): void {
   console.debug("[Verani:Client] WebSocket error event");
@@ -36,15 +37,12 @@ export function handleWebSocketError(
  */
 export function handleConnectionError(
   error: Error,
-  connectionTimeout: { value: number | undefined; clear: () => void },
-  connectionPromise: {
-    reject?: (error: Error) => void;
-    clear: () => void;
-  },
+  connectionTimeout: ConnectionTimeoutState,
+  connectionPromise: PartialConnectionPromiseState,
   connectionManager: ConnectionManager,
   eventEmitter: EventEmitter,
   connectFn: () => void,
-  isConnectingRef?: { value: boolean }
+  isConnectingRef?: IsConnectingRef
 ): void {
   console.error("[Verani] Connection error:", error);
 

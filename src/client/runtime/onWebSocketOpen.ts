@@ -2,21 +2,18 @@ import type { ConnectionManager } from "../connection";
 import type { KeepaliveManager } from "./keepalive";
 import type { MessageQueue } from "./messageQueue";
 import type { EventEmitter } from "./eventEmitter";
+import type { ConnectionTimeoutState, ConnectionPromiseState } from "../types";
 
 /**
  * Handles successful WebSocket connection
  */
 export function handleWebSocketOpen(
-  connectionTimeout: { value: number | undefined; clear: () => void },
+  connectionTimeout: ConnectionTimeoutState,
   connectionManager: ConnectionManager,
   keepalive: KeepaliveManager,
   messageQueue: MessageQueue,
   ws: WebSocket,
-  connectionPromise: {
-    resolve?: () => void;
-    reject?: (error: Error) => void;
-    clear: () => void;
-  },
+  connectionPromise: ConnectionPromiseState,
   eventEmitter: EventEmitter,
   onOpenCallback?: () => void
 ): void {

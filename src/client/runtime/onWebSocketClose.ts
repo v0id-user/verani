@@ -1,20 +1,18 @@
 import type { ConnectionManager } from "../connection";
 import type { EventEmitter } from "./eventEmitter";
+import type { ConnectionTimeoutState, PartialConnectionPromiseState, IsConnectingRef } from "../types";
 
 /**
  * Handles WebSocket closure
  */
 export function handleWebSocketClose(
   event: CloseEvent,
-  connectionTimeout: { value: number | undefined; clear: () => void },
+  connectionTimeout: ConnectionTimeoutState,
   connectionManager: ConnectionManager,
-  connectionPromise: {
-    reject?: (error: Error) => void;
-    clear: () => void;
-  },
+  connectionPromise: PartialConnectionPromiseState,
   eventEmitter: EventEmitter,
   connectFn: () => void,
-  isConnectingRef?: { value: boolean },
+  isConnectingRef?: IsConnectingRef,
   onCloseCallback?: (event: CloseEvent) => void
 ): void {
   console.debug("[Verani:Client] Connection closed, code:", event.code, "reason:", event.reason);

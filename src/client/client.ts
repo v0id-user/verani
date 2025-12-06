@@ -5,10 +5,12 @@ import { VeraniClientOptions, resolveClientOptions, type ResolvedClientOptions }
 import { MessageQueue, type QueuedMessage } from "./runtime/messageQueue";
 import { KeepaliveManager } from "./runtime/keepalive";
 import { EventEmitter } from "./runtime/eventEmitter";
-import { ConnectionHandler, type ConnectionPromiseState } from "./runtime/connection";
+import { ConnectionHandler } from "./runtime/connection";
+import type { ConnectionStateInfo, ConnectionPromiseState, IsConnectingRef } from "./types";
 
 // Re-export VeraniClientOptions for backward compatibility
 export type { VeraniClientOptions };
+export type { ConnectionStateInfo, ConnectionPromiseState, ConnectionTimeoutState, IsConnectingRef } from "./types";
 
 /**
  * Verani WebSocket client with automatic reconnection and lifecycle management
@@ -40,7 +42,7 @@ export class VeraniClient {
   };
 
   // Connection state tracking
-  private isConnectingRef: { value: boolean };
+  private isConnectingRef: IsConnectingRef;
 
   /**
    * Creates a new Verani client
@@ -135,13 +137,7 @@ export class VeraniClient {
   /**
    * Gets detailed connection information
    */
-  getConnectionState(): {
-    state: ConnectionState;
-    isConnected: boolean;
-    isConnecting: boolean;
-    reconnectAttempts: number;
-    connectionId: number;
-  } {
+  getConnectionState(): ConnectionStateInfo {
     return {
       state: this.connectionManager.getState(),
       isConnected: this.isConnected(),

@@ -1,3 +1,5 @@
+import type { DocumentLike } from "../types";
+
 /**
  * Environment-aware Page Visibility API wrapper
  * Detects when browser tab becomes visible/invisible and provides callbacks
@@ -19,7 +21,7 @@ function isBrowserEnvironment(): boolean {
 /**
  * Gets the document object if in browser environment
  */
-function getDocument(): { hidden: boolean; addEventListener: (type: string, handler: () => void) => void; removeEventListener: (type: string, handler: () => void) => void } | null {
+function getDocument(): DocumentLike | null {
   if (isBrowserEnvironment() && "document" in globalThis) {
     return (globalThis as any).document;
   }

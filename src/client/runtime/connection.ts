@@ -6,24 +6,7 @@ import { handleWebSocketMessage } from "./onWebSocketMessage";
 import { handleWebSocketClose } from "./onWebSocketClose";
 import { handleWebSocketError, handleConnectionError } from "./onWebSocketError";
 import type { ResolvedClientOptions } from "./configuration";
-
-/**
- * Connection promise state
- */
-export interface ConnectionPromiseState {
-  promise?: Promise<void>;
-  resolve?: () => void;
-  reject?: (error: Error) => void;
-  clear(): void;
-}
-
-/**
- * Connection timeout state
- */
-export interface ConnectionTimeoutState {
-  value: number | undefined;
-  clear(): void;
-}
+import type { ConnectionPromiseState, ConnectionTimeoutState, IsConnectingRef } from "../types";
 
 /**
  * Handles WebSocket connection establishment and cleanup
@@ -49,7 +32,7 @@ export class ConnectionHandler {
     private eventEmitter: EventEmitter,
     private messageQueue: any,
     private connectionPromise: ConnectionPromiseState,
-    private isConnectingRef: { value: boolean },
+    private isConnectingRef: IsConnectingRef,
     private isConnectedFn: () => boolean,
     private onOpenCallback?: () => void,
     private onCloseCallback?: (event: CloseEvent) => void,
@@ -219,4 +202,7 @@ export class ConnectionHandler {
     );
   }
 }
+
+// Re-export types for backward compatibility
+export type { ConnectionPromiseState, ConnectionTimeoutState, IsConnectingRef } from "../types";
 
