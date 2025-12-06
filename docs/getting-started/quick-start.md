@@ -610,6 +610,46 @@ export const chatRoom = defineRoom({
 });
 ```
 
+### Add State Persistence
+
+Persist room state across hibernation:
+
+```typescript
+export const chatRoom = defineRoom({
+  // Define state with initial values
+  state: {
+    messageCount: 0,
+    lastActivity: null as Date | null,
+    settings: { maxUsers: 100 }
+  },
+
+  // Only these keys are persisted
+  persistedKeys: ["messageCount", "settings"],
+
+  onConnect(ctx) {
+    // Access persisted state - fully typed!
+    ctx.actor.roomState.messageCount++;
+    console.log(`Total messages: ${ctx.actor.roomState.messageCount}`);
+  },
+
+  onMessage(ctx, frame) {
+    if (frame.type === "chat.message") {
+      // State changes are automatically persisted
+      ctx.actor.roomState.messageCount++;
+      ctx.actor.roomState.lastActivity = new Date();
+
+      ctx.actor.broadcast("default", {
+        type: "chat.message",
+        from: ctx.meta.userId,
+        text: frame.data.text
+      });
+    }
+  }
+});
+```
+
+**See**: [Persistence Concepts](../concepts/persistence.md) for full documentation.
+
 ### Add Multiple Channels
 
 Use channels for selective broadcasting:
@@ -673,8 +713,9 @@ export const chatRoom = defineRoom<ChatMeta>({
 ## What's Next?
 
 - **[Concepts - Architecture](../concepts/architecture.md)** - Understand the architecture and RPC concepts
+- **[Concepts - Persistence](../concepts/persistence.md)** - State persistence across hibernation
 - **[API Reference](../api/server.md)** - Complete API docs including RPC methods
-- **[Examples](../examples/README.md)** - More usage patterns including RPC examples
+- **[Examples](../examples/README.md)** - More usage patterns including persistence and RPC examples
 - **[Security Guide](../security/authentication.md)** - Authentication and authorization
 - **[Troubleshooting](./troubleshooting.md)** - Common issues and solutions
 
