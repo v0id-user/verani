@@ -13,6 +13,14 @@ import { onWebSocketDisconnect as onWebSocketDisconnectImpl } from "./runtime/on
 import { createActorEmit } from "./runtime/emit";
 import { createFetch, type ActorInstanceWithFetchMethods } from "./runtime/fetch";
 import { encodeFrame } from "./protocol";
+import {
+	initializePersistedState,
+	isStateReady as checkStateReady,
+	setPeristErrorHandler,
+	STATE_READY,
+	PERSISTED_STATE,
+	type PersistableActor
+} from "./persist";
 
 /**
  * Return type for createActorHandler - represents an Actor class constructor
@@ -28,22 +36,49 @@ export type ActorHandlerClass<E = unknown> = {
  * @param room - The room definition with lifecycle hooks
  * @returns Actor class for Cloudflare Workers (extends DurableObject)
  */
-export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown>(
-	room: RoomDefinition<TMeta, E>
+export function createActorHandler<
+	TMeta extends ConnectionMeta = ConnectionMeta,
+	E = unknown,
+	TState extends Record<string, unknown> = Record<string, unknown>
+>(
+	room: RoomDefinition<TMeta, E, TState>
 ): ActorHandlerClass<E> {
 	// Determine class name with priority: room.name > room.websocketPath > "VeraniActor"
 	const className = sanitizeToClassName(room.name || room.websocketPath || "VeraniActor");
+
+	// Cast room for runtime helpers that don't need TState
+	const roomDef = room as RoomDefinition<TMeta, E>;
 
 	// Create named class dynamically
 	class NamedActorClass extends Actor<E> {
 		sessions = new Map<WebSocket, { ws: WebSocket; meta: TMeta }>();
 		emit = createActorEmit<TMeta, E>(this as any);
 
+		// State persistence support
+		[STATE_READY] = false;
+		[PERSISTED_STATE]: Record<string, unknown> = {};
+
+		/**
+		 * User-defined persisted state for this actor.
+		 * Access this after onInit completes. Changes to tracked keys are automatically persisted.
+		 */
+		get roomState(): Record<string, unknown> {
+			return this[PERSISTED_STATE];
+		}
+
+		/**
+		 * Check if the persisted state has been initialized.
+		 * Returns true after onInit completes and state is loaded from storage.
+		 */
+		isStateReady(): boolean {
+			return checkStateReady(this as unknown as PersistableActor);
+		}
+
 		/**
 		 * Static configuration method for Cloudflare Actors
 		 * Specifies WebSocket upgrade path and other options
 		 */
-		static configuration = createConfiguration(room);
+		static configuration = createConfiguration(roomDef);
 
 		protected async shouldUpgradeWebSocket(request: Request): Promise<boolean> {
 			return true;
@@ -51,36 +86,60 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 
 
 		// https://github.com/cloudflare/actors/issues/92
-		fetch = createFetch(room, this as unknown as ActorInstanceWithFetchMethods);
+		fetch = createFetch(roomDef, this as unknown as ActorInstanceWithFetchMethods);
 
 
 	/**
 	 * Called when the Actor initializes or wakes from hibernation
-	 * Restores sessions from WebSocket attachments
+	 * Restores sessions from WebSocket attachments and initializes persisted state
 	 */
 	protected async onInit() {
-		await onInitImpl(this, room);
+		// Initialize persisted state if room defines state
+		if (room.state) {
+			// Set error handler if defined
+			if (room.onPersistError) {
+				setPeristErrorHandler(
+					this as unknown as PersistableActor,
+					room.onPersistError
+				);
+			}
+
+			// Initialize state from storage
+			const persistedKeys = room.persistedKeys as string[] | undefined;
+			const initializedState = await initializePersistedState(
+				this as unknown as PersistableActor,
+				room.state,
+				persistedKeys,
+				room.persistOptions
+			);
+
+			this[PERSISTED_STATE] = initializedState;
+			console.debug(`[Verani:Persist] State initialized with keys: ${Object.keys(initializedState).join(', ')}`);
+		}
+
+		// Call the original onInit implementation
+		await onInitImpl(this, roomDef);
 	}
 
 	/**
 	 * Called when a new WebSocket connection is established
 	 */
 	protected async onWebSocketConnect(ws: WebSocket, req: Request) {
-		await onWebSocketConnectImpl(this, room, ws, req);
+		await onWebSocketConnectImpl(this, roomDef, ws, req);
 	}
 
 	/**
 	 * Called when a message is received from a WebSocket
 	 */
 	protected async onWebSocketMessage(ws: WebSocket, raw: any) {
-		await onWebSocketMessageImpl(this, room, ws, raw);
+		await onWebSocketMessageImpl(this, roomDef, ws, raw);
 	}
 
 	/**
 	 * Called when a WebSocket connection is closed
 	 */
 	protected async onWebSocketDisconnect(ws: WebSocket) {
-		await onWebSocketDisconnectImpl(this, room, ws);
+		await onWebSocketDisconnectImpl(this, roomDef, ws);
 	}
 
 	/**

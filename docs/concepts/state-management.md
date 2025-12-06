@@ -45,19 +45,54 @@ room.on("chat.message", (ctx, data) => {
 
 **Important**: Handlers are automatically rebuilt when the Actor wakes from hibernation. You don't need to do anything - just define them statically in your code.
 
-## 4. Durable State (Optional)
+## 4. Persisted Room State (Survives Hibernation)
 
-Stored in Durable Object storage or external database.
+Declared in your room definition and automatically persisted to Durable Object storage.
 
 ```typescript
-// Use Durable Object storage
-await ctx.actor.getStorage().put("lastMessage", message);
+const room = defineRoom({
+  state: {
+    messageCount: 0,
+    settings: { maxUsers: 100 }
+  },
+  persistedKeys: ["messageCount", "settings"],
+  
+  onConnect(ctx) {
+    ctx.actor.roomState.messageCount++;
+    // Automatically persisted!
+  }
+});
 ```
 
-**Use case**: Chat history, persistent configuration, audit logs.
+**Use case**: Counters, settings, game state, anything that should survive hibernation.
+
+**See**: [Persistence](./persistence.md) for full documentation.
+
+## 5. Manual Durable Storage (Full Control)
+
+For advanced use cases, access Durable Object storage directly.
+
+```typescript
+// Manual storage access
+await ctx.actor.getStorage().put("lastMessage", message);
+const msg = await ctx.actor.getStorage().get("lastMessage");
+```
+
+**Use case**: Chat history, audit logs, large datasets, custom serialization.
+
+## Quick Reference
+
+| State Type | Survives Hibernation | Access |
+|------------|---------------------|--------|
+| Connection Metadata | ✅ Yes | `ctx.meta` |
+| Ephemeral Actor State | ❌ No | Class properties |
+| Handler Definitions | ✅ Yes | `room.on()` |
+| Persisted Room State | ✅ Yes | `ctx.actor.roomState` |
+| Manual Durable Storage | ✅ Yes | `ctx.actor.getStorage()` |
 
 ## Related Documentation
 
+- [Persistence](./persistence.md) - Declarative state persistence
 - [Hibernation](./hibernation.md) - How hibernation affects state and handlers
 - [Server API - getStorage](../api/server.md#getstorage-durableobjectstorage) - Storage API
 - [Examples - Presence](../examples/presence.md) - Example using durable storage

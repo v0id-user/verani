@@ -33,6 +33,33 @@ export type {
 } from "./actor/actor-runtime";
 
 // ============================================================================
+// State Persistence - Safe wrapper for @Persist decorator
+// ============================================================================
+
+export {
+  // Initialization and helpers
+  initializePersistedState,
+  isStateReady,
+  getPersistedState,
+  setPeristErrorHandler,
+  persistKey,
+  deletePersistedKey,
+  getPersistedKeys,
+  clearPersistedState,
+  // Serialization utilities
+  safeSerialize,
+  safeDeserialize,
+  // Error classes
+  PersistNotReadyError,
+  PersistError
+} from "./actor/persist";
+
+export type {
+  SafePersistOptions,
+  PersistableActor
+} from "./actor/persist";
+
+// ============================================================================
 // Shared exports - Protocol and types
 // ============================================================================
 

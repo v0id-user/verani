@@ -1,5 +1,6 @@
 import type { Actor } from "@cloudflare/actors";
 import type { ConnectionMeta, MessageFrame } from "../shared/types";
+import type { SafePersistOptions } from "./persist";
 
 export type { ConnectionMeta, MessageFrame };
 
@@ -111,13 +112,26 @@ export interface ActorStub {
 /**
  * Extended Actor interface with Verani-specific methods
  */
-export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> extends Actor<E> {
+export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>> extends Actor<E> {
   /**
    * Map of active WebSocket sessions keyed by their WebSocket instance.
    * Each entry contains the WebSocket and its associated metadata.
    * See: @src/actor/actor-runtime.ts usage for session management.
    */
   sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }>;
+
+  /**
+   * User-defined persisted state for this actor.
+   * Access this after onInit completes. Changes to tracked keys are automatically persisted.
+   * @see RoomDefinition.state and RoomDefinition.persistedKeys
+   */
+  roomState: TState;
+
+  /**
+   * Check if the persisted state has been initialized.
+   * Returns true after onInit completes and state is loaded from storage.
+   */
+  isStateReady(): boolean;
 
   /**
    * Broadcast a message to all connections in a channel.
@@ -300,8 +314,12 @@ export interface MessageContext<TMeta extends ConnectionMeta = ConnectionMeta, E
  * **Important:** All lifecycle hooks are properly awaited if they return a Promise.
  * This ensures async operations complete before the actor proceeds to the next step
  * or potentially enters hibernation.
+ *
+ * @template TMeta - Connection metadata type
+ * @template E - Environment type
+ * @template TState - Room state type (for persistence)
  */
-export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> {
+export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>> {
   /** Optional room name for debugging */
   name?: string;
 
@@ -365,4 +383,51 @@ export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E
    * @internal
    */
   _staticHandlers?: Map<string, Set<EventHandler<TMeta, E>>>;
+
+  // ========== State Persistence ==========
+
+  /**
+   * Initial state for this room. This object defines the default values
+   * for your room's state. Access via `actor.roomState` in lifecycle hooks.
+   *
+   * @example
+   * ```typescript
+   * const room = defineRoom({
+   *   state: {
+   *     messageCount: 0,
+   *     lastActivity: null as Date | null,
+   *     settings: { maxUsers: 100 }
+   *   },
+   *   persistedKeys: ['messageCount', 'settings'],
+   *   // ...
+   * });
+   * ```
+   */
+  state?: TState;
+
+  /**
+   * Keys from `state` to persist to Durable Object storage.
+   * If empty or undefined, no state is persisted.
+   * Changes to these keys are automatically saved and restored on hibernation wake.
+   *
+   * @example
+   * ```typescript
+   * persistedKeys: ['messageCount', 'settings'] // Only these keys are persisted
+   * ```
+   */
+  persistedKeys?: (string & keyof TState)[];
+
+  /**
+   * Options for state persistence behavior.
+   */
+  persistOptions?: SafePersistOptions;
+
+  /**
+   * Called when persistence fails for a key.
+   * Use this to handle errors gracefully (e.g., notify admins, fallback behavior).
+   *
+   * @param key - The state key that failed to persist
+   * @param error - The error that occurred
+   */
+  onPersistError?(key: string, error: Error): void;
 }
