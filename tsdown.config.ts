@@ -1,7 +1,12 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["./src/verani.ts", "./src/client.ts"],
+  entry: {
+    verani: "./src/verani.ts",
+    client: "./src/client.ts",
+    typed: "./src/typed/index.ts",
+    "typed-client": "./src/typed/client-entry.ts",
+  },
   format: ["esm", "cjs"],
   outDir: "dist",
   dts: true,

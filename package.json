@@ -1,6 +1,6 @@
 {
 	"name": "verani",
-	"version": "0.5.5",
+	"version": "0.6.0",
 	"description": "A simple, focused realtime SDK for Cloudflare Actors with Socket.io-like semantics",
 	"license": "ISC",
 	"keywords": [
@@ -33,6 +33,26 @@
 			"require": {
 				"types": "./dist/client.d.cts",
 				"default": "./dist/client.cjs"
+			}
+		},
+		"./typed": {
+			"import": {
+				"types": "./dist/typed.d.mts",
+				"default": "./dist/typed.mjs"
+			},
+			"require": {
+				"types": "./dist/typed.d.cts",
+				"default": "./dist/typed.cjs"
+			}
+		},
+		"./typed/client": {
+			"import": {
+				"types": "./dist/typed-client.d.mts",
+				"default": "./dist/typed-client.mjs"
+			},
+			"require": {
+				"types": "./dist/typed-client.d.cts",
+				"default": "./dist/typed-client.cjs"
 			}
 		}
 	},
