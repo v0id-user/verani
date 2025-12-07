@@ -4,10 +4,9 @@ import { CounterActor } from "../examples/persistence/counter-room";
 import { createActorHandler } from "./actor/actor-runtime";
 
 export const PresenceExample = createActorHandler(presenceRoom);
-export const CounterExample = CounterActor;
 export class ChatExample extends Actor<Env> {}
 export class NotificationsExample extends Actor<Env> {}
-
+export { CounterActor };
 
 // Export default handler with routing logic
 export default {
@@ -22,7 +21,7 @@ export default {
 		}
 
 		if (path.startsWith("/ws/counter")) {
-			const stub = CounterExample.get("")
+			const stub = CounterActor.get("")
 			return stub.fetch(request);
 		}
 

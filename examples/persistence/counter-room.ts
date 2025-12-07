@@ -8,7 +8,7 @@
 import { defineRoom, createActorHandler } from "../../src/verani";
 
 export const counterRoom = defineRoom({
-  name: "counter",
+  name: "counter-actor",
   websocketPath: "/ws/counter",
 
   // Define your room's state

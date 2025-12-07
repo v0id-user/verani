@@ -56,7 +56,9 @@ export function createActorHandler<
 
 		// State persistence support
 		[STATE_READY] = false;
-		[PERSISTED_STATE]: Record<string, unknown> = {};
+		// Initialize with initial state values immediately so roomState is always valid
+		// This prevents undefined values when onConnect is called before onInit completes
+		[PERSISTED_STATE]: Record<string, unknown> = room.state ? { ...room.state } : {};
 
 		/**
 		 * User-defined persisted state for this actor.
@@ -81,6 +83,7 @@ export function createActorHandler<
 		static configuration = createConfiguration(roomDef);
 
 		protected async shouldUpgradeWebSocket(request: Request): Promise<boolean> {
+			console.debug("[Verani:ActorRuntime] shouldUpgradeWebSocket called, url:", request.url);
 			return true;
 		}
 
@@ -125,6 +128,7 @@ export function createActorHandler<
 	 * Called when a new WebSocket connection is established
 	 */
 	protected async onWebSocketConnect(ws: WebSocket, req: Request) {
+		console.debug("[Verani:ActorRuntime] onWebSocketConnect method called");
 		await onWebSocketConnectImpl(this, roomDef, ws, req);
 	}
 
@@ -132,6 +136,7 @@ export function createActorHandler<
 	 * Called when a message is received from a WebSocket
 	 */
 	protected async onWebSocketMessage(ws: WebSocket, raw: any) {
+		console.debug("[Verani:ActorRuntime] onWebSocketMessage method called");
 		await onWebSocketMessageImpl(this, roomDef, ws, raw);
 	}
 
@@ -139,6 +144,7 @@ export function createActorHandler<
 	 * Called when a WebSocket connection is closed
 	 */
 	protected async onWebSocketDisconnect(ws: WebSocket) {
+		console.debug("[Verani:ActorRuntime] onWebSocketDisconnect method called");
 		await onWebSocketDisconnectImpl(this, roomDef, ws);
 	}
 
@@ -148,6 +154,7 @@ export function createActorHandler<
 	 * @returns Number of sessions cleaned up
 	 */
 	cleanupStaleSessions(): number {
+		console.debug("[Verani:ActorRuntime] cleanupStaleSessions method called");
 		return cleanupStaleSessionsImpl(this.sessions);
 	}
 
@@ -160,6 +167,7 @@ export function createActorHandler<
 	 * @returns Number of connections that received the message
 	 */
 	broadcast(channel: string, data: any, opts?: BroadcastOptions): number {
+		console.debug("[Verani:ActorRuntime] broadcast method called, channel:", channel);
 		return broadcastImpl(this.sessions, channel, data, opts);
 	}
 
@@ -168,6 +176,7 @@ export function createActorHandler<
 	 * @returns Number of connected WebSockets
 	 */
 	getSessionCount(): number {
+		console.debug("[Verani:ActorRuntime] getSessionCount method called");
 		return getSessionCountImpl(this.sessions);
 	}
 
@@ -176,6 +185,7 @@ export function createActorHandler<
 	 * @returns Array of unique user IDs
 	 */
 	getConnectedUserIds(): string[] {
+		console.debug("[Verani:ActorRuntime] getConnectedUserIds method called");
 		return getConnectedUserIdsImpl(this.sessions);
 	}
 
@@ -185,6 +195,7 @@ export function createActorHandler<
 	 * @returns Array of WebSockets belonging to the user
 	 */
 	getUserSessions(userId: string): WebSocket[] {
+		console.debug("[Verani:ActorRuntime] getUserSessions method called, userId:", userId);
 		return getUserSessionsImpl(this.sessions, userId);
 	}
 
@@ -197,6 +208,7 @@ export function createActorHandler<
 	 * @returns Number of sessions that received the message
 	 */
 	sendToUser(userId: string, channel: string, data?: any): number {
+		console.debug("[Verani:ActorRuntime] sendToUser method called, userId:", userId, "channel:", channel);
 		return sendToUserImpl(this.sessions, userId, channel, data);
 	}
 
@@ -217,6 +229,7 @@ export function createActorHandler<
 	 * ```
 	 */
 	emitToChannel(channel: string, event: string, data?: any): number {
+		console.debug("[Verani:ActorRuntime] emitToChannel method called, channel:", channel, "event:", event);
 		const eventData = { type: event, ...data };
 		return broadcastImpl(this.sessions, channel, eventData);
 	}
@@ -239,6 +252,7 @@ export function createActorHandler<
 	 * ```
 	 */
 	emitToUser(userId: string, event: string, data?: any): number {
+		console.debug("[Verani:ActorRuntime] emitToUser method called, userId:", userId, "event:", event);
 		const eventData = { type: event, ...data };
 		const frame = { type: "event" as const, channel: "default", data: eventData };
 		const encoded = encodeFrame(frame);
@@ -269,6 +283,7 @@ export function createActorHandler<
 			this.sessions.delete(ws);
 		}
 
+		console.debug("[Verani:ActorRuntime] emitToUser complete, sent to:", sentCount, "sessions");
 		return sentCount;
 	}
 
@@ -277,6 +292,7 @@ export function createActorHandler<
 	 * @returns DurableObjectStorage instance
 	 */
 	getStorage(): DurableObjectStorage {
+		console.debug("[Verani:ActorRuntime] getStorage method called");
 		return getStorageImpl(this.ctx);
 	}
 	};

@@ -63,6 +63,7 @@ export interface SafePersistOptions {
  * Handles circular references and special types gracefully.
  */
 export function safeSerialize(value: unknown): string {
+  console.debug("[Verani:Persist] safeSerialize called");
   const seen = new WeakSet();
 
   return JSON.stringify(value, (key, val) => {
@@ -106,6 +107,7 @@ export function safeSerialize(value: unknown): string {
  * Restores special types that were serialized.
  */
 export function safeDeserialize(json: string): unknown {
+  console.debug("[Verani:Persist] safeDeserialize called, json length:", json.length);
   return JSON.parse(json, (key, val) => {
     if (val && typeof val === 'object' && val.__type) {
       switch (val.__type) {
@@ -187,6 +189,7 @@ export async function initializePersistedState<T extends Record<string, unknown>
   persistedKeys: (keyof T)[] = [],
   options: SafePersistOptions = {}
 ): Promise<T> {
+  console.debug("[Verani:Persist] initializePersistedState called, keys to track:", persistedKeys.length > 0 ? persistedKeys.map(String) : "all");
   const { shallow = true, throwOnError = true } = options;
   const storage = actor.ctx.storage;
   const keysToTrack = persistedKeys.length > 0
@@ -199,8 +202,10 @@ export async function initializePersistedState<T extends Record<string, unknown>
   // Load persisted values from storage
   for (const key of keysToTrack) {
     try {
+      console.debug(`[Verani:Persist] Loading persisted value for key: ${key}`);
       const stored = await storage.get<string>(`_verani_persist:${key}`);
       if (stored !== undefined) {
+        console.debug(`[Verani:Persist] Found stored value for key: ${key}`);
         try {
           const parsed = safeDeserialize(stored);
           (state as Record<string, unknown>)[key] = parsed;
@@ -211,6 +216,8 @@ export async function initializePersistedState<T extends Record<string, unknown>
           }
           // Keep initial value on parse error
         }
+      } else {
+        console.debug(`[Verani:Persist] No stored value for key: ${key}, using initial value`);
       }
     } catch (err) {
       console.error(`[Verani:Persist] Failed to load persisted value for "${key}":`, err);
@@ -222,11 +229,16 @@ export async function initializePersistedState<T extends Record<string, unknown>
 
   // Create persist function
   const persistKey = async (key: string, value: unknown) => {
-    if (!keysToTrack.includes(key)) return;
+    if (!keysToTrack.includes(key)) {
+      console.debug(`[Verani:Persist] Skipping persist for untracked key: ${key}`);
+      return;
+    }
 
     try {
+      console.debug(`[Verani:Persist] Persisting key: ${key}`);
       const serialized = safeSerialize(value);
       await storage.put(`_verani_persist:${key}`, serialized);
+      console.debug(`[Verani:Persist] Successfully persisted key: ${key}`);
     } catch (err) {
       console.error(`[Verani:Persist] Failed to persist "${key}":`, err);
 
@@ -244,10 +256,15 @@ export async function initializePersistedState<T extends Record<string, unknown>
 
   // Create delete function
   const deleteKey = async (key: string) => {
-    if (!keysToTrack.includes(key)) return;
+    if (!keysToTrack.includes(key)) {
+      console.debug(`[Verani:Persist] Skipping delete for untracked key: ${key}`);
+      return;
+    }
 
     try {
+      console.debug(`[Verani:Persist] Deleting persisted key: ${key}`);
       await storage.delete(`_verani_persist:${key}`);
+      console.debug(`[Verani:Persist] Successfully deleted key: ${key}`);
     } catch (err) {
       console.error(`[Verani:Persist] Failed to delete "${key}":`, err);
 
@@ -266,12 +283,14 @@ export async function initializePersistedState<T extends Record<string, unknown>
   let proxiedState: T;
 
   if (shallow) {
+    console.debug("[Verani:Persist] Creating shallow proxy for state");
     proxiedState = createShallowProxy(
       state,
       (key, value) => { persistKey(String(key), value); },
       (key) => { deleteKey(String(key)); }
     );
   } else {
+    console.debug("[Verani:Persist] Creating deep proxy for state");
     // Deep proxy - use Cloudflare's implementation concept but with error handling
     proxiedState = createDeepProxy(
       state,
@@ -284,6 +303,7 @@ export async function initializePersistedState<T extends Record<string, unknown>
   // Mark state as ready
   actor[STATE_READY] = true;
   actor[PERSISTED_STATE] = proxiedState;
+  console.debug("[Verani:Persist] State initialization complete, ready:", actor[STATE_READY]);
 
   return proxiedState;
 }
@@ -366,7 +386,9 @@ function createDeepProxy<T extends object>(
  * Helper to check if state is ready for access
  */
 export function isStateReady(actor: PersistableActor): boolean {
-  return actor[STATE_READY] === true;
+  const ready = actor[STATE_READY] === true;
+  console.debug("[Verani:Persist] isStateReady:", ready);
+  return ready;
 }
 
 /**
@@ -389,6 +411,7 @@ export function setPeristErrorHandler(
   actor: PersistableActor,
   handler: (key: string, error: Error) => void
 ): void {
+  console.debug("[Verani:Persist] setPeristErrorHandler called");
   actor[PERSIST_ERROR_HANDLER] = handler;
 }
 
@@ -400,9 +423,11 @@ export async function persistKey(
   key: string,
   value: unknown
 ): Promise<void> {
+  console.debug("[Verani:Persist] persistKey called manually for key:", key);
   const storage = actor.ctx.storage;
   const serialized = safeSerialize(value);
   await storage.put(`_verani_persist:${key}`, serialized);
+  console.debug("[Verani:Persist] persistKey completed for key:", key);
 }
 
 /**
@@ -412,8 +437,10 @@ export async function deletePersistedKey(
   actor: PersistableActor,
   key: string
 ): Promise<void> {
+  console.debug("[Verani:Persist] deletePersistedKey called for key:", key);
   const storage = actor.ctx.storage;
   await storage.delete(`_verani_persist:${key}`);
+  console.debug("[Verani:Persist] deletePersistedKey completed for key:", key);
 }
 
 /**
@@ -422,9 +449,12 @@ export async function deletePersistedKey(
 export async function getPersistedKeys(
   actor: PersistableActor
 ): Promise<string[]> {
+  console.debug("[Verani:Persist] getPersistedKeys called");
   const storage = actor.ctx.storage;
   const map = await storage.list({ prefix: '_verani_persist:' });
-  return Array.from(map.keys()).map(k => k.replace('_verani_persist:', ''));
+  const keys = Array.from(map.keys()).map(k => k.replace('_verani_persist:', ''));
+  console.debug("[Verani:Persist] getPersistedKeys found", keys.length, "keys");
+  return keys;
 }
 
 /**
@@ -433,8 +463,12 @@ export async function getPersistedKeys(
 export async function clearPersistedState(
   actor: PersistableActor
 ): Promise<void> {
+  console.debug("[Verani:Persist] clearPersistedState called");
   const storage = actor.ctx.storage;
   const map = await storage.list({ prefix: '_verani_persist:' });
-  await storage.delete(Array.from(map.keys()));
+  const keys = Array.from(map.keys());
+  console.debug("[Verani:Persist] clearPersistedState deleting", keys.length, "keys");
+  await storage.delete(keys);
+  console.debug("[Verani:Persist] clearPersistedState completed");
 }
 

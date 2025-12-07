@@ -8,7 +8,9 @@ import type { ConnectionMeta } from "../types";
 export function getSessionCount<TMeta>(
 	sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }>
 ): number {
-	return sessions.size;
+	const count = sessions.size;
+	console.debug("[Verani:ActorRuntime] getSessionCount:", count);
+	return count;
 }
 
 /**
@@ -23,7 +25,9 @@ export function getConnectedUserIds<TMeta extends ConnectionMeta>(
 	for (const { meta } of sessions.values()) {
 		userIds.add(meta.userId);
 	}
-	return Array.from(userIds);
+	const result = Array.from(userIds);
+	console.debug("[Verani:ActorRuntime] getConnectedUserIds:", result);
+	return result;
 }
 
 /**
@@ -36,12 +40,14 @@ export function getUserSessions<TMeta extends ConnectionMeta>(
 	sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }>,
 	userId: string
 ): WebSocket[] {
+	console.debug("[Verani:ActorRuntime] getUserSessions for userId:", userId);
 	const sockets: WebSocket[] = [];
 	for (const { ws, meta } of sessions.values()) {
 		if (meta.userId === userId) {
 			sockets.push(ws);
 		}
 	}
+	console.debug("[Verani:ActorRuntime] getUserSessions found", sockets.length, "sessions");
 	return sockets;
 }
 
@@ -51,6 +57,7 @@ export function getUserSessions<TMeta extends ConnectionMeta>(
  * @returns DurableObjectStorage instance
  */
 export function getStorage(ctx: { storage: DurableObjectStorage }): DurableObjectStorage {
+	console.debug("[Verani:ActorRuntime] getStorage called");
 	return ctx.storage;
 }
 

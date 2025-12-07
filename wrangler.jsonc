@@ -8,12 +8,16 @@
 	},
 	"migrations": [
 		{
-			"new_sqlite_classes": ["ChatExample", "PresenceExample", "NotificationsExample"],
+			"new_sqlite_classes": ["CounterActor", "ChatExample", "PresenceExample", "NotificationsExample"],
 			"tag": "v1"
 		}
 	],
 	"durable_objects": {
 		"bindings": [
+		  {
+			"class_name": "CounterActor",
+			"name": "CounterActor"
+		  },
 		  {
 			"class_name": "ChatExample",
 			"name": "ChatExample"
