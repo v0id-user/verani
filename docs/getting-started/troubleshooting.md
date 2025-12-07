@@ -101,6 +101,18 @@ const count = await stub.getSessionCount();
 const userIds = await stub.getConnectedUserIds();
 ```
 
+**Access persisted state:**
+```typescript
+// Inside lifecycle hook - fully typed!
+const messageCount = ctx.actor.roomState.messageCount;
+ctx.actor.roomState.messageCount++; // Automatically persisted
+
+// Check if state is ready
+if (ctx.actor.isStateReady()) {
+  // Safe to access roomState
+}
+```
+
 ### Key Differences: Direct vs RPC
 
 | Feature | Direct (`ctx.actor`) | RPC (`stub`) |
@@ -110,9 +122,61 @@ const userIds = await stub.getConnectedUserIds();
 | **Broadcast options** | `BroadcastOptions` (includes `except`) | `RpcBroadcastOptions` (no `except`) |
 | **Available methods** | All methods | Only serializable return types |
 
+## Persistence Issues
+
+### State not persisting
+
+1. **Check `persistedKeys`**: Only keys in this array are persisted
+2. **Verify state is defined**: Ensure `state` is defined in your room definition
+3. **Check for errors**: Use `onPersistError` hook to catch persistence failures
+4. **Wait for initialization**: State is loaded during `onInit` - use `isStateReady()` if needed
+
+```typescript
+const room = defineRoom({
+  state: { count: 0 },
+  persistedKeys: ["count"], // Must include the key!
+  
+  onPersistError(key, error) {
+    console.error(`Failed to persist ${key}:`, error);
+  },
+  
+  onConnect(ctx) {
+    // State is ready by the time onConnect is called
+    ctx.actor.roomState.count++; // Automatically persisted
+  }
+});
+```
+
+### State type errors
+
+State is fully typed based on your definition:
+
+```typescript
+// ✅ Correct: Typed based on state definition
+ctx.actor.roomState.count; // number
+ctx.actor.roomState.settings; // { maxUsers: number }
+
+// ❌ Error: Property doesn't exist
+ctx.actor.roomState.foo; // TypeScript error
+```
+
+### State accessed before initialization
+
+State is loaded asynchronously during `onInit`. In practice, it's always ready by the time `onConnect` is called, but you can check:
+
+```typescript
+onConnect(ctx) {
+  if (ctx.actor.isStateReady()) {
+    // Safe to access roomState
+    console.log(ctx.actor.roomState.count);
+  }
+}
+```
+
 ## Related Documentation
 
 - [Quick Start Guide](./quick-start.md) - Step-by-step tutorial
+- [Persistence Concepts](../concepts/persistence.md) - State persistence guide
 - [API Reference](../api/server.md) - Complete API documentation
 - [RPC Guide](../guides/rpc.md) - Remote Procedure Calls
 - [Configuration Guide](../guides/configuration.md) - Wrangler configuration

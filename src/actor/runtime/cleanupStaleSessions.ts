@@ -7,6 +7,7 @@
 export function cleanupStaleSessions<TMeta>(
 	sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }>
 ): number {
+	console.debug("[Verani:ActorRuntime] cleanupStaleSessions called, total sessions:", sessions.size);
 	let cleanedCount = 0;
 	const deadSessions: WebSocket[] = [];
 
@@ -17,6 +18,8 @@ export function cleanupStaleSessions<TMeta>(
 		}
 	}
 
+	console.debug("[Verani:ActorRuntime] Found", deadSessions.length, "dead sessions to clean up");
+
 	// Remove dead sessions
 	for (const ws of deadSessions) {
 		sessions.delete(ws);
@@ -25,6 +28,8 @@ export function cleanupStaleSessions<TMeta>(
 
 	if (cleanedCount > 0) {
 		console.debug("[Verani:ActorRuntime] Cleaned up", cleanedCount, "dead sessions");
+	} else {
+		console.debug("[Verani:ActorRuntime] No stale sessions to clean up");
 	}
 
 	return cleanedCount;

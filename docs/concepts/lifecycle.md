@@ -5,6 +5,13 @@ Understanding the connection lifecycle on both server and client.
 ## Server Side
 
 ```
+Actor starts / wakes from hibernation
+      ↓
+onInit() called
+      ↓
+  ├─ Restore sessions from attachments
+  └─ Initialize persisted state (if defined)
+      ↓
 WebSocket connects
       ↓
 extractMeta(request)  → { userId, clientId, channels }
@@ -13,17 +20,21 @@ storeAttachment(ws, meta)
       ↓
 sessions.set(ws, { ws, meta })
       ↓
-onConnect(ctx)  → ctx.emit available
+onConnect(ctx)  → ctx.emit available, ctx.actor.roomState ready
       ↓
 [connection active, messages flow]
       ↓
 Event handlers (room.on()) or onMessage hook
+      ↓
+State changes automatically persisted (if persistedKeys defined)
       ↓
 WebSocket closes
       ↓
 sessions.delete(ws)
       ↓
 onDisconnect(ctx)  → ctx.emit available
+      ↓
+Actor may hibernate (state persists)
 ```
 
 ## Lifecycle Hooks with Socket.io-like API
@@ -100,10 +111,41 @@ Exponential backoff delay
 Retry connection
 ```
 
+## State Initialization
+
+If your room defines persisted state, it's initialized during `onInit`:
+
+```typescript
+const room = defineRoom({
+  state: {
+    count: 0,
+    lastActivity: null as Date | null
+  },
+  persistedKeys: ["count", "lastActivity"],
+
+  onConnect(ctx) {
+    // State is ready here - loaded from storage during onInit
+    console.log(`Current count: ${ctx.actor.roomState.count}`);
+    
+    // Changes are automatically persisted
+    ctx.actor.roomState.count++;
+  }
+});
+```
+
+**Timeline:**
+1. `onInit()` - State loaded from Durable Object storage
+2. `onConnect()` - State is ready and accessible
+3. State changes - Automatically persisted to storage
+4. Hibernation - State survives in storage
+5. Wake - State restored in `onInit()`
+
 ## Related Documentation
 
 - [Architecture](./architecture.md) - System architecture
 - [Hibernation](./hibernation.md) - Hibernation behavior
+- [Persistence](./persistence.md) - State persistence guide
+- [State Management](./state-management.md) - State types overview
 - [Server API - Lifecycle Hooks](../api/server.md#roomdefinitiontmeta) - Hook documentation
 - [Client API](../api/client.md) - Client lifecycle methods
 

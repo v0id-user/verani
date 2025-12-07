@@ -1,11 +1,12 @@
 import { Actor } from "@cloudflare/actors";
 import { presenceRoom } from "../examples/presence-room";
+import { CounterActor } from "../examples/persistence/counter-room";
 import { createActorHandler } from "./actor/actor-runtime";
 
 export const PresenceExample = createActorHandler(presenceRoom);
 export class ChatExample extends Actor<Env> {}
 export class NotificationsExample extends Actor<Env> {}
-
+export { CounterActor };
 
 // Export default handler with routing logic
 export default {
@@ -16,6 +17,11 @@ export default {
 
 		if (path.startsWith("/ws/presence")) {
 			const stub = PresenceExample.get("")
+			return stub.fetch(request);
+		}
+
+		if (path.startsWith("/ws/counter")) {
+			const stub = CounterActor.get("")
 			return stub.fetch(request);
 		}
 
@@ -100,6 +106,12 @@ function getInfoPage(): string {
 	</div>
 
 	<div class="example">
+		<h3>🔢 Persistent Counter</h3>
+		<pre><code>bun run examples/persistence/counter-client.ts</code></pre>
+		<p>Demonstrates state persistence across Actor hibernation. Counter value survives server restarts!</p>
+	</div>
+
+	<div class="example">
 		<h3>🔔 Notifications Feed</h3>
 		<pre><code>bun run examples/clients/notifications-client.ts</code></pre>
 		<p>Personal notification stream with read/unread tracking and multi-device sync. Each instance uses a random username.</p>
@@ -109,6 +121,7 @@ function getInfoPage(): string {
 	<ul>
 		<li><code>/ws/chat</code> - Chat room endpoint</li>
 		<li><code>/ws/presence</code> - Presence tracking endpoint</li>
+		<li><code>/ws/counter</code> - Persistent counter endpoint</li>
 		<li><code>/ws/notifications</code> - Notifications feed endpoint (requires userId param)</li>
 	</ul>
 

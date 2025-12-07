@@ -129,6 +129,39 @@ export default {
 };
 ```
 
+## Persistence in Production
+
+When using state persistence:
+
+- **Test persistence**: Verify state survives hibernation and server restarts
+- **Handle errors**: Implement `onPersistError` to handle persistence failures gracefully
+- **Monitor storage**: Check Durable Object storage usage and costs
+- **Optimize keys**: Only persist what you need - each key adds storage overhead
+
+```typescript
+const room = defineRoom({
+  state: {
+    // Only persist essential state
+    messageCount: 0,
+    settings: { maxUsers: 100 }
+  },
+  persistedKeys: ["messageCount", "settings"], // Minimal set
+  
+  persistOptions: {
+    shallow: true, // Faster than deep proxying
+    throwOnError: false // Don't crash on persistence failures
+  },
+  
+  onPersistError(key, error) {
+    // Log to monitoring service
+    console.error(`[Persistence] Failed to persist ${key}:`, error);
+    // Maybe notify admins or use fallback storage
+  }
+});
+```
+
+**See**: [Persistence Concepts](../concepts/persistence.md) for full documentation.
+
 ## Security Checklist
 
 Before going to production:
@@ -143,6 +176,8 @@ Before going to production:
 - [ ] Set up monitoring and alerts
 - [ ] Verify Origin header to prevent CSWSH attacks
 - [ ] Use environment variables for secrets (never commit secrets)
+- [ ] Test state persistence across hibernation cycles
+- [ ] Implement error handling for persistence failures
 
 **📖 Read the complete [Security Guide](../security/authentication.md) for implementation details.**
 

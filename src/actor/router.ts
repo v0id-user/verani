@@ -31,21 +31,21 @@ function defaultExtractMeta(req: Request): ConnectionMeta {
 /**
  * Extended room definition with socket.io-like convenience methods
  */
-export interface RoomDefinitionWithHandlers<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown>
-  extends RoomDefinition<TMeta, E> {
+export interface RoomDefinitionWithHandlers<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>>
+  extends RoomDefinition<TMeta, E, TState> {
   /**
    * Register an event handler (socket.io-like API)
    * @param event - Event name
    * @param handler - Handler function
    */
-  on(event: string, handler: EventHandler<TMeta, E>): void;
+  on(event: string, handler: EventHandler<TMeta, E, TState>): void;
 
   /**
    * Remove an event handler (socket.io-like API)
    * @param event - Event name
    * @param handler - Optional specific handler to remove
    */
-  off(event: string, handler?: EventHandler<TMeta, E>): void;
+  off(event: string, handler?: EventHandler<TMeta, E, TState>): void;
 }
 
 /**
@@ -53,17 +53,21 @@ export interface RoomDefinitionWithHandlers<TMeta extends ConnectionMeta = Conne
  * @param def - Room definition with optional hooks
  * @returns Normalized room definition with defaults and socket.io-like event handler methods
  */
-export function defineRoom<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown>(
-  def: RoomDefinition<TMeta, E>
-): RoomDefinitionWithHandlers<TMeta, E> {
+export function defineRoom<
+  TMeta extends ConnectionMeta = ConnectionMeta,
+  E = unknown,
+  TState extends Record<string, unknown> = Record<string, unknown>
+>(
+  def: RoomDefinition<TMeta, E, TState>
+): RoomDefinitionWithHandlers<TMeta, E, TState> {
   // Create default event emitter if not provided
-  const eventEmitter = def.eventEmitter || createRoomEventEmitter<TMeta, E>();
+  const eventEmitter = def.eventEmitter || createRoomEventEmitter<TMeta, E, TState>();
 
   // Initialize static handlers storage if not already present
   // This persists across hibernation because it's stored in the room definition at module scope
-  const staticHandlers = def._staticHandlers || new Map<string, Set<EventHandler<TMeta, E>>>();
+  const staticHandlers = def._staticHandlers || new Map<string, Set<EventHandler<TMeta, E, TState>>>();
 
-  const room: RoomDefinitionWithHandlers<TMeta, E> = {
+  const room: RoomDefinitionWithHandlers<TMeta, E, TState> = {
     name: def.name,
     websocketPath: def.websocketPath,
     extractMeta: def.extractMeta || ((req: Request) => defaultExtractMeta(req) as TMeta),
@@ -74,8 +78,13 @@ export function defineRoom<TMeta extends ConnectionMeta = ConnectionMeta, E = un
     onHibernationRestore: def.onHibernationRestore,
     eventEmitter,
     _staticHandlers: staticHandlers,
+    // State persistence
+    state: def.state,
+    persistedKeys: def.persistedKeys,
+    persistOptions: def.persistOptions,
+    onPersistError: def.onPersistError,
     // Socket.io-like convenience methods
-    on(event: string, handler: EventHandler<TMeta, E>): void {
+    on(event: string, handler: EventHandler<TMeta, E, TState>): void {
       // Store in both eventEmitter (for current instance) and static storage (for persistence)
       eventEmitter.on(event, handler);
 
@@ -86,7 +95,7 @@ export function defineRoom<TMeta extends ConnectionMeta = ConnectionMeta, E = un
       staticHandlers.get(event)!.add(handler);
       console.debug(`[Verani:Router] Registered handler for event: ${event} (stored statically)`);
     },
-    off(event: string, handler?: EventHandler<TMeta, E>): void {
+    off(event: string, handler?: EventHandler<TMeta, E, TState>): void {
       // Remove from both eventEmitter and static storage
       eventEmitter.off(event, handler);
 

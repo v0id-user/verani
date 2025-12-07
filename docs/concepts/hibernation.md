@@ -38,6 +38,7 @@ restoreSessions(actor);
 - **WebSocket attachments** (metadata stored via `storeAttachment`)
 - **Static handler definitions** registered via `room.on()`
 - **Room definition** (it's at module scope, not instance scope)
+- **Persisted room state** (via `state` + `persistedKeys` in room definition)
 - **Durable Object storage** (if you use `getStorage()`)
 
 ## Event Handler Persistence
@@ -118,6 +119,7 @@ Sessions are automatically restored via WebSocket attachments, and event handler
 ## Related Documentation
 
 - [State Management](./state-management.md) - State types and persistence
+- [Persistence](./persistence.md) - Declarative state persistence
 - [Lifecycle](./lifecycle.md) - Connection lifecycle and hooks
 - [Server API - onHibernationRestore](../api/server.md#onhibernationrestoreactor-veraniactor-void--promisevoid) - Hibernation hook
 - [Examples - Presence](../examples/presence.md) - Example with hibernation handling

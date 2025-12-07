@@ -66,6 +66,29 @@ Verani handles this automatically, but make sure you're not keeping the Actor aw
 - Don't keep long-running promises
 - Let the Actor sleep when idle
 
+### 5. Optimize Persisted State
+
+When using state persistence:
+
+- **Only persist what you need**: Don't persist frequently-changing data like typing indicators
+- **Use shallow mode**: Default shallow tracking is faster than deep proxying
+- **Batch updates**: Multiple state changes trigger multiple persistence operations
+
+```typescript
+// ✅ Good: Only persist meaningful state
+state: {
+  messageCount: 0,        // Persist this
+  settings: { maxUsers: 100 } // Persist this
+  // Don't persist: typing indicators, cursor positions, etc.
+},
+persistedKeys: ["messageCount", "settings"],
+
+// ✅ Good: Batch state updates when possible
+ctx.actor.roomState.messageCount++;
+ctx.actor.roomState.lastActivity = new Date();
+// Both persisted, but consider batching if doing many updates
+```
+
 ## Scaling
 
 ### Vertical Scaling (Per Actor)
@@ -118,4 +141,5 @@ Cloudflare Workers pricing (as of 2024):
 - [Deployment Guide](./deployment.md) - Deployment steps
 - [Monitoring Guide](./monitoring.md) - Logs and metrics
 - [Configuration Guide](./configuration.md) - Actor routing strategies
+- [Persistence Concepts](../concepts/persistence.md) - State persistence and performance
 

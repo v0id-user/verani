@@ -4,6 +4,7 @@
  * @returns PascalCase class name (e.g., "ChatExample" or "WsPresence")
  */
 export function sanitizeToClassName(name: string): string {
+	console.debug("[Verani:ActorRuntime] sanitizeToClassName input:", name);
 	// Remove leading slashes and split by common separators
 	const cleaned = name.replace(/^\/+/, '');
 	const parts = cleaned.split(/[-_\/\s]+/);
@@ -16,6 +17,8 @@ export function sanitizeToClassName(name: string): string {
 		.join('');
 
 	// Fallback if sanitization results in empty string
-	return pascalCase || 'VeraniActor';
+	const result = pascalCase || 'VeraniActor';
+	console.debug("[Verani:ActorRuntime] sanitizeToClassName result:", result);
+	return result;
 }
 

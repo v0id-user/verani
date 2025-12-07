@@ -19,8 +19,10 @@ function createUserEmitBuilder<TMeta extends ConnectionMeta, E>(
 	sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }>,
 	defaultChannel: string
 ): EmitBuilder<TMeta, E> {
+	console.debug("[Verani:Emit] createUserEmitBuilder for userId:", userId, "channel:", defaultChannel);
 	return {
 		emit(event: string, data?: any): number {
+			console.debug("[Verani:Emit] User emit:", event, "to userId:", userId);
 			const eventData = { type: event, ...data };
 			return sendToUserImpl(sessions, userId, defaultChannel, eventData);
 		}
@@ -35,8 +37,10 @@ function createChannelEmitBuilder<TMeta extends ConnectionMeta, E>(
 	sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }>,
 	opts?: BroadcastOptions
 ): EmitBuilder<TMeta, E> {
+	console.debug("[Verani:Emit] createChannelEmitBuilder for channel:", channel, "options:", opts);
 	return {
 		emit(event: string, data?: any): number {
+			console.debug("[Verani:Emit] Channel emit:", event, "to channel:", channel);
 			const eventData = { type: event, ...data };
 			return broadcastImpl(sessions, channel, eventData, opts);
 		}
@@ -78,9 +82,11 @@ export function createSocketEmit<TMeta extends ConnectionMeta, E>(
 		 * Otherwise, it's treated as a userId.
 		 */
 		to(target: string): EmitBuilder<TMeta, E> {
+			console.debug("[Verani:Emit] Socket.to() called with target:", target);
 			// Check if target is a channel the current user is subscribed to
 			const isChannel = ctx.meta.channels.includes(target);
-			
+			console.debug("[Verani:Emit] Target is channel:", isChannel, "user channels:", ctx.meta.channels);
+
 			if (isChannel) {
 				// Target is a channel - broadcast to it, excluding current socket
 				return createChannelEmitBuilder(
@@ -123,6 +129,7 @@ export function createActorEmit<TMeta extends ConnectionMeta, E>(
 		 * Target a specific channel for broadcasting
 		 */
 		to(channel: string): EmitBuilder<TMeta, E> {
+			console.debug("[Verani:Emit] Actor.to() called with channel:", channel);
 			return createChannelEmitBuilder(channel, actor.sessions);
 		}
 	};

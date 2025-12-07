@@ -1,5 +1,6 @@
 import type { Actor } from "@cloudflare/actors";
 import type { ConnectionMeta, MessageFrame } from "../shared/types";
+import type { SafePersistOptions } from "./persist";
 
 export type { ConnectionMeta, MessageFrame };
 
@@ -111,13 +112,26 @@ export interface ActorStub {
 /**
  * Extended Actor interface with Verani-specific methods
  */
-export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> extends Actor<E> {
+export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>> extends Actor<E> {
   /**
    * Map of active WebSocket sessions keyed by their WebSocket instance.
    * Each entry contains the WebSocket and its associated metadata.
    * See: @src/actor/actor-runtime.ts usage for session management.
    */
   sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }>;
+
+  /**
+   * User-defined persisted state for this actor.
+   * Access this after onInit completes. Changes to tracked keys are automatically persisted.
+   * @see RoomDefinition.state and RoomDefinition.persistedKeys
+   */
+  roomState: TState;
+
+  /**
+   * Check if the persisted state has been initialized.
+   * Returns true after onInit completes and state is loaded from storage.
+   */
+  isStateReady(): boolean;
 
   /**
    * Broadcast a message to all connections in a channel.
@@ -177,28 +191,28 @@ export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = 
 /**
  * Event handler function type for socket.io-like event handling
  */
-export type EventHandler<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> = (
-  ctx: MessageContext<TMeta, E>,
+export type EventHandler<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>> = (
+  ctx: MessageContext<TMeta, E, TState>,
   data: any
 ) => void | Promise<void>;
 
 /**
  * Event emitter interface for room-level event handling
  */
-export interface RoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> {
+export interface RoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>> {
   /**
    * Register an event handler
    * @param event - Event name (supports wildcard "*")
    * @param handler - Handler function
    */
-  on(event: string, handler: EventHandler<TMeta, E>): void;
+  on(event: string, handler: EventHandler<TMeta, E, TState>): void;
 
   /**
    * Remove an event handler
    * @param event - Event name
    * @param handler - Optional specific handler to remove, or remove all handlers for event
    */
-  off(event: string, handler?: EventHandler<TMeta, E>): void;
+  off(event: string, handler?: EventHandler<TMeta, E, TState>): void;
 
   /**
    * Emit an event to registered handlers
@@ -206,7 +220,7 @@ export interface RoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta,
    * @param ctx - Message context
    * @param data - Event data
    */
-  emit(event: string, ctx: MessageContext<TMeta, E>, data: any): Promise<void>;
+  emit(event: string, ctx: MessageContext<TMeta, E, TState>, data: any): Promise<void>;
 
   /**
    * Rebuild handlers from static storage.
@@ -214,7 +228,7 @@ export interface RoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta,
    * This method MUST be implemented by all event emitter implementations.
    * @param staticHandlers - Map of event names to handler sets from static storage
    */
-  rebuildHandlers(staticHandlers: Map<string, Set<EventHandler<TMeta, E>>>): void;
+  rebuildHandlers(staticHandlers: Map<string, Set<EventHandler<TMeta, E, TState>>>): void;
 }
 
 /**
@@ -274,9 +288,9 @@ export interface ActorEmit<TMeta extends ConnectionMeta = ConnectionMeta, E = un
 /**
  * Context provided to room lifecycle hooks
  */
-export interface RoomContext<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> {
+export interface RoomContext<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>> {
   /** The actor instance handling this connection */
-  actor: VeraniActor<TMeta, E>;
+  actor: VeraniActor<TMeta, E, TState>;
   /** The WebSocket connection */
   ws: WebSocket;
   /** Connection metadata */
@@ -288,8 +302,8 @@ export interface RoomContext<TMeta extends ConnectionMeta = ConnectionMeta, E = 
 /**
  * Context for onMessage hook with frame included
  */
-export interface MessageContext<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown>
-  extends RoomContext<TMeta, E> {
+export interface MessageContext<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>>
+  extends RoomContext<TMeta, E, TState> {
   /** The received message frame */
   frame: MessageFrame;
 }
@@ -300,8 +314,12 @@ export interface MessageContext<TMeta extends ConnectionMeta = ConnectionMeta, E
  * **Important:** All lifecycle hooks are properly awaited if they return a Promise.
  * This ensures async operations complete before the actor proceeds to the next step
  * or potentially enters hibernation.
+ *
+ * @template TMeta - Connection metadata type
+ * @template E - Environment type
+ * @template TState - Room state type (for persistence)
  */
-export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> {
+export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>> {
   /** Optional room name for debugging */
   name?: string;
 
@@ -320,14 +338,14 @@ export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E
    * sessions map after this hook completes successfully. If this hook throws, the
    * connection is closed and no orphaned session is created.
    */
-  onConnect?(ctx: RoomContext<TMeta, E>): void | Promise<void>;
+  onConnect?(ctx: RoomContext<TMeta, E, TState>): void | Promise<void>;
 
   /**
    * Called when a WebSocket connection is closed.
    * This hook is awaited if it returns a Promise. The session is removed from the
    * sessions map before this hook is called.
    */
-  onDisconnect?(ctx: RoomContext<TMeta, E>): void | Promise<void>;
+  onDisconnect?(ctx: RoomContext<TMeta, E, TState>): void | Promise<void>;
 
   /**
    * Called when a message is received from a connection.
@@ -337,32 +355,79 @@ export interface RoomDefinition<TMeta extends ConnectionMeta = ConnectionMeta, E
    * **Note:** If event handlers are registered via `eventEmitter`, they take priority.
    * This hook is used as a fallback when no matching event handler is found.
    */
-  onMessage?(ctx: MessageContext<TMeta, E>, frame: MessageFrame): void | Promise<void>;
+  onMessage?(ctx: MessageContext<TMeta, E, TState>, frame: MessageFrame): void | Promise<void>;
 
   /**
    * Called when an error occurs in a lifecycle hook.
    * This hook is also awaited if it returns a Promise.
    */
-  onError?(error: Error, ctx: RoomContext<TMeta, E>): void | Promise<void>;
+  onError?(error: Error, ctx: RoomContext<TMeta, E, TState>): void | Promise<void>;
 
   /**
    * Called after actor wakes from hibernation and sessions are restored.
    * This hook is awaited if it returns a Promise. It is called even if some
    * sessions failed to restore, allowing you to handle partial restoration scenarios.
    */
-  onHibernationRestore?(actor: VeraniActor<TMeta, E>): void | Promise<void>;
+  onHibernationRestore?(actor: VeraniActor<TMeta, E, TState>): void | Promise<void>;
 
   /**
    * Event emitter for socket.io-like event handling.
    * If provided, event handlers registered here will be called for matching message types.
    * If not provided, a default event emitter will be created.
    */
-  eventEmitter?: RoomEventEmitter<TMeta, E>;
+  eventEmitter?: RoomEventEmitter<TMeta, E, TState>;
 
   /**
    * Static handler storage that persists across hibernation.
    * Handlers registered via room.on() are stored here and rebuilt in onInit.
    * @internal
    */
-  _staticHandlers?: Map<string, Set<EventHandler<TMeta, E>>>;
+  _staticHandlers?: Map<string, Set<EventHandler<TMeta, E, TState>>>;
+
+  // ========== State Persistence ==========
+
+  /**
+   * Initial state for this room. This object defines the default values
+   * for your room's state. Access via `actor.roomState` in lifecycle hooks.
+   *
+   * @example
+   * ```typescript
+   * const room = defineRoom({
+   *   state: {
+   *     messageCount: 0,
+   *     lastActivity: null as Date | null,
+   *     settings: { maxUsers: 100 }
+   *   },
+   *   persistedKeys: ['messageCount', 'settings'],
+   *   // ...
+   * });
+   * ```
+   */
+  state?: TState;
+
+  /**
+   * Keys from `state` to persist to Durable Object storage.
+   * If empty or undefined, no state is persisted.
+   * Changes to these keys are automatically saved and restored on hibernation wake.
+   *
+   * @example
+   * ```typescript
+   * persistedKeys: ['messageCount', 'settings'] // Only these keys are persisted
+   * ```
+   */
+  persistedKeys?: (string & keyof TState)[];
+
+  /**
+   * Options for state persistence behavior.
+   */
+  persistOptions?: SafePersistOptions;
+
+  /**
+   * Called when persistence fails for a key.
+   * Use this to handle errors gracefully (e.g., notify admins, fallback behavior).
+   *
+   * @param key - The state key that failed to persist
+   * @param error - The error that occurred
+   */
+  onPersistError?(key: string, error: Error): void;
 }

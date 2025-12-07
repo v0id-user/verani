@@ -13,6 +13,14 @@ import { onWebSocketDisconnect as onWebSocketDisconnectImpl } from "./runtime/on
 import { createActorEmit } from "./runtime/emit";
 import { createFetch, type ActorInstanceWithFetchMethods } from "./runtime/fetch";
 import { encodeFrame } from "./protocol";
+import {
+	initializePersistedState,
+	isStateReady as checkStateReady,
+	setPeristErrorHandler,
+	STATE_READY,
+	PERSISTED_STATE,
+	type PersistableActor
+} from "./persist";
 
 /**
  * Return type for createActorHandler - represents an Actor class constructor
@@ -28,59 +36,116 @@ export type ActorHandlerClass<E = unknown> = {
  * @param room - The room definition with lifecycle hooks
  * @returns Actor class for Cloudflare Workers (extends DurableObject)
  */
-export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown>(
-	room: RoomDefinition<TMeta, E>
+export function createActorHandler<
+	TMeta extends ConnectionMeta = ConnectionMeta,
+	E = unknown,
+	TState extends Record<string, unknown> = Record<string, unknown>
+>(
+	room: RoomDefinition<TMeta, E, TState>
 ): ActorHandlerClass<E> {
 	// Determine class name with priority: room.name > room.websocketPath > "VeraniActor"
 	const className = sanitizeToClassName(room.name || room.websocketPath || "VeraniActor");
+
+	// Cast room for runtime helpers that don't need TState
+	const roomDef = room as RoomDefinition<TMeta, E>;
 
 	// Create named class dynamically
 	class NamedActorClass extends Actor<E> {
 		sessions = new Map<WebSocket, { ws: WebSocket; meta: TMeta }>();
 		emit = createActorEmit<TMeta, E>(this as any);
 
+		// State persistence support
+		[STATE_READY] = false;
+		// Initialize with initial state values immediately so roomState is always valid
+		// This prevents undefined values when onConnect is called before onInit completes
+		[PERSISTED_STATE]: Record<string, unknown> = room.state ? { ...room.state } : {};
+
+		/**
+		 * User-defined persisted state for this actor.
+		 * Access this after onInit completes. Changes to tracked keys are automatically persisted.
+		 */
+		get roomState(): Record<string, unknown> {
+			return this[PERSISTED_STATE];
+		}
+
+		/**
+		 * Check if the persisted state has been initialized.
+		 * Returns true after onInit completes and state is loaded from storage.
+		 */
+		isStateReady(): boolean {
+			return checkStateReady(this as unknown as PersistableActor);
+		}
+
 		/**
 		 * Static configuration method for Cloudflare Actors
 		 * Specifies WebSocket upgrade path and other options
 		 */
-		static configuration = createConfiguration(room);
+		static configuration = createConfiguration(roomDef);
 
 		protected async shouldUpgradeWebSocket(request: Request): Promise<boolean> {
+			console.debug("[Verani:ActorRuntime] shouldUpgradeWebSocket called, url:", request.url);
 			return true;
 		}
 
 
 		// https://github.com/cloudflare/actors/issues/92
-		fetch = createFetch(room, this as unknown as ActorInstanceWithFetchMethods);
+		fetch = createFetch(roomDef, this as unknown as ActorInstanceWithFetchMethods);
 
 
 	/**
 	 * Called when the Actor initializes or wakes from hibernation
-	 * Restores sessions from WebSocket attachments
+	 * Restores sessions from WebSocket attachments and initializes persisted state
 	 */
 	protected async onInit() {
-		await onInitImpl(this, room);
+		// Initialize persisted state if room defines state
+		if (room.state) {
+			// Set error handler if defined
+			if (room.onPersistError) {
+				setPeristErrorHandler(
+					this as unknown as PersistableActor,
+					room.onPersistError
+				);
+			}
+
+			// Initialize state from storage
+			const persistedKeys = room.persistedKeys as string[] | undefined;
+			const initializedState = await initializePersistedState(
+				this as unknown as PersistableActor,
+				room.state,
+				persistedKeys,
+				room.persistOptions
+			);
+
+			this[PERSISTED_STATE] = initializedState;
+			console.debug(`[Verani:Persist] State initialized with keys: ${Object.keys(initializedState).join(', ')}`);
+		}
+
+		// Call the original onInit implementation
+		await onInitImpl(this, roomDef);
 	}
 
 	/**
 	 * Called when a new WebSocket connection is established
 	 */
 	protected async onWebSocketConnect(ws: WebSocket, req: Request) {
-		await onWebSocketConnectImpl(this, room, ws, req);
+		console.debug("[Verani:ActorRuntime] onWebSocketConnect method called");
+		await onWebSocketConnectImpl(this, roomDef, ws, req);
 	}
 
 	/**
 	 * Called when a message is received from a WebSocket
 	 */
 	protected async onWebSocketMessage(ws: WebSocket, raw: any) {
-		await onWebSocketMessageImpl(this, room, ws, raw);
+		console.debug("[Verani:ActorRuntime] onWebSocketMessage method called");
+		await onWebSocketMessageImpl(this, roomDef, ws, raw);
 	}
 
 	/**
 	 * Called when a WebSocket connection is closed
 	 */
 	protected async onWebSocketDisconnect(ws: WebSocket) {
-		await onWebSocketDisconnectImpl(this, room, ws);
+		console.debug("[Verani:ActorRuntime] onWebSocketDisconnect method called");
+		await onWebSocketDisconnectImpl(this, roomDef, ws);
 	}
 
 	/**
@@ -89,6 +154,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * @returns Number of sessions cleaned up
 	 */
 	cleanupStaleSessions(): number {
+		console.debug("[Verani:ActorRuntime] cleanupStaleSessions method called");
 		return cleanupStaleSessionsImpl(this.sessions);
 	}
 
@@ -101,6 +167,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * @returns Number of connections that received the message
 	 */
 	broadcast(channel: string, data: any, opts?: BroadcastOptions): number {
+		console.debug("[Verani:ActorRuntime] broadcast method called, channel:", channel);
 		return broadcastImpl(this.sessions, channel, data, opts);
 	}
 
@@ -109,6 +176,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * @returns Number of connected WebSockets
 	 */
 	getSessionCount(): number {
+		console.debug("[Verani:ActorRuntime] getSessionCount method called");
 		return getSessionCountImpl(this.sessions);
 	}
 
@@ -117,6 +185,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * @returns Array of unique user IDs
 	 */
 	getConnectedUserIds(): string[] {
+		console.debug("[Verani:ActorRuntime] getConnectedUserIds method called");
 		return getConnectedUserIdsImpl(this.sessions);
 	}
 
@@ -126,6 +195,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * @returns Array of WebSockets belonging to the user
 	 */
 	getUserSessions(userId: string): WebSocket[] {
+		console.debug("[Verani:ActorRuntime] getUserSessions method called, userId:", userId);
 		return getUserSessionsImpl(this.sessions, userId);
 	}
 
@@ -138,6 +208,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * @returns Number of sessions that received the message
 	 */
 	sendToUser(userId: string, channel: string, data?: any): number {
+		console.debug("[Verani:ActorRuntime] sendToUser method called, userId:", userId, "channel:", channel);
 		return sendToUserImpl(this.sessions, userId, channel, data);
 	}
 
@@ -158,6 +229,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * ```
 	 */
 	emitToChannel(channel: string, event: string, data?: any): number {
+		console.debug("[Verani:ActorRuntime] emitToChannel method called, channel:", channel, "event:", event);
 		const eventData = { type: event, ...data };
 		return broadcastImpl(this.sessions, channel, eventData);
 	}
@@ -180,6 +252,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * ```
 	 */
 	emitToUser(userId: string, event: string, data?: any): number {
+		console.debug("[Verani:ActorRuntime] emitToUser method called, userId:", userId, "event:", event);
 		const eventData = { type: event, ...data };
 		const frame = { type: "event" as const, channel: "default", data: eventData };
 		const encoded = encodeFrame(frame);
@@ -210,6 +283,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 			this.sessions.delete(ws);
 		}
 
+		console.debug("[Verani:ActorRuntime] emitToUser complete, sent to:", sentCount, "sessions");
 		return sentCount;
 	}
 
@@ -218,6 +292,7 @@ export function createActorHandler<TMeta extends ConnectionMeta = ConnectionMeta
 	 * @returns DurableObjectStorage instance
 	 */
 	getStorage(): DurableObjectStorage {
+		console.debug("[Verani:ActorRuntime] getStorage method called");
 		return getStorageImpl(this.ctx);
 	}
 	};
