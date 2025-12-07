@@ -10,7 +10,6 @@ export function createConfiguration<TMeta extends ConnectionMeta, E>(
 ): (request?: Request) => ActorConfiguration {
 	return function configuration(request?: Request): ActorConfiguration {
 		const config: ActorConfiguration = {
-			locationHint: "me",
 			sockets: {
 				upgradePath: room.websocketPath
 				// autoResponse removed - we handle ping/pong manually via protocol-encoded messages
