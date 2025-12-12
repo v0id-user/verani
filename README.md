@@ -35,7 +35,7 @@ import { defineRoom, createActorHandler } from "verani";
 
 // Define your room with lifecycle hooks
 export const chatRoom = defineRoom({
-  name: "chat",
+  name: "chatRoom",
   websocketPath: "/chat",
 
   onConnect(ctx) {
@@ -64,13 +64,17 @@ chatRoom.on("chat.message", (ctx, data) => {
   });
 });
 
-// Create the Durable Object class
+// Create the Durable Object class from the room definition
+// Important: Each defineRoom() creates a room definition object.
+// createActorHandler() converts it into a Durable Object class that must be exported.
 export const ChatRoom = createActorHandler(chatRoom);
 ```
 
 ### Wrangler Configuration
 
-**Critical**: Your Durable Object export names in `src/index.ts` **must match** the `class_name` in `wrangler.jsonc`:
+**Critical**: Each `defineRoom()` creates a room definition, and `createActorHandler()` converts it into a Durable Object class. This class **must be exported** and **declared in Wrangler configuration**.
+
+The export name in `src/index.ts` **must match** the `class_name` in `wrangler.jsonc`:
 
 ```jsonc
 {
@@ -91,10 +95,18 @@ export const ChatRoom = createActorHandler(chatRoom);
 }
 ```
 
-The three-way relationship:
-1. **Export** in `src/index.ts`: `export { ChatRoom }`
-2. **Class name** in `wrangler.jsonc`: `"class_name": "ChatRoom"`
-3. **Env binding**: Access via `env.ChatRoom` in your fetch handler
+**Three-way relationship** - these must all align:
+
+1. **Room definition**: `defineRoom({ name: "ChatRoom" })` - The `name` property is optional but recommended for consistency
+2. **Export** in `src/index.ts`: `export const ChatRoom = createActorHandler(chatRoom)` - The export name becomes the class name
+3. **Class name** in `wrangler.jsonc`: `"class_name": "ChatRoom"` - Must match the export name exactly
+
+**Important Notes:**
+- `defineRoom()` returns a room definition object, **not** a Durable Object class
+- `createActorHandler(room)` creates the actual Durable Object class
+- Each room definition must be converted to a class with `createActorHandler()` and exported
+- For multiple rooms, you need multiple exports and multiple bindings in `wrangler.jsonc`
+- The export name (e.g., `ChatRoom`) becomes the class name and must match `class_name` in configuration
 
 ### Client Side
 

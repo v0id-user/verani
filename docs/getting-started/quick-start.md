@@ -9,8 +9,10 @@ Create a file `src/rooms/chat.ts`:
 ```typescript
 import { defineRoom } from "verani";
 
+// defineRoom() creates a room definition object (not a Durable Object class yet)
+// This defines the behavior, lifecycle hooks, and configuration for your room
 export const chatRoom = defineRoom({
-  name: "chat",
+  name: "chat", // Optional: Used for debugging and class name generation
   websocketPath: "/ws", // Optional: WebSocket path (defaults to "/ws")
 
   // Called when a user connects
@@ -104,10 +106,12 @@ Update your `src/index.ts`:
 import { createActorHandler } from "verani";
 import { chatRoom } from "./rooms/chat";
 
-// Create the Durable Object class
+// createActorHandler() converts the room definition into a Durable Object class
+// This is the actual class that Cloudflare Workers will use
 const ChatRoom = createActorHandler(chatRoom);
 
-// Export it - name MUST match wrangler.jsonc class_name
+// Export it - the export name becomes the class name
+// This name MUST match the class_name in wrangler.jsonc
 export { ChatRoom };
 
 // Define environment bindings
@@ -132,7 +136,10 @@ export default {
 };
 ```
 
-**Important**: The export name `ChatRoom` MUST match the `class_name` in your Wrangler configuration.
+**Important**: 
+- The export name `ChatRoom` becomes the Durable Object class name
+- This MUST match the `class_name` in your Wrangler configuration
+- Each `defineRoom()` + `createActorHandler()` creates a separate Durable Object class that must be exported and configured
 
 ## Step 3: Calling Actor Methods via RPC
 
@@ -256,7 +263,7 @@ Update your `wrangler.jsonc`:
   "durable_objects": {
     "bindings": [
       {
-        "class_name": "ChatRoom",  // MUST match export in src/index.ts
+        "class_name": "ChatRoom",  // MUST match export name in src/index.ts
         "name": "CHAT"              // Binding name (env.ChatRoom)
       }
     ]
@@ -271,9 +278,46 @@ Update your `wrangler.jsonc`:
 }
 ```
 
-**Two-way relationship** - these must align:
-1. Export in `src/index.ts`: `export { ChatRoom }`
-2. Class name in config: `"class_name": "ChatRoom"`
+**Three-way relationship** - these must all align:
+
+1. **Room definition**: `defineRoom({ name: "chat" })` - The `name` property is optional but recommended for consistency
+2. **Export** in `src/index.ts`: `export const ChatRoom = createActorHandler(chatRoom)` - The export name becomes the class name
+3. **Class name** in `wrangler.jsonc`: `"class_name": "ChatRoom"` - Must match the export name exactly
+
+**Key Points:**
+- `defineRoom()` creates a room definition object, **not** a Durable Object class
+- `createActorHandler(room)` converts it into the actual Durable Object class
+- Each room definition must be converted with `createActorHandler()` and exported
+- The export name (e.g., `ChatRoom`) becomes the class name and must match `class_name` in configuration
+- For multiple rooms, you need multiple exports and multiple bindings in `wrangler.jsonc`
+
+**Example with multiple rooms:**
+
+```typescript
+// src/index.ts
+export const ChatRoom = createActorHandler(chatRoom);
+export const PresenceRoom = createActorHandler(presenceRoom);
+export const NotificationRoom = createActorHandler(notificationRoom);
+```
+
+```jsonc
+// wrangler.jsonc
+{
+  "durable_objects": {
+    "bindings": [
+      { "class_name": "ChatRoom", "name": "CHAT" },
+      { "class_name": "PresenceRoom", "name": "PRESENCE" },
+      { "class_name": "NotificationRoom", "name": "NOTIFICATIONS" }
+    ]
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["ChatRoom", "PresenceRoom", "NotificationRoom"],
+      "tag": "v1"
+    }
+  ]
+}
+```
 
 **Note**: You access the Actor via `ChatRoom.get(id)` - no namespace binding needed in your code!
 
