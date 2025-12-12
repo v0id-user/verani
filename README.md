@@ -30,7 +30,12 @@ bun add verani @cloudflare/actors
 
 ### Server Side (Cloudflare Worker)
 
+**Suggested folder structure** (optional, for clarity):
+- `src/actors/chat.actor.ts` - Room definitions
+- `src/index.ts` - Export Durable Object classes
+
 ```typescript
+// src/actors/chat.actor.ts
 import { defineRoom, createActorHandler } from "verani";
 
 // Define your room with lifecycle hooks
@@ -67,6 +72,15 @@ chatRoom.on("chat.message", (ctx, data) => {
 // Create the Durable Object class from the room definition
 // Important: Each defineRoom() creates a room definition object.
 // createActorHandler() converts it into a Durable Object class that must be exported.
+export const ChatRoom = createActorHandler(chatRoom);
+```
+
+```typescript
+// src/index.ts
+import { createActorHandler } from "verani";
+import { chatRoom } from "./actors/chat.actor";
+
+// Create and export the Durable Object class
 export const ChatRoom = createActorHandler(chatRoom);
 ```
 

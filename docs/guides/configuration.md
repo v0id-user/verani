@@ -11,7 +11,7 @@ How to configure your Verani application for Cloudflare Workers.
 1. **Export in `src/index.ts`** - The actual Durable Object class:
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
 
 // Create the Durable Object class
 const ChatRoom = createActorHandler(chatRoom);
@@ -97,9 +97,13 @@ Create or update your `wrangler.jsonc`:
 
 In your `src/index.ts`, create and export the Durable Object class:
 
+**Suggested folder structure** (optional, for clarity):
+- `src/actors/chat.actor.ts` - Room definitions
+- `src/index.ts` - Export Durable Object classes
+
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor"; // Adjust import path based on your folder structure
 
 // Create the Durable Object class
 const ChatRoom = createActorHandler(chatRoom);
@@ -131,7 +135,7 @@ You control which Actor instance handles requests by choosing the Actor ID when 
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor";
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };
@@ -155,7 +159,7 @@ export default {
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor";
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };
@@ -180,7 +184,7 @@ export default {
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor";
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };
@@ -261,7 +265,7 @@ script_name = "my-verani-app"  # Must match name field
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor";
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };

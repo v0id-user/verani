@@ -4,7 +4,11 @@ A step-by-step guide to building your first Verani application.
 
 ## Step 1: Create Your First Room
 
-Create a file `src/rooms/chat.ts`:
+**Suggested folder structure** (optional, for clarity):
+- `src/actors/chat.actor.ts` - Room definitions
+- `src/index.ts` - Export Durable Object classes
+
+Create a file `src/actors/chat.actor.ts` (or any location you prefer):
 
 ```typescript
 import { defineRoom } from "verani";
@@ -104,7 +108,7 @@ Update your `src/index.ts`:
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor"; // Adjust import path based on your folder structure
 
 // createActorHandler() converts the room definition into a Durable Object class
 // This is the actual class that Cloudflare Workers will use
