@@ -26,7 +26,9 @@ export const DEFAULT_RECONNECTION_CONFIG: ReconnectionConfig = {
 };
 
 /**
- * Manages WebSocket connection lifecycle and reconnection logic
+ * Manages WebSocket connection lifecycle and reconnection logic.
+ * Tracks connection state transitions, schedules reconnection attempts with exponential backoff,
+ * and validates state transitions to ensure consistency.
  */
 export class ConnectionManager {
   private state: ConnectionState = "disconnected";
@@ -42,14 +44,21 @@ export class ConnectionManager {
   }
 
   /**
-   * Gets the current connection state
+   * Gets the current connection state.
+   *
+   * @returns The current connection state ("connecting", "connected", "disconnected", "reconnecting", or "error")
    */
   getState(): ConnectionState {
     return this.state;
   }
 
   /**
-   * Validates if a state transition is valid
+   * Validates if a state transition is valid.
+   * Ensures that state changes follow a logical flow and prevents invalid transitions.
+   *
+   * @param from - The current state
+   * @param to - The target state
+   * @returns True if the transition is valid, false otherwise
    */
   private isValidStateTransition(from: ConnectionState, to: ConnectionState): boolean {
     // Define valid state transitions
@@ -65,7 +74,11 @@ export class ConnectionManager {
   }
 
   /**
-   * Updates the connection state and notifies listeners
+   * Updates the connection state and notifies listeners.
+   * Validates the state transition and logs warnings for invalid transitions.
+   * Only triggers callbacks if the state actually changes.
+   *
+   * @param newState - The new connection state to transition to
    */
   setState(newState: ConnectionState): void {
     if (this.state !== newState) {
@@ -78,7 +91,7 @@ export class ConnectionManager {
           newState
         );
       }
-      
+
       console.debug("[Verani:Connection] State change:", this.state, "->", newState);
       this.state = newState;
       this.onStateChange?.(newState);
@@ -86,7 +99,9 @@ export class ConnectionManager {
   }
 
   /**
-   * Resets reconnection state (called on successful connection)
+   * Resets reconnection state (called on successful connection).
+   * Clears the reconnection attempt counter and resets the delay to the initial value.
+   * Also cancels any pending reconnection timers.
    */
   resetReconnection(): void {
     console.debug("[Verani:Connection] Resetting reconnection state");
@@ -96,7 +111,12 @@ export class ConnectionManager {
   }
 
   /**
-   * Schedules a reconnection attempt
+   * Schedules a reconnection attempt with exponential backoff.
+   * Checks if reconnection is enabled and if max attempts haven't been reached.
+   * Updates the delay for the next attempt using exponential backoff.
+   *
+   * @param connectFn - Function to call when it's time to reconnect
+   * @returns True if reconnection was scheduled, false if reconnection is disabled or max attempts reached
    */
   scheduleReconnect(connectFn: () => void): boolean {
     // Check if we should attempt reconnection
@@ -133,7 +153,8 @@ export class ConnectionManager {
   }
 
   /**
-   * Cancels any pending reconnection
+   * Cancels any pending reconnection attempt.
+   * Clears the reconnection timer and transitions state from "reconnecting" to "disconnected" if applicable.
    */
   cancelReconnect(): void {
     this.clearReconnectTimer();
@@ -143,7 +164,8 @@ export class ConnectionManager {
   }
 
   /**
-   * Clears the reconnect timer
+   * Clears the reconnect timer if one is set.
+   * Internal helper method used to clean up pending reconnection attempts.
    */
   private clearReconnectTimer(): void {
     if (this.reconnectTimer !== undefined) {
@@ -153,21 +175,27 @@ export class ConnectionManager {
   }
 
   /**
-   * Gets the current reconnection attempt count
+   * Gets the current reconnection attempt count.
+   *
+   * @returns The number of reconnection attempts made so far
    */
   getReconnectAttempts(): number {
     return this.reconnectAttempts;
   }
 
   /**
-   * Gets the next reconnection delay
+   * Gets the next reconnection delay in milliseconds.
+   * This value increases with each attempt due to exponential backoff.
+   *
+   * @returns The delay in milliseconds before the next reconnection attempt
    */
   getNextDelay(): number {
     return this.currentDelay;
   }
 
   /**
-   * Cleanup method
+   * Cleanup method that clears all timers and resources.
+   * Should be called when the ConnectionManager is no longer needed.
    */
   destroy(): void {
     this.clearReconnectTimer();

@@ -9,7 +9,9 @@ import type { ResolvedClientOptions } from "./configuration";
 import type { ConnectionPromiseState, ConnectionTimeoutState, IsConnectingRef } from "../types";
 
 /**
- * Handles WebSocket connection establishment and cleanup
+ * Handles WebSocket connection establishment and cleanup.
+ * Manages the WebSocket lifecycle, connection timeouts, and event handlers.
+ * Tracks connection attempts with unique IDs to prevent race conditions.
  */
 export class ConnectionHandler {
   private ws?: WebSocket;
@@ -40,7 +42,11 @@ export class ConnectionHandler {
   ) {}
 
   /**
-   * Establishes WebSocket connection
+   * Establishes WebSocket connection.
+   * Prevents concurrent connection attempts and sets up event handlers.
+   * Sets a connection timeout and tracks the connection attempt with a unique ID.
+   *
+   * @throws Error if WebSocket creation fails
    */
   connect(): void {
     // Guard: Prevent concurrent connection attempts
@@ -128,7 +134,9 @@ export class ConnectionHandler {
   }
 
   /**
-   * Cleans up existing WebSocket connection and resources
+   * Cleans up existing WebSocket connection and resources.
+   * Stops ping interval, clears connection timeout, and closes the WebSocket if still open.
+   * Clears the instance variable first to prevent event handlers from processing old connection events.
    */
   cleanupWebSocket(): void {
     // Stop ping interval
@@ -157,21 +165,27 @@ export class ConnectionHandler {
   }
 
   /**
-   * Gets the current WebSocket instance
+   * Gets the current WebSocket instance.
+   *
+   * @returns The current WebSocket instance, or undefined if no connection exists
    */
   getWebSocket(): WebSocket | undefined {
     return this.ws;
   }
 
   /**
-   * Gets the current connection ID
+   * Gets the current connection ID.
+   * Connection IDs are incremented with each connection attempt to track concurrent attempts.
+   *
+   * @returns The current connection attempt ID
    */
   getConnectionId(): number {
     return this.connectionId;
   }
 
   /**
-   * Internal handler for connection open
+   * Internal handler for connection open.
+   * Delegates to handleWebSocketOpen and clears the connecting flag.
    */
   private handleOpenInternal(): void {
     handleWebSocketOpen(
@@ -188,7 +202,10 @@ export class ConnectionHandler {
   }
 
   /**
-   * Internal handler for connection errors
+   * Internal handler for connection errors.
+   * Delegates to handleConnectionError to consolidate error handling logic.
+   *
+   * @param error - The error that occurred
    */
   private handleConnectionErrorInternal(error: Error): void {
     handleConnectionError(

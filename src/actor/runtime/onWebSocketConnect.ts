@@ -3,7 +3,17 @@ import type { RoomDefinition, RoomContext, MessageContext, ConnectionMeta, Veran
 import { createSocketEmit } from "./emit";
 
 /**
- * Called when a new WebSocket connection is established
+ * Called when a new WebSocket connection is established.
+ * Extracts metadata from the request, stores it as an attachment for hibernation survival,
+ * calls the user-defined onConnect hook, and adds the session to the sessions map.
+ * If onConnect throws, the connection is closed and no session is created.
+ *
+ * @param actor - The actor instance handling the connection
+ * @param room - The room definition with extractMeta and onConnect hooks
+ * @param ws - The WebSocket connection being established
+ * @param req - The HTTP request that initiated the WebSocket upgrade
+ * @returns Promise that resolves when connection handling is complete
+ * @throws Error if critical connection setup fails (connection is closed on error)
  */
 export async function onWebSocketConnect<TMeta extends ConnectionMeta, E>(
 	actor: VeraniActor<TMeta, E>,

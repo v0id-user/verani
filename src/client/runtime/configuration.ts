@@ -29,7 +29,11 @@ export interface ResolvedClientOptions {
 }
 
 /**
- * Resolves client options with defaults
+ * Resolves client options with defaults.
+ * Merges user-provided options with default values for all configuration properties.
+ *
+ * @param options - Partial client options from the user
+ * @returns Fully resolved client options with all defaults applied
  */
 export function resolveClientOptions(options: VeraniClientOptions): ResolvedClientOptions {
   const reconnectionConfig: ReconnectionConfig = {

@@ -3,7 +3,18 @@ import type { EventEmitter } from "./eventEmitter";
 import type { ConnectionTimeoutState, PartialConnectionPromiseState, IsConnectingRef } from "../types";
 
 /**
- * Handles WebSocket closure
+ * Handles WebSocket closure.
+ * Clears connection state, rejects connection promise, emits lifecycle events,
+ * and schedules reconnection if the close was not clean (code !== 1000 && code !== 1001).
+ *
+ * @param event - The WebSocket close event
+ * @param connectionTimeout - Connection timeout state to clear
+ * @param connectionManager - Connection manager to update state and schedule reconnection
+ * @param connectionPromise - Promise state to reject
+ * @param eventEmitter - Event emitter for lifecycle events
+ * @param connectFn - Function to call for reconnection
+ * @param isConnectingRef - Optional ref to clear connecting flag
+ * @param onCloseCallback - Optional user callback for backward compatibility
  */
 export function handleWebSocketClose(
   event: CloseEvent,

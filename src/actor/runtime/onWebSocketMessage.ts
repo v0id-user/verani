@@ -3,7 +3,16 @@ import type { RoomDefinition, MessageContext, MessageFrame, ConnectionMeta, Vera
 import { createSocketEmit } from "./emit";
 
 /**
- * Called when a message is received from a WebSocket
+ * Called when a message is received from a WebSocket.
+ * Decodes the message frame, handles protocol-level ping/pong messages,
+ * and routes the message to either event handlers (if registered) or the onMessage hook.
+ *
+ * @param actor - The actor instance handling the message
+ * @param room - The room definition with event handlers and onMessage hook
+ * @param ws - The WebSocket connection that received the message
+ * @param raw - Raw message data from the WebSocket
+ * @returns Promise that resolves when message handling is complete
+ * @throws Error if message processing fails (error handler is called if defined)
  */
 export async function onWebSocketMessage<TMeta extends ConnectionMeta, E>(
 	actor: VeraniActor<TMeta, E>,

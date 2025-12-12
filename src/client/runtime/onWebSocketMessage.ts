@@ -3,7 +3,13 @@ import type { KeepaliveManager } from "./keepalive";
 import type { EventEmitter } from "./eventEmitter";
 
 /**
- * Handles incoming WebSocket messages
+ * Handles incoming WebSocket messages.
+ * Decodes the message, handles protocol-level pong responses for keepalive,
+ * and dispatches application events to registered listeners.
+ *
+ * @param ev - The WebSocket message event
+ * @param keepalive - Keepalive manager to record pong responses
+ * @param eventEmitter - Event emitter to dispatch events to listeners
  */
 export function handleWebSocketMessage(
   ev: MessageEvent,

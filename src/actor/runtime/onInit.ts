@@ -2,8 +2,14 @@ import { restoreSessions } from "../attachment";
 import type { RoomDefinition, ConnectionMeta, VeraniActor } from "../types";
 
 /**
- * Called when the Actor initializes or wakes from hibernation
- * Restores sessions from WebSocket attachments
+ * Called when the Actor initializes or wakes from hibernation.
+ * Restores sessions from WebSocket attachments and rebuilds event handlers from static storage.
+ * This function is called automatically by the actor runtime and should not be called directly.
+ *
+ * @param actor - The actor instance to initialize
+ * @param room - The room definition containing event handlers and hooks
+ * @returns Promise that resolves when initialization is complete
+ * @throws Error if critical initialization steps fail (individual failures are logged)
  */
 export async function onInit<TMeta extends ConnectionMeta, E>(
 	actor: VeraniActor<TMeta, E>,

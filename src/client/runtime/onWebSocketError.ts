@@ -3,7 +3,16 @@ import type { EventEmitter } from "./eventEmitter";
 import type { ConnectionTimeoutState, PartialConnectionPromiseState, IsConnectingRef } from "../types";
 
 /**
- * Handles WebSocket errors
+ * Handles WebSocket errors.
+ * Clears connection state, emits error lifecycle event, calls user callback,
+ * and delegates to handleConnectionError for reconnection logic.
+ *
+ * @param error - The WebSocket error event
+ * @param connectionTimeout - Connection timeout state to clear
+ * @param eventEmitter - Event emitter for lifecycle events
+ * @param handleConnectionErrorFn - Function to handle connection errors and schedule reconnection
+ * @param isConnectingRef - Optional ref to clear connecting flag
+ * @param onErrorCallback - Optional user callback for backward compatibility
  */
 export function handleWebSocketError(
   error: Event,
@@ -33,7 +42,17 @@ export function handleWebSocketError(
 }
 
 /**
- * Handles connection errors
+ * Handles connection errors.
+ * Clears connection state, rejects connection promise, emits error lifecycle event,
+ * and schedules reconnection if enabled.
+ *
+ * @param error - The connection error
+ * @param connectionTimeout - Connection timeout state to clear
+ * @param connectionPromise - Promise state to reject
+ * @param connectionManager - Connection manager to schedule reconnection
+ * @param eventEmitter - Event emitter for lifecycle events
+ * @param connectFn - Function to call for reconnection
+ * @param isConnectingRef - Optional ref to clear connecting flag
  */
 export function handleConnectionError(
   error: Error,

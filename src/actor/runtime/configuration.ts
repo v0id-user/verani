@@ -2,8 +2,17 @@ import type { ActorConfiguration } from "@cloudflare/actors";
 import type { RoomDefinition, ConnectionMeta } from "../types";
 
 /**
- * Static configuration method for Cloudflare Actors
- * Specifies WebSocket upgrade path and other options
+ * Creates the static configuration method for Cloudflare Actors.
+ * Specifies the WebSocket upgrade path and other actor configuration options.
+ * This function returns a configuration function that is used by Cloudflare's Actor runtime.
+ *
+ * @param room - The room definition containing the websocketPath
+ * @returns A configuration function that returns ActorConfiguration
+ * @example
+ * ```typescript
+ * static configuration = createConfiguration(room);
+ * // Returns: { sockets: { upgradePath: "/ws" } }
+ * ```
  */
 export function createConfiguration<TMeta extends ConnectionMeta, E>(
 	room: RoomDefinition<TMeta, E>

@@ -3,9 +3,17 @@ import { createRoomEventEmitter } from "./runtime/eventEmitter";
 
 
 /**
- * Default metadata extraction function
+ * Default metadata extraction function.
+ * Generates random UUIDs for userId and clientId, and extracts channels from query parameters.
+ * Falls back to ["default"] channel if no channels are specified in the URL.
+ *
  * @param req - The incoming WebSocket upgrade request
- * @returns Connection metadata with userId, clientId, and default channels
+ * @returns Connection metadata with userId, clientId, and channels array
+ * @example
+ * ```typescript
+ * // URL: /ws?channels=chat,notifications
+ * // Returns: { userId: "uuid", clientId: "uuid", channels: ["chat", "notifications"] }
+ * ```
  */
 function defaultExtractMeta(req: Request): ConnectionMeta {
   console.debug("[Verani:Router] Extracting metadata from request:", req.url);
@@ -49,9 +57,25 @@ export interface RoomDefinitionWithHandlers<TMeta extends ConnectionMeta = Conne
 }
 
 /**
- * Defines a room with lifecycle hooks and metadata extraction
- * @param def - Room definition with optional hooks
+ * Defines a room with lifecycle hooks and metadata extraction.
+ * Creates a normalized room definition with default values and socket.io-like event handler methods.
+ * The returned room object supports `.on()` and `.off()` methods for event handling.
+ *
+ * @param def - Room definition with optional hooks, state, and configuration
  * @returns Normalized room definition with defaults and socket.io-like event handler methods
+ * @example
+ * ```typescript
+ * const room = defineRoom({
+ *   websocketPath: "/ws",
+ *   onConnect: (ctx) => console.log("User connected:", ctx.meta.userId),
+ *   onMessage: (ctx, frame) => console.log("Message:", frame.type)
+ * });
+ *
+ * // Register event handlers
+ * room.on("chat", (ctx, data) => {
+ *   ctx.emit.emit("message", data);
+ * });
+ * ```
  */
 export function defineRoom<
   TMeta extends ConnectionMeta = ConnectionMeta,

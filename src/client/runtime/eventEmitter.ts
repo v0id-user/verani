@@ -1,11 +1,17 @@
 /**
- * Manages event listeners and lifecycle events
+ * Manages event listeners and lifecycle events for the Verani client.
+ * Provides methods to register, remove, and dispatch events.
+ * Supports both regular event listeners and one-time listeners.
  */
 export class EventEmitter {
   private listeners = new Map<string, Set<(data: any) => void>>();
 
   /**
-   * Registers an event listener
+   * Registers an event listener that will be called whenever the event is dispatched.
+   * Multiple listeners can be registered for the same event.
+   *
+   * @param event - Event type to listen for
+   * @param callback - Callback function to invoke when event is received
    */
   on(event: string, callback: (data: any) => void): void {
     if (!this.listeners.has(event)) {
@@ -15,7 +21,11 @@ export class EventEmitter {
   }
 
   /**
-   * Removes an event listener
+   * Removes an event listener.
+   * If the callback is not found, this method does nothing.
+   *
+   * @param event - Event type to remove listener from
+   * @param callback - Callback function to remove (must be the same function reference)
    */
   off(event: string, callback: (data: any) => void): void {
     const set = this.listeners.get(event);
@@ -28,7 +38,11 @@ export class EventEmitter {
   }
 
   /**
-   * Registers a one-time event listener
+   * Registers a one-time event listener that will be called only once.
+   * The listener is automatically removed after being called.
+   *
+   * @param event - Event type to listen for
+   * @param callback - Callback function to invoke once
    */
   once(event: string, callback: (data: any) => void): void {
     const wrapper = (data: any) => {
@@ -39,7 +53,12 @@ export class EventEmitter {
   }
 
   /**
-   * Emits a lifecycle event to registered listeners
+   * Emits a lifecycle event to registered listeners.
+   * Lifecycle events include "connecting", "connected", "disconnected", "reconnecting", "error", etc.
+   * Errors in listeners are caught and logged but do not prevent other listeners from being called.
+   *
+   * @param event - Lifecycle event name
+   * @param data - Optional event data to pass to listeners
    */
   emitLifecycleEvent(event: string, data?: any): void {
     const set = this.listeners.get(event);
@@ -56,7 +75,12 @@ export class EventEmitter {
   }
 
   /**
-   * Dispatches an event to registered listeners
+   * Dispatches an event to registered listeners.
+   * This is used for application-level events (not lifecycle events).
+   * Errors in listeners are caught and logged but do not prevent other listeners from being called.
+   *
+   * @param eventType - Event type name
+   * @param eventData - Event data to pass to listeners
    */
   dispatch(eventType: string, eventData: any): void {
     const set = this.listeners.get(eventType);
@@ -76,7 +100,8 @@ export class EventEmitter {
   }
 
   /**
-   * Clears all listeners
+   * Clears all event listeners.
+   * Should be called during cleanup to prevent memory leaks.
    */
   clear(): void {
     this.listeners.clear();

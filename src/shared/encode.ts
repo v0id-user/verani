@@ -1,10 +1,12 @@
 import type { MessageFrame } from "./types";
 
 /**
- * Encodes a message frame to JSON string for transmission
+ * Encodes a message frame to JSON string for transmission over WebSocket.
+ * This is the core encoding function used by both client and server.
+ *
  * @param frame - The message frame to encode
  * @returns JSON string representation of the frame
- * @throws Error if encoding fails
+ * @throws Error if JSON serialization fails
  */
 export function encodeFrame(frame: MessageFrame): string {
   console.debug("[Verani:Encode] Encoding frame:", { type: frame.type, hasChannel: !!frame.channel, hasData: !!frame.data });
@@ -20,7 +22,9 @@ export function encodeFrame(frame: MessageFrame): string {
 }
 
 /**
- * Encodes a client message to JSON string
+ * Encodes a client message to JSON string.
+ * Alias for encodeFrame, provided for semantic clarity when encoding client messages.
+ *
  * @param message - The client message to encode
  * @returns JSON string representation
  */
@@ -29,7 +33,9 @@ export function encodeClientMessage(message: MessageFrame): string {
 }
 
 /**
- * Encodes a server message to JSON string
+ * Encodes a server message to JSON string.
+ * Alias for encodeFrame, provided for semantic clarity when encoding server messages.
+ *
  * @param message - The server message to encode
  * @returns JSON string representation
  */

@@ -1,12 +1,15 @@
 import type { DocumentLike } from "../types";
 
 /**
- * Environment-aware Page Visibility API wrapper
- * Detects when browser tab becomes visible/invisible and provides callbacks
+ * Environment-aware Page Visibility API wrapper.
+ * Detects when browser tab becomes visible/invisible and provides callbacks.
+ * Works in browser environments and gracefully handles non-browser environments.
  */
 
 /**
- * Type guard to check if we're in a browser environment with document API
+ * Type guard to check if we're in a browser environment with document API.
+ *
+ * @returns True if running in a browser environment with Page Visibility API support
  */
 function isBrowserEnvironment(): boolean {
   return (
@@ -19,7 +22,9 @@ function isBrowserEnvironment(): boolean {
 }
 
 /**
- * Gets the document object if in browser environment
+ * Gets the document object if in browser environment.
+ *
+ * @returns Document object if in browser, null otherwise
  */
 function getDocument(): DocumentLike | null {
   if (isBrowserEnvironment() && "document" in globalThis) {
@@ -29,7 +34,10 @@ function getDocument(): DocumentLike | null {
 }
 
 /**
- * Gets the current visibility state
+ * Gets the current visibility state.
+ * In non-browser environments, assumes the page is always visible.
+ *
+ * @returns True if the page is visible, false if hidden
  */
 function isPageVisible(): boolean {
   const doc = getDocument();
@@ -71,7 +79,10 @@ export function onVisibilityChange(callback: (isVisible: boolean) => void): (() 
 }
 
 /**
- * Gets the current page visibility state
+ * Gets the current page visibility state.
+ * Public API for checking if the browser tab is currently visible.
+ *
+ * @returns True if the page is visible, false if hidden (or true in non-browser environments)
  */
 export function getVisibilityState(): boolean {
   return isPageVisible();

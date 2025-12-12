@@ -35,12 +35,28 @@ export function isValidConnectionMeta(meta: any): meta is ConnectionMeta {
   return true;
 }
 
-// Get the cloudflare actor's WebSocket attachment
+/**
+ * Stores connection metadata as a WebSocket attachment for hibernation survival.
+ * This allows the actor to restore session information when it wakes from hibernation.
+ *
+ * @param ws - The WebSocket connection to attach metadata to
+ * @param meta - Connection metadata containing userId, clientId, and channels
+ * @throws Error if serialization fails
+ */
 export function storeAttachment(ws: WebSocket, meta: ConnectionMeta) {
   console.debug("[Verani:Attachment][storeAttachment] Storing attachment:", { userId: meta.userId, clientId: meta.clientId, channels: meta.channels });
   ws.serializeAttachment(meta);
 }
 
+/**
+ * Restores WebSocket sessions from hibernation by deserializing attachments.
+ * Only restores sessions that are in OPEN state and have valid metadata.
+ * Sessions with invalid or missing metadata are skipped.
+ *
+ * @param actor - The actor instance with a sessions Map and ctx.getWebSockets() method
+ * @returns void - Sessions are added directly to actor.sessions Map
+ * @throws Error if deserialization fails critically (individual failures are logged and skipped)
+ */
 export function restoreSessions(actor: any) {
   console.debug("[Verani:Attachment][restoreSessions] Restoring sessions from hibernation");
   let restoredCount = 0;

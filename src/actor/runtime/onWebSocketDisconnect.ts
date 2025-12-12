@@ -2,7 +2,15 @@ import type { RoomDefinition, RoomContext, MessageContext, ConnectionMeta, Veran
 import { createSocketEmit } from "./emit";
 
 /**
- * Called when a WebSocket connection is closed
+ * Called when a WebSocket connection is closed.
+ * Removes the session from the sessions map and calls the user-defined onDisconnect hook.
+ * The session is removed before calling onDisconnect to ensure cleanup happens even if the hook throws.
+ *
+ * @param actor - The actor instance handling the disconnection
+ * @param room - The room definition with onDisconnect hook
+ * @param ws - The WebSocket connection that was closed
+ * @returns Promise that resolves when disconnection handling is complete
+ * @throws Error if disconnection handling fails (errors are logged but not propagated)
  */
 export async function onWebSocketDisconnect<TMeta extends ConnectionMeta, E>(
 	actor: VeraniActor<TMeta, E>,

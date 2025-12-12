@@ -3,7 +3,9 @@ import type { ResolvedClientOptions } from "./configuration";
 import { onVisibilityChange } from "./browserVisibility";
 
 /**
- * Manages ping/pong keepalive for WebSocket connections
+ * Manages ping/pong keepalive for WebSocket connections.
+ * Sends periodic ping messages and monitors pong responses to detect connection failures.
+ * Automatically resyncs ping interval when the browser tab becomes visible.
  */
 export class KeepaliveManager {
   private pingInterval?: number;
@@ -18,7 +20,10 @@ export class KeepaliveManager {
   ) {}
 
   /**
-   * Starts the ping interval to keep the connection alive
+   * Starts the ping interval to keep the connection alive.
+   * Sends ping messages at the configured interval and monitors for pong responses.
+   * Sets up a visibility change listener to resync ping when the page becomes visible.
+   * Does nothing if ping is disabled (pingInterval === 0) or already running.
    */
   startPingInterval(): void {
     // Don't start if ping is disabled or already running
@@ -65,8 +70,10 @@ export class KeepaliveManager {
   }
 
   /**
-   * Resyncs the ping interval by stopping and restarting it
-   * Also sends an immediate ping to check connection health
+   * Resyncs the ping interval by stopping and restarting it.
+   * Also sends an immediate ping to check connection health.
+   * This is typically called when the browser tab becomes visible after being hidden.
+   * Does nothing if the WebSocket is not in OPEN state.
    */
   resyncPingInterval(): void {
     const ws = this.getWebSocket();
@@ -121,7 +128,9 @@ export class KeepaliveManager {
   }
 
   /**
-   * Stops the ping interval
+   * Stops the ping interval and cleans up resources.
+   * Clears the ping interval timer, pong timeout timer, and visibility change listener.
+   * Should be called when the connection is closed or during cleanup.
    */
   stopPingInterval(): void {
     if (this.pingInterval !== undefined) {
@@ -143,7 +152,9 @@ export class KeepaliveManager {
   }
 
   /**
-   * Records that a pong was received
+   * Records that a pong was received.
+   * Updates the timestamp used to detect pong timeouts.
+   * Should be called whenever a pong message is received from the server.
    */
   recordPong(): void {
     this.lastPongReceived = Date.now();

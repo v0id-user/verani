@@ -1,7 +1,13 @@
 import type { RoomEventEmitter, EventHandler, MessageContext, ConnectionMeta } from "../types";
 
 /**
- * Room-level event emitter for socket.io-like event handling
+ * Room-level event emitter for socket.io-like event handling.
+ * Manages event handlers that survive actor hibernation by storing them in static storage.
+ * Supports wildcard "*" handlers that receive all events.
+ *
+ * @template TMeta - Connection metadata type
+ * @template E - Environment type
+ * @template TState - Room state type
  */
 export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>>
 	implements RoomEventEmitter<TMeta, E, TState> {
@@ -88,9 +94,11 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 	}
 
 	/**
-	 * Check if there are any handlers for a given event
-	 * @param event - Event name
-	 * @returns True if handlers exist for the event or wildcard
+	 * Check if there are any handlers registered for a given event.
+	 * Returns true if handlers exist for the specific event or for the wildcard "*" event.
+	 *
+	 * @param event - Event name to check
+	 * @returns True if handlers exist for the event or wildcard, false otherwise
 	 */
 	hasHandlers(event: string): boolean {
 		return (
@@ -100,8 +108,10 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 	}
 
 	/**
-	 * Get all registered event names
-	 * @returns Array of event names
+	 * Get all registered event names.
+	 * Returns an array of all event names that have at least one handler registered.
+	 *
+	 * @returns Array of event names (excluding wildcard "*" if present)
 	 */
 	getEventNames(): string[] {
 		return Array.from(this.handlers.keys());
@@ -125,7 +135,13 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 }
 
 /**
- * Create a new room event emitter instance
+ * Create a new room event emitter instance.
+ * Factory function that creates a RoomEventEmitterImpl instance.
+ *
+ * @template TMeta - Connection metadata type
+ * @template E - Environment type
+ * @template TState - Room state type
+ * @returns A new RoomEventEmitter instance
  */
 export function createRoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>>(): RoomEventEmitter<TMeta, E, TState> {
 	return new RoomEventEmitterImpl<TMeta, E, TState>();

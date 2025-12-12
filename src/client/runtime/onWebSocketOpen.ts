@@ -5,7 +5,18 @@ import type { EventEmitter } from "./eventEmitter";
 import type { ConnectionTimeoutState, ConnectionPromiseState } from "../types";
 
 /**
- * Handles successful WebSocket connection
+ * Handles successful WebSocket connection.
+ * Clears connection timeout, updates connection state, starts keepalive ping,
+ * flushes queued messages, resolves connection promise, and emits lifecycle events.
+ *
+ * @param connectionTimeout - Connection timeout state to clear
+ * @param connectionManager - Connection manager to update state
+ * @param keepalive - Keepalive manager to start ping interval
+ * @param messageQueue - Message queue to flush
+ * @param ws - The WebSocket connection that opened
+ * @param connectionPromise - Promise state to resolve
+ * @param eventEmitter - Event emitter for lifecycle events
+ * @param onOpenCallback - Optional user callback for backward compatibility
  */
 export function handleWebSocketOpen(
   connectionTimeout: ConnectionTimeoutState,

@@ -12,7 +12,14 @@ import { broadcast as broadcastImpl } from "./broadcast";
 import { sendToUser as sendToUserImpl } from "./sendToUser";
 
 /**
- * Creates an emit builder that targets a specific user
+ * Creates an emit builder that targets a specific user.
+ * Messages sent through this builder will be delivered to all sessions belonging to the user
+ * that are subscribed to the specified channel.
+ *
+ * @param userId - The user ID to target
+ * @param sessions - Map of WebSocket sessions
+ * @param defaultChannel - The channel to send messages to
+ * @returns EmitBuilder instance with emit() method
  */
 function createUserEmitBuilder<TMeta extends ConnectionMeta, E>(
 	userId: string,
@@ -30,7 +37,14 @@ function createUserEmitBuilder<TMeta extends ConnectionMeta, E>(
 }
 
 /**
- * Creates an emit builder that targets a specific channel
+ * Creates an emit builder that targets a specific channel.
+ * Messages sent through this builder will be broadcast to all connections subscribed to the channel,
+ * with optional filtering by userIds, clientIds, or exclusion of specific WebSockets.
+ *
+ * @param channel - The channel name to broadcast to
+ * @param sessions - Map of WebSocket sessions
+ * @param opts - Optional broadcast options for filtering (userIds, clientIds, except)
+ * @returns EmitBuilder instance with emit() method
  */
 function createChannelEmitBuilder<TMeta extends ConnectionMeta, E>(
 	channel: string,

@@ -3,6 +3,7 @@ import type { RoomDefinition, ConnectionMeta } from "../types";
 /**
  * Type representing an actor instance with the methods needed for fetch handling.
  * Uses method signatures without visibility constraints to allow accessing protected methods.
+ * This interface is used internally to type-check actor instances passed to createFetch.
  */
 export interface ActorInstanceWithFetchMethods {
 	shouldUpgradeWebSocket(request: Request): Promise<boolean>;
@@ -11,8 +12,14 @@ export interface ActorInstanceWithFetchMethods {
 }
 
 /**
- * Creates the fetch method for the actor class
- * Handles WebSocket upgrade requests
+ * Creates the fetch method for the actor class.
+ * Handles WebSocket upgrade requests by checking the path and Upgrade header,
+ * then delegating to shouldUpgradeWebSocket and onWebSocketUpgrade if appropriate.
+ * Non-WebSocket requests are passed to onRequest.
+ *
+ * @param room - The room definition containing the websocketPath
+ * @param actorInstance - The actor instance with WebSocket upgrade methods
+ * @returns A fetch function that handles HTTP requests and WebSocket upgrades
  */
 export function createFetch<TMeta extends ConnectionMeta, E>(
 	room: RoomDefinition<TMeta, E>,
