@@ -30,7 +30,7 @@ export const notificationsRoom = defineRoom({
 
 ```typescript
 import { createActorHandler } from "verani";
-import { notificationsRoom } from "./rooms/notifications";
+import { notificationsRoom } from "./actors/notifications.actor"; // Suggested: src/actors/ folder (optional)
 
 const NotificationsRoom = createActorHandler(notificationsRoom);
 export { NotificationsRoom };
@@ -120,7 +120,7 @@ Send announcements to all users in a channel:
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };
@@ -195,7 +195,7 @@ Call Actor methods from other Actors:
 
 ```typescript
 import { createActorHandler } from "verani";
-import { otherRoom } from "./rooms/other";
+import { otherRoom } from "./actors/other.actor"; // Suggested: src/actors/ folder (optional)
 
 const OtherRoom = createActorHandler(otherRoom);
 export { OtherRoom };

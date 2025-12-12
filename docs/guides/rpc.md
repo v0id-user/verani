@@ -12,7 +12,7 @@ When using RPC methods (calling Actor methods from Workers or other Actors), kee
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };

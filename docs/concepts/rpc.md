@@ -57,7 +57,7 @@ Since Actors are Durable Objects, you can call their methods remotely from Worke
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };
