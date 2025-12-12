@@ -160,7 +160,7 @@ Update your `src/index.ts` to add an HTTP endpoint that sends messages via RPC:
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor"; // Adjust import path based on your folder structure
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };

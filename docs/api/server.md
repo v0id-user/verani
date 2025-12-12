@@ -785,7 +785,7 @@ The Actor stub interface provides remote access to Actor methods from Workers or
 **Getting a stub:**
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };
@@ -857,7 +857,7 @@ const sentCount = await stub.emitToUser("alice", "notification", {
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };
@@ -1020,7 +1020,7 @@ console.log(`Cleaned up ${cleaned} stale sessions`);
 
 ```typescript
 import { createActorHandler } from "verani";
-import { chatRoom } from "./rooms/chat";
+import { chatRoom } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
 
 const ChatRoom = createActorHandler(chatRoom);
 export { ChatRoom };
