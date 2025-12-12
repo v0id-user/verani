@@ -253,6 +253,7 @@ export const CounterActor = createActorHandler(counterRoom);
 
 ## Related Documentation
 
+- [Server API - State Persistence](../api/server.md#state-persistence)
 - [State Management](./state-management.md) - Overview of state types
 - [Hibernation](./hibernation.md) - How hibernation affects state
 - [Lifecycle](./lifecycle.md) - When hooks are called

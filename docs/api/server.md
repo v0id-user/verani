@@ -282,6 +282,87 @@ const room = defineRoom({
 
 **See:** [Event Handlers](#event-handlers) section below for usage.
 
+### State Persistence
+
+Verani provides declarative state persistence that automatically saves and restores room state across Actor hibernation.
+
+#### `state?: TState`
+
+Initial state for the room. This object defines the default values for your room's state. Access via `actor.roomState` in lifecycle hooks.
+
+**Type:** `Record<string, unknown>`
+
+**Example:**
+
+```typescript
+export const chatRoom = defineRoom({
+  state: {
+    messageCount: 0,
+    lastActivity: null as Date | null,
+    settings: { maxUsers: 100 }
+  },
+  // ... other properties
+});
+```
+
+#### `persistedKeys?: (string & keyof TState)[]`
+
+Keys from `state` to persist to Durable Object storage. If empty or undefined, no state is persisted. Changes to these keys are automatically saved and restored on hibernation wake.
+
+**Example:**
+
+```typescript
+export const chatRoom = defineRoom({
+  state: {
+    messageCount: 0,
+    lastActivity: null as Date | null,
+    settings: { maxUsers: 100 }
+  },
+  persistedKeys: ["messageCount", "settings"], // Only these keys are persisted
+  // ... other properties
+});
+```
+
+#### `persistOptions?: SafePersistOptions`
+
+Options for state persistence behavior.
+
+**Properties:**
+- `shallow?: boolean` - If true, only track top-level property changes (default: `true`)
+- `throwOnError?: boolean` - If true, throw errors instead of swallowing them (default: `true`)
+
+**Example:**
+
+```typescript
+export const chatRoom = defineRoom({
+  state: { /* ... */ },
+  persistedKeys: ["messageCount"],
+  persistOptions: {
+    shallow: true,
+    throwOnError: false
+  }
+});
+```
+
+#### `onPersistError?(key: string, error: Error): void`
+
+Called when persistence fails for a key. Use this to handle errors gracefully (e.g., notify admins, fallback behavior).
+
+**Example:**
+
+```typescript
+export const chatRoom = defineRoom({
+  state: { /* ... */ },
+  persistedKeys: ["messageCount"],
+  onPersistError(key, error) {
+    console.error(`Failed to persist "${key}":`, error);
+    // Maybe notify monitoring service, fallback to cache, etc.
+  }
+});
+```
+
+**See:** [State Persistence Concepts](../concepts/persistence.md) for complete documentation and examples.
+
 ---
 
 ## `RoomContext<TMeta>`
@@ -579,6 +660,51 @@ The client automatically unwraps these messages and dispatches them as events.
 ## `VeraniActor`
 
 The Actor instance with Verani-specific methods.
+
+### `roomState: TState`
+
+User-defined persisted state for this actor. Access this after `onInit` completes. Changes to tracked keys (specified in `persistedKeys`) are automatically persisted.
+
+**Type:** `Record<string, unknown>` (or custom `TState` type)
+
+**Example:**
+
+```typescript
+onConnect(ctx) {
+  // Access persisted state - fully typed!
+  ctx.actor.roomState.messageCount++;
+  console.log(`Total messages: ${ctx.actor.roomState.messageCount}`);
+  
+  // State changes are automatically persisted
+  ctx.actor.roomState.lastActivity = new Date();
+}
+```
+
+**Important:**
+- State is only available after `onInit` completes
+- Use `actor.isStateReady()` to check if state is initialized
+- Only keys in `persistedKeys` are persisted
+- Changes to persisted keys are automatically saved
+
+**See:** [State Persistence Concepts](../concepts/persistence.md) for complete documentation.
+
+### `isStateReady(): boolean`
+
+Check if the persisted state has been initialized. Returns `true` after `onInit` completes and state is loaded from storage.
+
+**Example:**
+
+```typescript
+onConnect(ctx) {
+  if (!ctx.actor.isStateReady()) {
+    // State not ready yet, wait or use default values
+    return;
+  }
+  
+  // Safe to access roomState
+  console.log(ctx.actor.roomState.messageCount);
+}
+```
 
 ### `emit: ActorEmit`
 
