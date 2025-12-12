@@ -2,6 +2,8 @@
 
 A step-by-step guide to building your first Verani application.
 
+**Prerequisites**: If you don't have a Cloudflare Worker project yet, create one first using [C3 (create-cloudflare)](https://developers.cloudflare.com/pages/get-started/c3/). See the [Installation Guide](./installation.md) for details.
+
 ## Step 1: Create Your First Room
 
 **Suggested folder structure** (optional, for clarity):

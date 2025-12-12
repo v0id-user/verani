@@ -28,6 +28,15 @@ npm install verani @cloudflare/actors
 bun add verani @cloudflare/actors
 ```
 
+**Don't have a Cloudflare Worker project yet?** Create one using [C3 (create-cloudflare)](https://developers.cloudflare.com/pages/get-started/c3/):
+
+```bash
+npm create cloudflare@latest my-verani-app
+cd my-verani-app
+```
+
+This creates a new Cloudflare Worker project ready for Verani. Choose "Hello World" or "Common" template when prompted.
+
 ### Server Side (Cloudflare Worker)
 
 **Suggested folder structure** (optional, for clarity):
