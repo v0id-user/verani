@@ -181,6 +181,9 @@ Verani handles Cloudflare's hibernation automatically:
 - **[Concepts](./docs/concepts/)** - Architecture, hibernation, and core concepts
 - **[Security](./docs/security/)** - Authentication, authorization, and best practices
 
+## More Examples
+**[Vchats](https://github.com/v0id-user/vchats)** - A simple chat application built with Verani
+
 ## Features
 
 ### Server (Actor) Side
