@@ -75,7 +75,7 @@ When using state persistence:
 - **Batch updates**: Multiple state changes trigger multiple persistence operations
 
 ```typescript
-// ✅ Good: Only persist meaningful state
+// Good: Only persist meaningful state
 state: {
   messageCount: 0,        // Persist this
   settings: { maxUsers: 100 } // Persist this
@@ -83,7 +83,7 @@ state: {
 },
 persistedKeys: ["messageCount", "settings"],
 
-// ✅ Good: Batch state updates when possible
+// Good: Batch state updates when possible
 ctx.actor.roomState.messageCount++;
 ctx.actor.roomState.lastActivity = new Date();
 // Both persisted, but consider batching if doing many updates

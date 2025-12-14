@@ -19,7 +19,7 @@ async function main() {
 
   // Handle counter sync (initial state)
   client.on("counter:sync", (data) => {
-    console.log(`[Counter Client] 📊 Current count: ${data.count}`);
+    console.log(`[Counter Client] Current count: ${data.count}`);
     if (data.lastUpdatedBy) {
       console.log(`[Counter Client]    Last updated by: ${data.lastUpdatedBy}`);
     }
@@ -39,7 +39,7 @@ async function main() {
   try {
     // Wait for connection (client auto-connects in constructor)
     await client.waitForConnection();
-    console.log("[Counter Client] ✅ Connected");
+    console.log("[Counter Client] Connected");
 
     // Wait for initial sync
     await new Promise((resolve) => {
@@ -79,15 +79,15 @@ async function main() {
     client.emit("counter:increment", { amount: 3 });
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    console.log("[Counter Client] ✅ Demo complete. Counter state persists across hibernation!");
+    console.log("[Counter Client] Demo complete. Counter state persists across hibernation!");
     console.log("[Counter Client]    Disconnect and reconnect to see the persisted value.");
 
     // Disconnect after a moment
     await new Promise((resolve) => setTimeout(resolve, 1000));
     client.disconnect();
-    console.log("[Counter Client] 👋 Disconnected");
+    console.log("[Counter Client] Disconnected");
   } catch (err) {
-    console.log(`[Counter Client] ❌ Error: ${err}`);
+    console.log(`[Counter Client] Error: ${err}`);
   }
 }
 

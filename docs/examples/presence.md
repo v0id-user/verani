@@ -1,6 +1,6 @@
 # User Presence
 
-🔓 **Public** - Track who is online and notify on join/leave with consistent state management.
+**Public** - Track who is online and notify on join/leave with consistent state management.
 
 **Key Features:**
 - Durable storage for consistent presence tracking
@@ -388,13 +388,13 @@ client.emit("presence.list", {});
 Without transactions, rapid connect/disconnect events can cause race conditions:
 
 ```typescript
-// ❌ Race condition - device count can be wrong
+// Race condition - device count can be wrong
 const user = await storage.get(key);
 const newCount = user.deviceCount + 1;
 await storage.put(key, { ...user, deviceCount: newCount });
 // Another connection could have changed deviceCount between get and put!
 
-// ✅ Atomic - always consistent
+// Atomic - always consistent
 await storage.transaction(async (txn) => {
   const user = await txn.get(key);
   await txn.put(key, { ...user, deviceCount: user.deviceCount + 1 });

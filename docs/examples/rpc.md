@@ -1,6 +1,6 @@
 # Sending Messages via RPC
 
-🔒 **Authenticated** - Send messages to users from HTTP endpoints or other Workers
+**Authenticated** - Send messages to users from HTTP endpoints or other Workers
 
 Since Actors are Durable Objects, you can call their methods remotely using RPC. This is perfect for sending notifications from REST APIs, webhooks, or scheduled tasks.
 

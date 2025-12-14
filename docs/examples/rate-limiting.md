@@ -1,6 +1,6 @@
 # Rate Limiting
 
-🔓 **Public** - Limit messages per user to prevent spam.
+**Public** - Limit messages per user to prevent spam.
 
 ```typescript
 import { defineRoom } from "verani";

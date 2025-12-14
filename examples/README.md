@@ -38,7 +38,7 @@ bun run examples/clients/presence-client.ts
 
 Each instance generates a random username and displays a live presence dashboard.
 
-### 🔔 Notifications Feed
+### Notifications Feed
 **Server**: `/notifications` (WebSocket) | **Client**: `notifications-client.ts`
 
 Personal notification stream with:
@@ -311,42 +311,42 @@ client.emit("your.action", { /* data */ });
 
 ### Core Verani Features (Server-Side)
 
-✅ **Connection Lifecycle**
+**Connection Lifecycle**
 - `onConnect`, `onMessage`, `onDisconnect` hooks
 - Connection metadata extraction
 - Session management
 
-✅ **Broadcasting**
+**Broadcasting**
 - Broadcast to all connections
 - Broadcast with filters (`except`, `userIds`)
 - Channel-based routing
 
-✅ **Hibernation Support**
+**Hibernation Support**
 - WebSocket attachment persistence
 - Session restoration on wake
 - Automatic state recovery
 
-✅ **Multi-Device Support**
+**Multi-Device Support**
 - Same user, multiple connections
 - Device tracking
 - Cross-device synchronization
 
 ### SDK Features (Client-Side)
 
-✅ **VeraniClient Usage**
+**VeraniClient Usage**
 - WebSocket connection management
 - Event-based message handling (`on`, `emit`, `once`, `off`)
 - Automatic reconnection with exponential backoff
 - Connection state tracking (`connecting`, `connected`, `disconnected`)
 - Message queueing when disconnected
 
-✅ **Lifecycle Callbacks**
+**Lifecycle Callbacks**
 - `onOpen()` - Called when connection is established
 - `onClose()` - Called when connection closes
 - `onError()` - Called on connection errors
 - `onStateChange()` - Called on state transitions
 
-✅ **Best Practices**
+**Best Practices**
 - Try-catch around user hooks
 - Generic error messages to clients
 - Detailed server logging

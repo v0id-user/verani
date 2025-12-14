@@ -110,12 +110,12 @@ async function main() {
 
   // Setup lifecycle callbacks
   client.onOpen(() => {
-    console.log(`${colors.green}✓ Connected!${colors.reset}\n`);
+    console.log(`${colors.green}Connected!${colors.reset}\n`);
 
     // Send some demo messages
     setTimeout(() => {
       console.log(`${colors.dim}[Sending demo messages...]${colors.reset}`);
-      client.emit("chat.message", { text: "Hello everyone! 👋" });
+      client.emit("chat.message", { text: "Hello everyone!" });
     }, 1000);
 
     setTimeout(() => {
@@ -128,18 +128,18 @@ async function main() {
   });
 
   client.onClose((event) => {
-    console.log(`\n${colors.red}✗ Disconnected: ${event.reason || "Unknown reason"}${colors.reset}`);
+    console.log(`\n${colors.red}Disconnected: ${event.reason || "Unknown reason"}${colors.reset}`);
   });
 
   client.onError((error) => {
-    console.error(`${colors.red}✗ Error:${colors.reset}`, error);
+    console.error(`${colors.red}Error:${colors.reset}`, error);
   });
 
   client.onStateChange((connectionState) => {
     if (connectionState === "connecting") {
-      console.log(`${colors.yellow}⟳ Reconnecting...${colors.reset}`);
+      console.log(`${colors.yellow}Reconnecting...${colors.reset}`);
     } else if (connectionState === "connected") {
-      console.log(`${colors.green}✓ Reconnected!${colors.reset}`);
+      console.log(`${colors.green}Reconnected!${colors.reset}`);
     }
   });
 

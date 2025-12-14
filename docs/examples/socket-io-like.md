@@ -316,12 +316,12 @@ room.on("ping", (ctx, data) => {
 ### 1. Use Event Handlers for Clear Separation
 
 ```typescript
-// ✅ Good: Clear event-based structure
+// Good: Clear event-based structure
 room.on("user.join", handleUserJoin);
 room.on("user.leave", handleUserLeave);
 room.on("message.send", handleMessageSend);
 
-// ❌ Avoid: Everything in onMessage
+// Avoid: Everything in onMessage
 onMessage(ctx, frame) {
   if (frame.type === "user.join") { /* ... */ }
   else if (frame.type === "user.leave") { /* ... */ }
@@ -332,11 +332,11 @@ onMessage(ctx, frame) {
 ### 2. Use Emit API for Consistency
 
 ```typescript
-// ✅ Good: Using emit API
+// Good: Using emit API
 ctx.emit.to(userId).emit("notification", data);
 ctx.actor.emit.to("default").emit("update", data);
 
-// ❌ Less consistent: Mixing APIs
+// Less consistent: Mixing APIs
 ctx.actor.sendToUser(userId, "default", data);
 ctx.actor.broadcast("default", data);
 ```

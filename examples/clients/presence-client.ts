@@ -172,7 +172,7 @@ function render() {
 function showNotification(message: string, type: "info" | "success" = "info") {
   clearScreen();
   render();
-  const icon = type === "success" ? "✓" : "ℹ";
+  const icon = type === "success" ? "[+]" : "[i]";
   const color = type === "success" ? colors.green : colors.blue;
   // Pretty notification box
   const banner = `${color}${colors.bright}┏${"━".repeat(message.length+8)}┓${colors.reset}
@@ -219,19 +219,19 @@ async function main() {
 
   client.onClose((event) => {
     clearScreen();
-    console.log(`${colors.red}✗ Disconnected: ${event.reason || "Unknown reason"}${colors.reset}`);
+    console.log(`${colors.red}Disconnected: ${event.reason || "Unknown reason"}${colors.reset}`);
   });
 
   client.onError((error) => {
     clearScreen();
-    console.error(`${colors.red}✗ Error:${colors.reset}`, error);
+    console.error(`${colors.red}Error:${colors.reset}`, error);
   });
 
   client.onStateChange((connectionState) => {
     if (connectionState === "connecting") {
       clearScreen();
       render();
-      console.log(`${colors.yellow}⟳ Reconnecting...${colors.reset}`);
+      console.log(`${colors.yellow}Reconnecting...${colors.reset}`);
     } else if (connectionState === "connected") {
       clearScreen();
       render();

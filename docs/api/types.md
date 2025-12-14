@@ -109,7 +109,7 @@ const room = defineRoom<CustomMeta>({ /* ... */ });
 room.on("chat.message", (ctx, data) => {
   // ctx is typed as MessageContext<CustomMeta, E>
   // ctx.meta has type CustomMeta with all custom properties
-  console.log(ctx.meta.username); // ✅ Type-safe access
+  console.log(ctx.meta.username); // Type-safe access
 });
 ```
 
@@ -175,14 +175,14 @@ interface RpcBroadcastOptions {
 ```typescript
 // Inside lifecycle hook - can use except
 ctx.actor.broadcast("default", data, {
-  except: ctx.ws,           // ✅ Available
+  except: ctx.ws,           // Available
   userIds: ["alice", "bob"]
 });
 
 // Via RPC - use RpcBroadcastOptions
 await stub.broadcast("default", data, {
-  except: ctx.ws,           // ❌ Not available - WebSocket can't be serialized
-  userIds: ["alice", "bob"] // ✅ Available
+  except: ctx.ws,           // Not available - WebSocket can't be serialized
+  userIds: ["alice", "bob"] // Available
 });
 ```
 

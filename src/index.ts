@@ -106,18 +106,18 @@ function getInfoPage(): string {
 	</div>
 
 	<div class="example">
-		<h3>🔢 Persistent Counter</h3>
+		<h3>Persistent Counter</h3>
 		<pre><code>bun run examples/persistence/counter-client.ts</code></pre>
 		<p>Demonstrates state persistence across Actor hibernation. Counter value survives server restarts!</p>
 	</div>
 
 	<div class="example">
-		<h3>🔔 Notifications Feed</h3>
+		<h3>Notifications Feed</h3>
 		<pre><code>bun run examples/clients/notifications-client.ts</code></pre>
 		<p>Personal notification stream with read/unread tracking and multi-device sync. Each instance uses a random username.</p>
 	</div>
 
-	<h2>🔗 WebSocket Endpoints</h2>
+	<h2>WebSocket Endpoints</h2>
 	<ul>
 		<li><code>/ws/chat</code> - Chat room endpoint</li>
 		<li><code>/ws/presence</code> - Presence tracking endpoint</li>
@@ -125,14 +125,14 @@ function getInfoPage(): string {
 		<li><code>/ws/notifications</code> - Notifications feed endpoint (requires userId param)</li>
 	</ul>
 
-	<h2>📚 Documentation</h2>
+	<h2>Documentation</h2>
 	<ul>
 		<li><a href="https://github.com/v0id-user/verani">GitHub Repository</a></li>
 		<li>Examples README: <code>examples/README.md</code></li>
 		<li>API Documentation: <code>docs/API.md</code></li>
 	</ul>
 
-	<h2>🛠️ Development</h2>
+	<h2>Development</h2>
 	<p>Make sure to run <code>wrangler dev</code> to start the server before running clients.</p>
 	<p>Default development URL: <strong>http://localhost:8787</strong></p>
 </body>

@@ -70,15 +70,15 @@ function clearScreen() {
 function getNotificationDisplay(type: string): { icon: string; color: string } {
   switch (type) {
     case "info":
-      return { icon: "ℹ️ ", color: colors.blue };
+      return { icon: "[i]", color: colors.blue };
     case "success":
-      return { icon: "✅", color: colors.green };
+      return { icon: "[+]", color: colors.green };
     case "warning":
-      return { icon: "⚠️ ", color: colors.yellow };
+      return { icon: "[!]", color: colors.yellow };
     case "error":
-      return { icon: "❌", color: colors.red };
+      return { icon: "[x]", color: colors.red };
     default:
-      return { icon: "📬", color: colors.gray };
+      return { icon: "[*]", color: colors.gray };
   }
 }
 
@@ -102,7 +102,7 @@ function formatTime(timestamp: number): string {
 function render() {
   clearScreen();
 
-  console.log(`${colors.bright}${colors.magenta}🔔 Notifications Feed${colors.reset}`);
+  console.log(`${colors.bright}${colors.magenta}Notifications Feed${colors.reset}`);
   console.log(`${colors.gray}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}\n`);
 
   // Header
@@ -190,7 +190,7 @@ async function main() {
   state.userId = username;
 
   clearScreen();
-  console.log(`${colors.bright}🔔 Notifications Client${colors.reset}`);
+  console.log(`${colors.bright}Notifications Client${colors.reset}`);
   console.log(`${colors.gray}Connecting as ${username}...${colors.reset}\n`);
 
   // Build WebSocket URL
@@ -235,17 +235,17 @@ async function main() {
 
   client.onClose((event) => {
     clearScreen();
-    console.log(`${colors.red}✗ Disconnected: ${event.reason || "Unknown reason"}${colors.reset}`);
+    console.log(`${colors.red}Disconnected: ${event.reason || "Unknown reason"}${colors.reset}`);
   });
 
   client.onError((error) => {
-    console.error(`${colors.red}✗ Error:${colors.reset}`, error);
+    console.error(`${colors.red}Error:${colors.reset}`, error);
   });
 
   client.onStateChange((connectionState) => {
     if (connectionState === "connecting") {
       clearScreen();
-      console.log(`${colors.yellow}⟳ Reconnecting...${colors.reset}`);
+      console.log(`${colors.yellow}Reconnecting...${colors.reset}`);
     } else if (connectionState === "connected") {
       render();
     }
@@ -281,14 +281,14 @@ async function main() {
       notif.read = true;
     }
     render();
-    console.log(`${colors.green}✓ All notifications marked as read${colors.reset}`);
+    console.log(`${colors.green}All notifications marked as read${colors.reset}`);
   });
 
   // Handle notification deleted
   client.on("notification.deleted", (data: { notificationId: string }) => {
     state.notifications.delete(data.notificationId);
     render();
-    console.log(`${colors.green}✓ Notification deleted${colors.reset}`);
+    console.log(`${colors.green}Notification deleted${colors.reset}`);
   });
 
   // Handle device connected/disconnected

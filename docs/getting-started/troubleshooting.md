@@ -20,11 +20,11 @@ Common issues and quick fixes.
 
 **"Method not found"**
 ```typescript
-// ✅ Correct
+// Correct
 const stub = ChatRoom.get("room-id");
 await stub.sendToUser("alice", "default", data);
 
-// ❌ Wrong - can't call directly on class
+// Wrong - can't call directly on class
 await ChatRoom.sendToUser(...);
 ```
 

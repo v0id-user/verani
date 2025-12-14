@@ -2,7 +2,7 @@
 
 Demonstrates how to persist room state across Actor hibernation using Verani's declarative persistence API.
 
-🔓 **Public** - No authentication required
+**Public** - No authentication required
 
 ## Overview
 
@@ -156,13 +156,13 @@ Keys not in this array are ephemeral (reset on hibernation wake).
 State is fully typed based on your definition:
 
 ```typescript
-// ✅ Typed as number
+// Typed as number
 ctx.actor.roomState.count += 1;
 
-// ✅ Typed as string | null
+// Typed as string | null
 ctx.actor.roomState.lastUpdatedBy = ctx.meta.userId;
 
-// ❌ Type error - property doesn't exist
+// Type error - property doesn't exist
 ctx.actor.roomState.foo;
 ```
 
@@ -212,17 +212,17 @@ onPersistError(key, error) {
 
 ## What Gets Persisted?
 
-- ✅ Values in `persistedKeys` array
-- ✅ Primitives (string, number, boolean, null)
-- ✅ Objects and arrays
-- ✅ Special types: Date, Map, Set, RegExp
+- Values in `persistedKeys` array
+- Primitives (string, number, boolean, null)
+- Objects and arrays
+- Special types: Date, Map, Set, RegExp
 
 ## What Doesn't Get Persisted?
 
-- ❌ Keys not in `persistedKeys` array
-- ❌ Functions
-- ❌ Symbols
-- ❌ Circular references (detected and warned)
+- Keys not in `persistedKeys` array
+- Functions
+- Symbols
+- Circular references (detected and warned)
 
 ## Related Documentation
 

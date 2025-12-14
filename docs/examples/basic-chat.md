@@ -1,6 +1,6 @@
 # Basic Chat Room
 
-🔒 **Authenticated** - Token-based authentication required
+**Authenticated** - Token-based authentication required
 
 A chat room example with authentication, message broadcasting, typing indicators, and online user tracking.
 

@@ -49,11 +49,11 @@ bun run examples/persistence/counter-client.ts
 ### 3. Try It Out
 
 ```
-🔢 Persistent Counter Client
+Persistent Counter Client
 ============================
 
-✅ Connected!
-📊 Current count: 0
+Connected!
+Current count: 0
 
 Commands:
   +       Increment by 1
@@ -74,7 +74,7 @@ Commands:
 ✨ Count updated to 5 by user-abc123
 
 > q
-👋 Goodbye!
+Goodbye!
 ```
 
 ## Testing Persistence

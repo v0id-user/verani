@@ -1,6 +1,6 @@
 # Authentication (JWT)
 
-🔒 **Authenticated** - JWT token verification required
+**Authenticated** - JWT token verification required
 
 This example shows how to properly verify user identity using JWT tokens.
 

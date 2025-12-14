@@ -96,18 +96,18 @@ The contract enforces correct usage at compile time:
 ```typescript
 const room = createTypedRoom(chatContract, { ... });
 
-// ✅ Server can emit serverEvents
+// Server can emit serverEvents
 ctx.emit("chat.message", { from: "alice", text: "Hello" });
 
-// ✅ Server can listen to clientEvents
+// Server can listen to clientEvents
 room.on("message.send", (ctx, data) => {
   // data.text is typed as string
 });
 
-// ❌ TypeScript Error: Server can't emit clientEvents
+// TypeScript Error: Server can't emit clientEvents
 ctx.emit("message.send", { text: "Hello" });
 
-// ❌ TypeScript Error: Server can't listen to serverEvents
+// TypeScript Error: Server can't listen to serverEvents
 room.on("chat.message", (ctx, data) => { });
 ```
 
@@ -116,18 +116,18 @@ room.on("chat.message", (ctx, data) => { });
 ```typescript
 const client = createTypedClient(chatContract, url);
 
-// ✅ Client can listen to serverEvents
+// Client can listen to serverEvents
 client.on("chat.message", (data) => {
   // data.from and data.text are typed
 });
 
-// ✅ Client can emit clientEvents
+// Client can emit clientEvents
 client.emit("message.send", { text: "Hello" });
 
-// ❌ TypeScript Error: Client can't listen to clientEvents
+// TypeScript Error: Client can't listen to clientEvents
 client.on("message.send", (data) => { });
 
-// ❌ TypeScript Error: Client can't emit serverEvents
+// TypeScript Error: Client can't emit serverEvents
 client.emit("chat.message", { from: "me", text: "Hello" });
 ```
 

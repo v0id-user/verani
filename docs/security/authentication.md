@@ -17,12 +17,12 @@ export const publicRoom = defineRoom({
 });
 ```
 
-**⚠️ Security Risks:**
+**Security Risks:**
 - Users can impersonate anyone
 - No accountability
 - Vulnerable to abuse
 
-**✅ Use for:**
+**Use for:**
 - Public demos
 - Anonymous chat rooms
 - Read-only public feeds

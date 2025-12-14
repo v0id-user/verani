@@ -84,11 +84,11 @@ const msg = await ctx.actor.getStorage().get("lastMessage");
 
 | State Type | Survives Hibernation | Access |
 |------------|---------------------|--------|
-| Connection Metadata | ✅ Yes | `ctx.meta` |
-| Ephemeral Actor State | ❌ No | Class properties |
-| Handler Definitions | ✅ Yes | `room.on()` |
-| Persisted Room State | ✅ Yes | `ctx.actor.roomState` |
-| Manual Durable Storage | ✅ Yes | `ctx.actor.getStorage()` |
+| Connection Metadata | Yes | `ctx.meta` |
+| Ephemeral Actor State | No | Class properties |
+| Handler Definitions | Yes | `room.on()` |
+| Persisted Room State | Yes | `ctx.actor.roomState` |
+| Manual Durable Storage | Yes | `ctx.actor.getStorage()` |
 
 ## Related Documentation
 

@@ -25,7 +25,7 @@ restoreSessions(actor);
 
 ## What Gets Lost vs What Persists
 
-### Lost After Hibernation ❌
+### Lost After Hibernation
 
 - **In-memory Maps** (like `sessions` Map - but restored automatically)
 - **Dynamic closures** created at runtime
@@ -33,7 +33,7 @@ restoreSessions(actor);
 - **Runtime-generated handlers** that depend on instance state
 - **Any closure that captures `this`** or instance-specific state
 
-### Persists Across Hibernation ✅
+### Persists Across Hibernation
 
 - **WebSocket attachments** (metadata stored via `storeAttachment`)
 - **Static handler definitions** registered via `room.on()`
@@ -74,12 +74,12 @@ room.on("user.typing", (ctx, data) => {
 
 **This is similar to Express/Elysia/Fastify routing** - routes are code-defined, not runtime-generated, so they survive restarts and hibernation.
 
-### What NOT to Do ❌
+### What NOT to Do
 
 Don't create dynamic handlers that depend on instance state:
 
 ```typescript
-// ❌ BAD: Handler closure captures instance state
+// BAD: Handler closure captures instance state
 class MyActor {
   constructor() {
     this.cache = new Map();
@@ -97,7 +97,7 @@ class MyActor {
 Instead, use static handlers:
 
 ```typescript
-// ✅ GOOD: Static handler definition
+// GOOD: Static handler definition
 const room = defineRoom({ /* ... */ });
 
 room.on("event", (ctx, data) => {

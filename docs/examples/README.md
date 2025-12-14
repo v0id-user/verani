@@ -5,22 +5,22 @@ Common usage patterns and recipes for Verani.
 ## Authentication Note
 
 Examples marked with:
-- 🔓 **Public** - No authentication required (anyone can connect)
-- 🔒 **Authenticated** - Requires token verification
-- 🔐 **Authorized** - Requires authentication + role/permission checks
+- **Public** - No authentication required (anyone can connect)
+- **Authenticated** - Requires token verification
+- **Authorized** - Requires authentication + role/permission checks
 
 **For production apps**, always use authenticated examples. See [Security Guide - Authentication](../security/authentication.md) for implementation details.
 
 ## Examples
 
-- [Basic Chat Room](./basic-chat.md) 🔓 - Simple chat room example
-- [Socket.io-like API](./socket-io-like.md) 🔓 - Event handlers and emit API
-- [Channels](./channels.md) 🔓 - Custom WebSocket paths and multiple channels
-- [User Presence](./presence.md) 🔓 - Track who is online
-- [State Persistence](./persistence.md) 🔓 - Persist room state across hibernation
-- [Authentication](./authentication.md) 🔒 - JWT token verification
-- [Rate Limiting](./rate-limiting.md) 🔓 - Prevent spam with rate limits
-- [RPC](./rpc.md) 🔒 - Send messages via Remote Procedure Calls
+- [Basic Chat Room](./basic-chat.md) - Simple chat room example
+- [Socket.io-like API](./socket-io-like.md) - Event handlers and emit API
+- [Channels](./channels.md) - Custom WebSocket paths and multiple channels
+- [User Presence](./presence.md) - Track who is online
+- [State Persistence](./persistence.md) - Persist room state across hibernation
+- [Authentication](./authentication.md) - JWT token verification
+- [Rate Limiting](./rate-limiting.md) - Prevent spam with rate limits
+- [RPC](./rpc.md) - Send messages via Remote Procedure Calls
 
 ## Related Documentation
 

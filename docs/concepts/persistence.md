@@ -183,9 +183,9 @@ Values are JSON-serialized with special handling for:
 
 ```typescript
 state: {
-  createdAt: new Date(),           // ✅ Works
-  userSet: new Set<string>(),      // ✅ Works
-  config: new Map([["key", "val"]]) // ✅ Works
+  createdAt: new Date(),           // Works
+  userSet: new Set<string>(),      // Works
+  config: new Map([["key", "val"]]) // Works
 }
 ```
 

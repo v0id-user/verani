@@ -63,15 +63,15 @@ These constraints keep Verani simple and predictable.
 ## When to Use Verani
 
 **Use Verani when:**
-- ✅ You're on Cloudflare Workers/Pages
-- ✅ You want Socket.io-like simplicity
-- ✅ You need automatic hibernation handling
-- ✅ Your rooms are independent
+- You're on Cloudflare Workers/Pages
+- You want Socket.io-like simplicity
+- You need automatic hibernation handling
+- Your rooms are independent
 
 **Consider alternatives when:**
-- ❌ You need cross-room messaging (use Cloudflare Pub/Sub)
-- ❌ You need guaranteed ordering (use queues)
-- ❌ You're not on Cloudflare (use Socket.io, Ably, etc.)
+- You need cross-room messaging (use Cloudflare Pub/Sub)
+- You need guaranteed ordering (use queues)
+- You're not on Cloudflare (use Socket.io, Ably, etc.)
 
 ## Related
 

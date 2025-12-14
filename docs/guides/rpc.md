@@ -45,21 +45,21 @@ await stub.sendToUser("alice", "default", data);
 **2. Always await RPC calls:**
 
 ```typescript
-// ✅ Correct
+// Correct
 const count = await stub.getSessionCount();
 
-// ❌ Wrong
+// Wrong
 const count = stub.getSessionCount();
 ```
 
 **3. Use stub, not class:**
 
 ```typescript
-// ✅ Correct
+// Correct
 const stub = ChatRoom.get("room-id");
 await stub.sendToUser(...);
 
-// ❌ Wrong
+// Wrong
 await ChatRoom.sendToUser(...);
 ```
 
@@ -83,13 +83,13 @@ try {
 - Cache actor state queries
 
 ```typescript
-// ✅ Good: Parallel
+// Good: Parallel
 const [count, userIds] = await Promise.all([
   stub.getSessionCount(),
   stub.getConnectedUserIds()
 ]);
 
-// ❌ Bad: Sequential
+// Bad: Sequential
 const count = await stub.getSessionCount();
 const userIds = await stub.getConnectedUserIds();
 ```

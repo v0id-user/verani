@@ -1,6 +1,6 @@
 # Channels
 
-🔓 **Public** - Configure custom WebSocket endpoint paths and multiple channels
+**Public** - Configure custom WebSocket endpoint paths and multiple channels
 
 ## Custom WebSocket Paths
 
