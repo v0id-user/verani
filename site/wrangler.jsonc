@@ -1,0 +1,9 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "verani-docs",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-06-01",
+	"assets": {
+		"directory": "public"
+	}
+}

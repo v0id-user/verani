@@ -1,0 +1,22 @@
+{
+  "name": "verani-docs-site",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build:docs": "bun run scripts/build-docs.ts",
+    "dev": "bun run build:docs && wrangler dev",
+    "deploy": "bun run build:docs && wrangler deploy",
+    "start": "wrangler dev"
+  },
+  "dependencies": {
+    "elysia": "^1.4.0",
+    "marked": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/marked": "^6.0.0",
+    "typescript": "^5.0.0",
+    "@types/bun": "latest",
+    "wrangler": "^3.0.0"
+  },
+  "private": true
+}

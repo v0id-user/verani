@@ -1,0 +1,187 @@
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+body {
+	font-family: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace;
+	background-color: #000;
+	color: #fff;
+	line-height: 1.6;
+}
+
+.container {
+	display: flex;
+	min-height: 100vh;
+}
+
+.sidebar {
+	width: 280px;
+	background-color: #000;
+	border-right: 1px solid #333;
+	padding: 20px;
+	position: fixed;
+	height: 100vh;
+	overflow-y: auto;
+}
+
+.nav-header {
+	margin-bottom: 30px;
+	padding-bottom: 20px;
+	border-bottom: 1px solid #333;
+}
+
+.nav-header h1 {
+	font-size: 24px;
+	font-weight: normal;
+	color: #fff;
+}
+
+.nav-list {
+	list-style: none;
+}
+
+.nav-list li {
+	margin-bottom: 8px;
+}
+
+.nav-list a {
+	color: #fff;
+	text-decoration: none;
+	display: block;
+	padding: 6px 0;
+	transition: opacity 0.2s;
+}
+
+.nav-list a:hover {
+	opacity: 0.7;
+}
+
+.nav-list li.active > a {
+	font-weight: bold;
+}
+
+.nav-sublist {
+	list-style: none;
+	margin-left: 16px;
+	margin-top: 4px;
+}
+
+.content {
+	margin-left: 280px;
+	flex: 1;
+	padding: 40px;
+	max-width: 900px;
+}
+
+.doc-content {
+	color: #fff;
+}
+
+.doc-content h1 {
+	font-size: 32px;
+	margin-bottom: 24px;
+	font-weight: normal;
+	border-bottom: 1px solid #333;
+	padding-bottom: 16px;
+}
+
+.doc-content h2 {
+	font-size: 24px;
+	margin-top: 32px;
+	margin-bottom: 16px;
+	font-weight: normal;
+	border-bottom: 1px solid #333;
+	padding-bottom: 8px;
+}
+
+.doc-content h3 {
+	font-size: 20px;
+	margin-top: 24px;
+	margin-bottom: 12px;
+	font-weight: normal;
+}
+
+.doc-content h4 {
+	font-size: 16px;
+	margin-top: 20px;
+	margin-bottom: 10px;
+	font-weight: normal;
+}
+
+.doc-content p {
+	margin-bottom: 16px;
+}
+
+.doc-content ul,
+.doc-content ol {
+	margin-bottom: 16px;
+	margin-left: 24px;
+}
+
+.doc-content li {
+	margin-bottom: 8px;
+}
+
+.doc-content a {
+	color: #fff;
+	text-decoration: underline;
+}
+
+.doc-content a:hover {
+	opacity: 0.7;
+}
+
+.doc-content code {
+	background-color: #1a1a1a;
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-size: 0.9em;
+}
+
+.doc-content pre {
+	background-color: #1a1a1a;
+	padding: 16px;
+	border-radius: 4px;
+	overflow-x: auto;
+	margin-bottom: 16px;
+	border: 1px solid #333;
+}
+
+.doc-content pre code {
+	background-color: transparent;
+	padding: 0;
+}
+
+.doc-content blockquote {
+	border-left: 3px solid #333;
+	padding-left: 16px;
+	margin-left: 0;
+	margin-bottom: 16px;
+	color: #ccc;
+}
+
+.doc-content table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 16px;
+}
+
+.doc-content th,
+.doc-content td {
+	border: 1px solid #333;
+	padding: 8px 12px;
+	text-align: left;
+}
+
+.doc-content th {
+	background-color: #1a1a1a;
+	font-weight: normal;
+}
+
+.doc-content hr {
+	border: none;
+	border-top: 1px solid #333;
+	margin: 32px 0;
+}
