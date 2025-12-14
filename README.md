@@ -4,111 +4,121 @@
 
 [![MADE BY #V0ID](https://img.shields.io/badge/MADE%20BY%20%23V0ID-F3EEE1.svg?style=for-the-badge)](https://github.com/v0id-user)
 
+**Build realtime apps on Cloudflare with Socket.io-like simplicity**
+
+[Getting Started](#quick-start) • [Documentation](./docs/) • [Examples](./examples/)
+
 </div>
 
-> A simple, focused realtime SDK for Cloudflare Actors with Socket.io-like semantics
+Verani brings the familiar developer experience of Socket.io to Cloudflare's Durable Objects (Actors), with proper hibernation support and minimal overhead. Build realtime chat, presence systems, notifications, and more—all running on Cloudflare's edge.
 
-Verani brings the familiar developer experience of Socket.io to Cloudflare's Durable Objects (Actors), with proper hibernation support and minimal overhead.
+## ✨ Why Verani?
 
-## Why Verani?
+- **🎯 Familiar API**: If you've used Socket.io, you already know how to use Verani
+- **💤 Hibernation Support**: Properly handles Cloudflare Actor hibernation out of the box
+- **🔒 Type Safe**: Built with TypeScript, full type safety throughout
+- **🧠 Simple Mental Model**: Rooms, channels, and broadcast semantics that just make sense
+- **⚡ Modern DX**: Automatic reconnection, error handling, and connection lifecycle management
+- **🌍 Edge-Ready**: Built for Cloudflare Workers and Durable Objects
 
-- **Familiar API**: If you've used Socket.io, you already know how to use Verani
-- **Hibernation Support**: Properly handles Cloudflare Actor hibernation out of the box
-- **Type Safe**: Built with TypeScript, full type safety throughout
-- **Simple Mental Model**: Rooms, channels, and broadcast semantics that just make sense
-- **Modern DX**: Automatic reconnection, error handling, and connection lifecycle management
+## 🚀 Quick Start
 
-## Quick Start
+Get a realtime chat app running in 5 minutes.
 
-### Installation
+### Step 1: Install
 
 ```bash
 npm install verani @cloudflare/actors
-# or
-bun add verani @cloudflare/actors
 ```
 
-**Don't have a Cloudflare Worker project yet?** Create one using [C3 (create-cloudflare)](https://developers.cloudflare.com/pages/get-started/c3/):
+**Don't have a Cloudflare Worker project?** Create one:
 
 ```bash
 npm create cloudflare@latest my-verani-app
 cd my-verani-app
+npm install verani @cloudflare/actors
 ```
 
-This creates a new Cloudflare Worker project ready for Verani. Choose "Hello World" or "Common" template when prompted.
+### Step 2: Create Your Room
 
-### Server Side (Cloudflare Worker)
-
-**Suggested folder structure** (optional, for clarity):
-- `src/actors/chat.actor.ts` - Room definitions
-- `src/index.ts` - Export Durable Object classes
+Create `src/actors/chat.actor.ts`:
 
 ```typescript
-// src/actors/chat.actor.ts
-import { defineRoom, createActorHandler } from "verani";
+import { defineRoom } from "verani";
 
-// Define your room with lifecycle hooks
 export const chatRoom = defineRoom({
-  name: "chatRoom",
-  websocketPath: "/chat",
-
   onConnect(ctx) {
-    console.log(`User ${ctx.meta.userId} connected`);
-    // Use emit API (socket.io-like)
+    // Notify others when someone joins
     ctx.actor.emit.to("default").emit("user.joined", {
       userId: ctx.meta.userId
     });
   },
 
   onDisconnect(ctx) {
-    console.log(`User ${ctx.meta.userId} disconnected`);
+    // Notify others when someone leaves
     ctx.actor.emit.to("default").emit("user.left", {
       userId: ctx.meta.userId
     });
   }
 });
 
-// Register event handlers (socket.io-like, recommended)
+// Handle messages (socket.io-like API)
 chatRoom.on("chat.message", (ctx, data) => {
-  // Broadcast to all in default channel
+  // Broadcast to everyone in the "default" channel
   ctx.actor.emit.to("default").emit("chat.message", {
     from: ctx.meta.userId,
     text: data.text,
     timestamp: Date.now()
   });
 });
-
-// Create the Durable Object class from the room definition
-// Important: Each defineRoom() creates a room definition object.
-// createActorHandler() converts it into a Durable Object class that must be exported.
-export const ChatRoom = createActorHandler(chatRoom);
 ```
 
+### Step 3: Wire Up Your Worker
+
+Update `src/index.ts`:
+
 ```typescript
-// src/index.ts
 import { createActorHandler } from "verani";
 import { chatRoom } from "./actors/chat.actor";
 
-// Create and export the Durable Object class
+// Convert room definition to Durable Object class
 export const ChatRoom = createActorHandler(chatRoom);
+
+// Route WebSocket connections
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const url = new URL(request.url);
+    
+    if (url.pathname.startsWith("/ws")) {
+      // Get or create the Actor instance
+      const stub = ChatRoom.get("chat-room");
+      return stub.fetch(request);
+    }
+    
+    return new Response("Not Found", { status: 404 });
+  }
+};
 ```
 
-### Wrangler Configuration
+### Step 4: Configure Wrangler
 
-**Critical**: Each `defineRoom()` creates a room definition, and `createActorHandler()` converts it into a Durable Object class. This class **must be exported** and **declared in Wrangler configuration**.
-
-The export name in `src/index.ts` **must match** the `class_name` in `wrangler.jsonc`:
+Update `wrangler.jsonc`:
 
 ```jsonc
 {
+  "name": "my-verani-app",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+  
   "durable_objects": {
     "bindings": [
       {
-        "class_name": "ChatRoom",  // Must match export name
-        "name": "ChatRoom"              // Binding name in env
+        "class_name": "ChatRoom",  // Must match export name above
+        "name": "CHAT"              // Binding name (used internally by Cloudflare)
       }
     ]
   },
+  
   "migrations": [
     {
       "new_sqlite_classes": ["ChatRoom"],
@@ -118,35 +128,14 @@ The export name in `src/index.ts` **must match** the `class_name` in `wrangler.j
 }
 ```
 
-**Three-way relationship** - these must all align:
+**Important**: The export name `ChatRoom` must match `class_name` in `wrangler.jsonc`.
 
-1. **Room definition**: `defineRoom({ name: "ChatRoom" })` - The `name` property is optional but recommended for consistency
-2. **Export** in `src/index.ts`: `export const ChatRoom = createActorHandler(chatRoom)` - The export name becomes the class name
-3. **Class name** in `wrangler.jsonc`: `"class_name": "ChatRoom"` - Must match the export name exactly
-
-**Important Notes:**
-- `defineRoom()` returns a room definition object, **not** a Durable Object class
-- `createActorHandler(room)` creates the actual Durable Object class
-- Each room definition must be converted to a class with `createActorHandler()` and exported
-- For multiple rooms, you need multiple exports and multiple bindings in `wrangler.jsonc`
-- The export name (e.g., `ChatRoom`) becomes the class name and must match `class_name` in configuration
-
-### Client Side
+### Step 5: Build Your Client
 
 ```typescript
-import { VeraniClient } from "verani";
+import { VeraniClient } from "verani/client";
 
-// Connect to your Cloudflare Worker with ping/pong keepalive
-const client = new VeraniClient("wss://your-worker.dev/ws?userId=alice", {
-  pingInterval: 5000,  // Send ping every 5 seconds
-  pongTimeout: 5000,  // Expect pong within 5 seconds
-  reconnection: {
-    enabled: true,
-    maxAttempts: 10,
-    initialDelay: 1000,
-    maxDelay: 30000
-  }
-});
+const client = new VeraniClient("ws://localhost:8787/ws?userId=alice");
 
 // Listen for messages
 client.on("chat.message", (data) => {
@@ -154,60 +143,33 @@ client.on("chat.message", (data) => {
 });
 
 client.on("user.joined", (data) => {
-  console.log(`User ${data.userId} joined`);
+  console.log(`User ${data.userId} joined!`);
 });
 
 // Send messages
 client.emit("chat.message", { text: "Hello, world!" });
 
-// Handle connection lifecycle
-client.onOpen(() => {
-  console.log("Connected!");
-});
-
-client.onStateChange((state) => {
-  console.log("Connection state:", state);
-});
-
-// Wait for connection before sending
+// Wait for connection (optional)
 await client.waitForConnection();
-client.emit("ready", {});
 ```
 
-## Key Concepts
+### Step 6: Run It!
 
-### Actors = Rooms
+```bash
+# Start the server
+npm run dev
+# or
+wrangler dev
 
-Each Cloudflare Actor instance represents a **logical container** for realtime communication:
-
-- **Chat room**: All users in the same chat share one Actor
-- **User notifications**: Each user gets their own Actor
-- **Game session**: Each game instance is one Actor
-
-### Channels
-
-Inside an Actor, connections can join **channels** for selective message routing:
-
-```typescript
-// Server: broadcast to specific channel using emit API
-ctx.actor.emit.to("game-updates").emit("update", data);
-
-// Or send to a specific user (all their sessions)
-ctx.emit.to("alice").emit("notification", { message: "Hello!" });
-
-// Client: joins "default" channel automatically
-// You can implement join/leave for custom channels
+# In another terminal, run your client
+# (or open multiple browser tabs with your client code)
 ```
 
-### Hibernation
+**That's it!** You now have a working realtime chat app. 🎉
 
-Verani handles Cloudflare's hibernation automatically:
+**Need more help?** Check out the [Quick Start Guide](./docs/getting-started/quick-start.md) for detailed examples.
 
-- Connection metadata survives hibernation via WebSocket attachments
-- Sessions are restored when the Actor wakes up
-- No manual state management needed
-
-## Documentation
+## 📚 Documentation
 
 - **[Getting Started](./docs/getting-started/)** - Installation and quick start guide
 - **[API Reference](./docs/api/)** - Complete server and client API documentation
@@ -216,91 +178,59 @@ Verani handles Cloudflare's hibernation automatically:
 - **[Concepts](./docs/concepts/)** - Architecture, hibernation, and core concepts
 - **[Security](./docs/security/)** - Authentication, authorization, and best practices
 
-## More Examples
-**[Vchats](https://github.com/v0id-user/vchats)** - A simple chat application built with Verani
+## 🎯 Key Concepts
 
-## Features
+- **Room** = A Durable Object that handles WebSocket connections
+- **Channel** = A group within a room (default: `"default"`)
+- **Emit** = Send messages (`ctx.actor.emit.to("channel").emit("event", data)`)
+- **Hibernation** = Handled automatically, no manual work needed
 
-### Server (Actor) Side
+## ✨ Features
 
-- **Socket.io-like event handlers** - `room.on()` and `room.off()` for clean event handling
-- **Emit API** - `ctx.emit` and `ctx.actor.emit.to()` for intuitive message sending
-- Room-based architecture with lifecycle hooks (`onConnect`, `onDisconnect`, `onHibernationRestore`)
-- WebSocket attachment management for hibernation
-- Selective broadcasting with filters (userIds, clientIds, except)
-- User and client ID tracking
-- **RPC methods** - Call Actor methods remotely from Workers or other Actors
-- Durable Object storage access for persistent state
-- Error boundaries and logging
-- Flexible metadata extraction from requests
+### Server-Side
+- **Socket.io-like API**: `room.on()`, `ctx.actor.emit.to()`, familiar patterns
+- **Lifecycle Hooks**: `onConnect`, `onDisconnect`, `onMessage` for full control
+- **RPC Support**: Call Actor methods directly from Workers
+- **Automatic Hibernation**: Handles Cloudflare Actor hibernation seamlessly
+- **Persistent State**: Built-in support for state that survives hibernation
+- **Type Safety**: Full TypeScript support with type inference
 
-### Client Side
+### Client-Side
+- **Automatic Reconnection**: Exponential backoff with configurable retry logic
+- **Message Queueing**: Messages queued when disconnected, sent on reconnect
+- **Keepalive**: Built-in ping/pong to detect dead connections
+- **Event-Based API**: Familiar `on()`, `emit()`, `once()`, `off()` methods
+- **Connection State**: Track connection lifecycle (`connecting`, `connected`, `disconnected`)
 
-- Automatic reconnection with exponential backoff
-- Connection state management (`getState()`, `getConnectionState()`, `isConnecting`)
-- Message queueing when disconnected
-- Event-based API (on/off/once/emit)
-- Promise-based connection waiting (`waitForConnection()`)
-- Lifecycle callbacks (`onOpen`, `onClose`, `onError`, `onStateChange`)
-- **Ping/pong keepalive** with automatic Page Visibility API resync
-- Configurable connection timeout and queue size
+## 🎮 Try the Examples
 
-### RPC Support
-
-Call Actor methods remotely from Workers or other Actors:
-
-```typescript
-// In your Worker fetch handler
-const stub = ChatRoom.get("room-id");
-
-// Send to user
-await stub.sendToUser("alice", "notifications", {
-  type: "alert",
-  message: "You have a new message"
-});
-
-// Broadcast to channel
-await stub.broadcast("default", { type: "announcement", text: "Hello!" });
-
-// Query state
-const count = await stub.getSessionCount();
-const userIds = await stub.getConnectedUserIds();
-```
-
-- Send messages to users from HTTP endpoints
-- Query actor state remotely
-- Broadcast from external events or scheduled tasks
-- Coordinate between multiple Actors
-
-## Live Examples
-
-Try out Verani with working examples:
+See Verani in action with working examples:
 
 ```bash
-# Clone and run
 git clone https://github.com/v0id-user/verani
 cd verani
-bun install  # or npm install
-bun run dev  # or npm run dev
-
-# Open http://localhost:8787
+bun install && bun run dev
 ```
 
-See `examples/` for chat, presence, and notifications demos!
+Then in another terminal, try:
 
-## Project Status
+```bash
+# Chat room example
+bun run examples/clients/chat-client.ts
 
-Verani is in early stages and active development. Current version includes:
+# Presence tracking
+bun run examples/clients/presence-client.ts
 
-**Implemented:**
-- Core realtime messaging
-- Hibernation support
-- Client reconnection
-- Presence protocol with multi-device support
-- Persistent storage integration with Durable Object storage
+# Notifications feed
+bun run examples/clients/notifications-client.ts
+```
 
-**Coming Soon:**
-- React/framework adapters
+See the [Examples README](./examples/README.md) for more details.
+
+## 🌟 Real-World Example
+
+**[Vchats](https://github.com/v0id-user/vchats)** - A complete chat application built with Verani
+
 
 ## License
 
@@ -308,5 +238,5 @@ ISC
 
 ## Contributing
 
-Contributions welcome! Please read our contributing guidelines first.
+Contributions welcome! Please read our [Contributing Guidelines](./CONTRIBUTING.md) first.
 
