@@ -4,7 +4,7 @@
 
 [![MADE BY #V0ID](https://img.shields.io/badge/MADE%20BY%20%23V0ID-F3EEE1.svg?style=for-the-badge)](https://github.com/v0id-user)
 
-**Build realtime apps on Cloudflare with Socket.io-like simplicity**
+Build realtime apps on Cloudflare with Socket.io-like simplicity
 
 [Getting Started](#quick-start) • [Documentation](./docs/) • [Examples](./examples/)
 
@@ -12,16 +12,16 @@
 
 Verani brings the familiar developer experience of Socket.io to Cloudflare's Durable Objects (Actors), with proper hibernation support and minimal overhead. Build realtime chat, presence systems, notifications, and more—all running on Cloudflare's edge.
 
-## ✨ Why Verani?
+## Why Verani?
 
-- **🎯 Familiar API**: If you've used Socket.io, you already know how to use Verani
-- **💤 Hibernation Support**: Properly handles Cloudflare Actor hibernation out of the box
-- **🔒 Type Safe**: Built with TypeScript, full type safety throughout
-- **🧠 Simple Mental Model**: Rooms, channels, and broadcast semantics that just make sense
-- **⚡ Modern DX**: Automatic reconnection, error handling, and connection lifecycle management
-- **🌍 Edge-Ready**: Built for Cloudflare Workers and Durable Objects
+- Familiar API: If you've used Socket.io, you already know how to use Verani
+- Hibernation support: Handles Cloudflare Actor hibernation automatically
+- Type safe: Built with TypeScript, full type safety throughout
+- Simple mental model: Rooms, channels, and broadcast semantics that just make sense
+- Modern DX: Automatic reconnection, error handling, and connection lifecycle management
+- Edge-ready: Built for Cloudflare Workers and Durable Objects
 
-## 🚀 Quick Start
+## Quick Start
 
 Get a realtime chat app running in 5 minutes.
 
@@ -31,7 +31,7 @@ Get a realtime chat app running in 5 minutes.
 npm install verani @cloudflare/actors
 ```
 
-**Don't have a Cloudflare Worker project?** Create one:
+Don't have a Cloudflare Worker project? Create one:
 
 ```bash
 npm create cloudflare@latest my-verani-app
@@ -128,7 +128,7 @@ Update `wrangler.jsonc`:
 }
 ```
 
-**Important**: The export name `ChatRoom` must match `class_name` in `wrangler.jsonc`.
+Important: The export name `ChatRoom` must match `class_name` in `wrangler.jsonc`.
 
 ### Step 5: Build Your Client
 
@@ -165,44 +165,44 @@ wrangler dev
 # (or open multiple browser tabs with your client code)
 ```
 
-**That's it!** You now have a working realtime chat app. 🎉
+That's it! You now have a working realtime chat app.
 
-**Need more help?** Check out the [Quick Start Guide](./docs/getting-started/quick-start.md) for detailed examples.
+Need more help? Check out the [Quick Start Guide](./docs/getting-started/quick-start.md) for detailed examples.
 
-## 📚 Documentation
+## Documentation
 
-- **[Getting Started](./docs/getting-started/)** - Installation and quick start guide
-- **[API Reference](./docs/api/)** - Complete server and client API documentation
-- **[Guides](./docs/guides/)** - Configuration, deployment, scaling, and RPC
-- **[Examples](./docs/examples/)** - Common usage patterns and code samples
-- **[Concepts](./docs/concepts/)** - Architecture, hibernation, and core concepts
-- **[Security](./docs/security/)** - Authentication, authorization, and best practices
+- [Getting Started](./docs/getting-started/) - Installation and quick start guide
+- [API Reference](./docs/api/) - Complete server and client API documentation
+- [Guides](./docs/guides/) - Configuration, deployment, scaling, and RPC
+- [Examples](./docs/examples/) - Common usage patterns and code samples
+- [Concepts](./docs/concepts/) - Architecture, hibernation, and core concepts
+- [Security](./docs/security/) - Authentication, authorization, and best practices
 
-## 🎯 Key Concepts
+## Key Concepts
 
-- **Room** = A Durable Object that handles WebSocket connections
-- **Channel** = A group within a room (default: `"default"`)
-- **Emit** = Send messages (`ctx.actor.emit.to("channel").emit("event", data)`)
-- **Hibernation** = Handled automatically, no manual work needed
+- Room = A Durable Object that handles WebSocket connections
+- Channel = A group within a room (default: `"default"`)
+- Emit = Send messages (`ctx.actor.emit.to("channel").emit("event", data)`)
+- Hibernation = Handled automatically, no manual work needed
 
-## ✨ Features
+## Features
 
 ### Server-Side
-- **Socket.io-like API**: `room.on()`, `ctx.actor.emit.to()`, familiar patterns
-- **Lifecycle Hooks**: `onConnect`, `onDisconnect`, `onMessage` for full control
-- **RPC Support**: Call Actor methods directly from Workers
-- **Automatic Hibernation**: Handles Cloudflare Actor hibernation seamlessly
-- **Persistent State**: Built-in support for state that survives hibernation
-- **Type Safety**: Full TypeScript support with type inference
+- Socket.io-like API: `room.on()`, `ctx.actor.emit.to()`, familiar patterns
+- Lifecycle hooks: `onConnect`, `onDisconnect`, `onMessage` for full control
+- RPC support: Call Actor methods directly from Workers
+- Automatic hibernation: Handles Cloudflare Actor hibernation seamlessly
+- Persistent state: Built-in support for state that survives hibernation
+- Type safety: Full TypeScript support with type inference
 
 ### Client-Side
-- **Automatic Reconnection**: Exponential backoff with configurable retry logic
-- **Message Queueing**: Messages queued when disconnected, sent on reconnect
-- **Keepalive**: Built-in ping/pong to detect dead connections
-- **Event-Based API**: Familiar `on()`, `emit()`, `once()`, `off()` methods
-- **Connection State**: Track connection lifecycle (`connecting`, `connected`, `disconnected`)
+- Automatic reconnection: Exponential backoff with configurable retry logic
+- Message queueing: Messages queued when disconnected, sent on reconnect
+- Keepalive: Built-in ping/pong to detect dead connections
+- Event-based API: Familiar `on()`, `emit()`, `once()`, `off()` methods
+- Connection state: Track connection lifecycle (`connecting`, `connected`, `disconnected`)
 
-## 🎮 Try the Examples
+## Try the Examples
 
 See Verani in action with working examples:
 
@@ -227,9 +227,9 @@ bun run examples/clients/notifications-client.ts
 
 See the [Examples README](./examples/README.md) for more details.
 
-## 🌟 Real-World Example
+## Real-World Example
 
-**[Vchats](https://github.com/v0id-user/vchats)** - A complete chat application built with Verani
+[Vchats](https://github.com/v0id-user/vchats) - A complete chat application built with Verani
 
 
 ## License
