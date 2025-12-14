@@ -1,6 +1,7 @@
 import type { ConnectionManager } from "../connection";
 import type { EventEmitter } from "./eventEmitter";
 import type { KeepaliveManager } from "./keepalive";
+import type { MessageQueue } from "./messageQueue";
 import { handleWebSocketOpen } from "./onWebSocketOpen";
 import { handleWebSocketMessage } from "./onWebSocketMessage";
 import { handleWebSocketClose } from "./onWebSocketClose";
@@ -32,7 +33,7 @@ export class ConnectionHandler {
     private connectionManager: ConnectionManager,
     private keepalive: KeepaliveManager,
     private eventEmitter: EventEmitter,
-    private messageQueue: any,
+    private messageQueue: MessageQueue,
     private connectionPromise: ConnectionPromiseState,
     private isConnectingRef: IsConnectingRef,
     private isConnectedFn: () => boolean,

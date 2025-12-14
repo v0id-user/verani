@@ -73,7 +73,7 @@ export async function onWebSocketMessage<TMeta extends ConnectionMeta, E>(
 
 		// Check if event handlers are registered for this event type
 		const eventEmitter = room.eventEmitter;
-		const hasEventHandlers = eventEmitter && (eventEmitter as any).hasHandlers && (eventEmitter as any).hasHandlers(frame.type);
+		const hasEventHandlers = eventEmitter?.hasHandlers(frame.type);
 
 		if (hasEventHandlers) {
 			// Use event handlers (socket.io-like)

@@ -223,6 +223,14 @@ export interface RoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta,
   emit(event: string, ctx: MessageContext<TMeta, E, TState>, data: any): Promise<void>;
 
   /**
+   * Check if there are any handlers registered for a given event.
+   * Returns true if handlers exist for the specific event or for the wildcard "*" event.
+   * @param event - Event name to check
+   * @returns True if handlers exist for the event or wildcard, false otherwise
+   */
+  hasHandlers(event: string): boolean;
+
+  /**
    * Rebuild handlers from static storage.
    * Called after hibernation to restore handlers from the room definition.
    * This method MUST be implemented by all event emitter implementations.

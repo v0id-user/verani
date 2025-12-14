@@ -67,13 +67,7 @@ export class VeraniClient {
 
     this.keepalive = new KeepaliveManager(
       this.options,
-      () => this.connectionHandler.getWebSocket(),
-      () => {
-        const ws = this.connectionHandler.getWebSocket();
-        if (ws) {
-          ws.close(1006, "Pong timeout");
-        }
-      }
+      () => this.connectionHandler.getWebSocket()
     );
 
     this.connectionHandler = new ConnectionHandler(

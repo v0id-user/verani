@@ -4,9 +4,8 @@
 
 - Node.js 18+ or Bun
 - A Cloudflare account (free tier works)
-- Basic understanding of WebSockets
 
-## Installation
+## Install Verani
 
 ```bash
 npm install verani @cloudflare/actors
@@ -14,28 +13,25 @@ npm install verani @cloudflare/actors
 bun add verani @cloudflare/actors
 ```
 
-## Set Up Your Cloudflare Worker Project
+## Create Cloudflare Worker Project
 
-If you don't have a Cloudflare Worker project yet, create one using [C3 (create-cloudflare)](https://developers.cloudflare.com/pages/get-started/c3/):
+If you don't have a Cloudflare Worker project yet:
 
 ```bash
 npm create cloudflare@latest my-verani-app
 cd my-verani-app
 ```
 
-**Important**: When prompted, choose:
-- **Template type**: "Hello World" or "Common" (these are Worker templates)
-- **Do NOT use** `--platform=pages` (that's for Cloudflare Pages, not Workers)
+When prompted, choose:
+- **Template**: "Hello World" or "Common"
+- **Do NOT use** `--platform=pages` (that's for Pages, not Workers)
 
-This will create a new Cloudflare Worker project with:
+This creates:
 - `src/index.ts` - Your Worker entry point
-- `wrangler.jsonc` or `wrangler.toml` - Wrangler configuration
+- `wrangler.jsonc` or `wrangler.toml` - Configuration
 - `package.json` - Dependencies
-
-You can then install Verani and start building your realtime application!
 
 ## Next Steps
 
-- [Quick Start Guide](./quick-start.md) - Build your first Verani application
-- [Troubleshooting](./troubleshooting.md) - Common issues and solutions
-
+- [Quick Start Guide](./quick-start.md) - Build your first app
+- [Troubleshooting](./troubleshooting.md) - Common issues
