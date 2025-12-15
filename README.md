@@ -171,6 +171,7 @@ Need more help? Check out the [Quick Start Guide](./docs/getting-started/quick-s
 
 ## Documentation
 
+- [Live Documentation](https://verani-docs.cloudflare-c49.workers.dev/docs/getting-started/installation) - Installation and quick start guide
 - [Getting Started](./docs/getting-started/) - Installation and quick start guide
 - [API Reference](./docs/api/) - Complete server and client API documentation
 - [Guides](./docs/guides/) - Configuration, deployment, scaling, and RPC
