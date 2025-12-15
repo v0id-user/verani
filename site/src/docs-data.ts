@@ -205,7 +205,7 @@ export const docsBundle = {
       "url": "/"
     },
     {
-      "title": "api",
+      "title": "API",
       "url": "/docs/api",
       "children": [
         {
@@ -231,7 +231,7 @@ export const docsBundle = {
       ]
     },
     {
-      "title": "concepts",
+      "title": "Concepts",
       "url": "/docs/concepts",
       "children": [
         {
@@ -315,7 +315,7 @@ export const docsBundle = {
       ]
     },
     {
-      "title": "getting-started",
+      "title": "Getting Started",
       "url": "/docs/getting-started",
       "children": [
         {
@@ -333,7 +333,7 @@ export const docsBundle = {
       ]
     },
     {
-      "title": "guides",
+      "title": "Guides",
       "url": "/docs/guides",
       "children": [
         {
@@ -359,7 +359,7 @@ export const docsBundle = {
       ]
     },
     {
-      "title": "security",
+      "title": "Security",
       "url": "/docs/security",
       "children": [
         {
