@@ -2,16 +2,25 @@
 
 A minimal black and white documentation site built with Bun, ElysiaJS, and deployed to Cloudflare Workers.
 
+This is a workspace package in the Verani monorepo. Dependencies are managed at the root level.
+
 ## Quick Start
 
-1. Install dependencies:
+1. Install dependencies from the repository root:
    ```bash
+   cd ..  # Go to repository root
    bun install
    ```
 
-2. Run the development server:
+2. Run the development server from the site directory:
    ```bash
+   cd site
    bun run dev
+   ```
+
+   Or from the repository root:
+   ```bash
+   bun --cwd site run dev
    ```
 
 3. Open your browser to:
@@ -64,11 +73,24 @@ To deploy to Cloudflare Workers:
 
 The site will be available at your Cloudflare Workers URL (something like `https://verani-docs.your-subdomain.workers.dev`).
 
+## Monorepo Setup
+
+This package is part of a Bun workspace monorepo. The root `package.json` includes:
+
+```json
+{
+  "workspaces": ["site"],
+  "private": true
+}
+```
+
+Dependencies are installed at the root level using `bun install` from the repository root. This ensures a single `bun.lock` file is maintained for the entire monorepo.
+
 ## Troubleshooting
 
 If the site doesn't load, make sure:
 
-1. You've run `bun install` to install dependencies
+1. You've run `bun install` from the repository root to install dependencies
 2. The docs bundle was built successfully (check if `src/docs-data.ts` exists)
 3. Wrangler is properly configured (run `npx wrangler login` if needed)
 

@@ -67,7 +67,7 @@ async function scanDocs(dir: string, basePath: string = ""): Promise<{
 				if (childNav.length > 0) {
 					const url = `/docs/${dirRelativePath}`;
 					navItems.push({
-						title: entry.name,
+						title: capitalizeSection(entry.name),
 						url,
 						children: childNav,
 					});
@@ -98,12 +98,57 @@ async function scanDocs(dir: string, basePath: string = ""): Promise<{
 	return { files, navigation: navItems };
 }
 
+function capitalizeSection(name: string): string {
+	// Handle common acronyms and special cases
+	const specialCases: Record<string, string> = {
+		api: "API",
+		rpc: "RPC",
+		http: "HTTP",
+		https: "HTTPS",
+		websocket: "WebSocket",
+		websockets: "WebSockets",
+		url: "URL",
+		uri: "URI",
+		json: "JSON",
+		xml: "XML",
+		html: "HTML",
+		css: "CSS",
+		js: "JS",
+		ts: "TS",
+		dom: "DOM",
+		ui: "UI",
+		ux: "UX",
+		cli: "CLI",
+		sdk: "SDK",
+		rest: "REST",
+		graphql: "GraphQL",
+		jwt: "JWT",
+		oauth: "OAuth",
+		cors: "CORS",
+	};
+
+	const lowerName = name.toLowerCase();
+	if (specialCases[lowerName]) {
+		return specialCases[lowerName];
+	}
+
+	// Capitalize first letter and handle kebab-case
+	return name
+		.split("-")
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+		.join(" ");
+}
+
 function extractTitle(content: string, filePath: string): string {
 	const h1Match = content.match(/^#\s+(.+)$/m);
 	if (h1Match) {
-		return h1Match[1];
+		const title = h1Match[1];
+		if (title) {
+			return title;
+		}
 	}
-	return basename(filePath, ".md");
+	const filename = basename(filePath, ".md");
+	return capitalizeSection(filename);
 }
 
 async function build() {

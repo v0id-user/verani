@@ -1,4 +1,4 @@
-import { NavItem } from "./markdown.js";
+import type { NavItem } from "./markdown.js";
 import { getNavigation } from "./markdown.js";
 
 /**

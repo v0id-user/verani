@@ -8,14 +8,20 @@ export const docsRoutes = new Elysia()
 		const doc = loadDoc("/");
 		if (!doc) {
 			set.status = 404;
-			return "Documentation not found";
+			return new Response("Documentation not found", {
+				status: 404,
+				headers: { "Content-Type": "text/plain" },
+			});
 		}
 
 		const navigation = getNavigationSync();
 		const html = renderPage(doc.title, doc.html, navigation, doc.url);
 
-		set.headers["content-type"] = "text/html";
-		return html;
+		return new Response(html, {
+			headers: {
+				"Content-Type": "text/html; charset=utf-8",
+			},
+		});
 	})
 	.get("/docs/*", ({ params, set }) => {
 		const path = params["*"];
@@ -24,12 +30,18 @@ export const docsRoutes = new Elysia()
 		const doc = loadDoc(urlPath);
 		if (!doc) {
 			set.status = 404;
-			return "Documentation not found";
+			return new Response("Documentation not found", {
+				status: 404,
+				headers: { "Content-Type": "text/plain" },
+			});
 		}
 
 		const navigation = getNavigationSync();
 		const html = renderPage(doc.title, doc.html, navigation, doc.url);
 
-		set.headers["content-type"] = "text/html";
-		return html;
+		return new Response(html, {
+			headers: {
+				"Content-Type": "text/html; charset=utf-8",
+			},
+		});
 	});

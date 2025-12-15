@@ -1,4 +1,4 @@
-import { NavItem } from "./markdown.js";
+import type { NavItem } from "./markdown.js";
 
 /**
  * Render navigation items to HTML
