@@ -17,68 +17,82 @@ npm create cloudflare@latest my-verani-app
 cd my-verani-app
 ```
 
-## Step 2: Create a Room
+## Step 2: Create a Connection Handler
 
-Create `src/actors/chat.actor.ts`:
+Create `src/actors/connection.ts`:
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection, createConnectionHandler, createRoomHandler } from "verani";
 
-export const chatRoom = defineRoom({
-  onConnect(ctx) {
-    console.log(`User ${ctx.meta.userId} connected`);
-    // Notify others
-    ctx.actor.emit.to("default").emit("user.joined", {
-      userId: ctx.meta.userId
-    });
+// Define connection handler (one WebSocket per user)
+const userConnection = defineConnection({
+  name: "UserConnection",
+
+  extractMeta(req) {
+    const url = new URL(req.url);
+    const userId = url.searchParams.get("userId") || crypto.randomUUID();
+    return {
+      userId,
+      clientId: crypto.randomUUID(),
+      channels: ["default"]
+    };
   },
 
-  onDisconnect(ctx) {
-    ctx.actor.emit.to("default").emit("user.left", {
-      userId: ctx.meta.userId
-    });
+  async onConnect(ctx) {
+    console.log(`User ${ctx.meta.userId} connected`);
+    // Join chat room (persisted across hibernation)
+    await ctx.actor.joinRoom("chat");
+  },
+
+  async onDisconnect(ctx) {
+    console.log(`User ${ctx.meta.userId} disconnected`);
+    // Room leave is handled automatically
   }
 });
 
 // Handle messages (socket.io-like)
-chatRoom.on("chat.message", (ctx, data) => {
-  // Broadcast to everyone
-  ctx.actor.emit.to("default").emit("chat.message", {
+userConnection.on("chat.message", async (ctx, data) => {
+  // Broadcast to everyone in the chat room
+  await ctx.emit.toRoom("chat").emit("chat.message", {
     from: ctx.meta.userId,
     text: data.text,
     timestamp: Date.now()
   });
 });
+
+// Export handlers
+export const UserConnection = createConnectionHandler(userConnection);
+export const ChatRoom = createRoomHandler({ name: "ChatRoom" });
 ```
 
-## Step 3: Export the Actor Class
+## Step 3: Export the DO Classes
 
 Update `src/index.ts`:
 
 ```typescript
-import { createActorHandler } from "verani";
-import { chatRoom } from "./actors/chat.actor";
+import { UserConnection, ChatRoom } from "./actors/connection";
 
-// Convert room to Durable Object class
-const ChatRoom = createActorHandler(chatRoom);
-export { ChatRoom };
+// Export Durable Object classes
+export { UserConnection, ChatRoom };
 
 // Route WebSocket connections
 export default {
   async fetch(request: Request) {
     const url = new URL(request.url);
-    
+
     if (url.pathname.startsWith("/ws")) {
-      const stub = ChatRoom.get("chat-room");
+      // Extract userId and route to user-specific DO
+      const userId = url.searchParams.get("userId") || crypto.randomUUID();
+      const stub = UserConnection.get(userId);
       return stub.fetch(request);
     }
-    
+
     return new Response("Not Found", { status: 404 });
   }
 };
 ```
 
-**Important**: The export name `ChatRoom` must match `class_name` in `wrangler.jsonc`.
+**Important**: Export names must match `class_name` in `wrangler.jsonc`.
 
 ## Step 4: Configure Wrangler
 
@@ -89,19 +103,23 @@ Update `wrangler.jsonc`:
   "name": "my-verani-app",
   "main": "src/index.ts",
   "compatibility_date": "2024-01-01",
-  
+
   "durable_objects": {
     "bindings": [
       {
-        "class_name": "ChatRoom",  // Must match export name
-        "name": "CHAT"
+        "class_name": "UserConnection",
+        "name": "CONNECTION_DO"
+      },
+      {
+        "class_name": "ChatRoom",
+        "name": "ROOM_DO"
       }
     ]
   },
-  
+
   "migrations": [
     {
-      "new_sqlite_classes": ["ChatRoom"],
+      "new_sqlite_classes": ["UserConnection", "ChatRoom"],
       "tag": "v1"
     }
   ]
@@ -154,9 +172,10 @@ You now have a working realtime chat app. Open multiple browser tabs and watch m
 
 ## Key Concepts
 
-- **Room** = A Durable Object that handles WebSocket connections
-- **Channel** = A group within a room (default: `"default"`)
-- **Emit** = Send messages (`ctx.actor.emit.to("channel").emit("event", data)`)
-- **on()** = Listen for events (`room.on("event", handler)`)
+- **ConnectionDO** = A Durable Object that owns ONE WebSocket per user
+- **RoomDO** = A Durable Object that coordinates room membership and broadcasts
+- **joinRoom()** = Join a room (membership persisted across hibernation)
+- **Emit** = Send messages (`ctx.emit.toRoom("chat").emit("event", data)`)
+- **on()** = Listen for events (`connection.on("event", handler)`)
 
 For more details, see the [Concepts](../concepts/) section.

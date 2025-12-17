@@ -2,42 +2,62 @@
 
 Performance tips and scaling strategies for Verani applications.
 
+## Architecture Choice Matters
+
+The biggest scaling decision is your architecture choice:
+
+### Per-Connection Architecture (Recommended)
+
+Use `createConnectionHandler()` + `createRoomHandler()` for:
+- **Unlimited horizontal scaling** - Each user has their own DO
+- **No single bottleneck** - No single DO handles all connections
+- **Cost-efficient** - Idle connections hibernate independently
+- **Better fault isolation** - One user's DO crash doesn't affect others
+
+```typescript
+import { defineConnection, createConnectionHandler, createRoomHandler } from "verani";
+
+// Each user gets their own DO
+const UserConnection = createConnectionHandler(defineConnection({
+  onConnect(ctx) {
+    ctx.actor.joinRoom("chat");
+  }
+}));
+
+// Rooms coordinate membership and broadcast
+const ChatRoom = createRoomHandler({ name: "ChatRoom" });
+
+// Worker routes to per-user DO
+export default {
+  async fetch(request) {
+    const userId = extractUserId(request);
+    const stub = UserConnection.get(userId); // User-specific DO
+    return stub.fetch(request);
+  }
+};
+```
+
+### Legacy Global Router (Not Recommended for Scale)
+
+The legacy `defineRoom()` + `createActorHandler()` pattern puts all connections in one DO:
+
+```typescript
+// LEGACY: All connections in one DO - bottleneck!
+const stub = ChatRoom.get(""); // Same DO for everyone
+```
+
+**Limits:**
+- ~1,000 WebSocket connections per Actor
+- ~10,000 messages/second per Actor
+- Single-threaded bottleneck
+
 ## Performance Tips
 
-### 1. Limit Connections Per Actor
+### 1. Use Per-Connection Architecture
 
-```typescript
-import { defineRoom } from "verani";
+The single biggest performance improvement. See above.
 
-export const chatRoom = defineRoom({
-  onConnect(ctx) {
-    const count = ctx.actor.getSessionCount();
-
-    if (count > 1000) {
-      ctx.ws.close(1008, "Room is full");
-      return;
-    }
-  }
-});
-```
-
-### 2. Use Channels for Selective Broadcasting
-
-Instead of broadcasting to everyone:
-
-```typescript
-// BAD: Everyone receives, many filter it out
-ctx.actor.broadcast("default", data);
-// or
-ctx.actor.emit.to("default").emit("event", data);
-
-// GOOD: Only subscribed users receive
-ctx.actor.broadcast("channel-123", data);
-// or using emit API
-ctx.actor.emit.to("channel-123").emit("event", data);
-```
-
-### 3. Batch Messages
+### 2. Batch Messages
 
 Send multiple updates in one message:
 
@@ -46,27 +66,19 @@ Send multiple updates in one message:
 const updates = [];
 updates.push(update1, update2, update3);
 
-// Send as a single batched message
-ctx.actor.broadcast("default", {
-  type: "batch.update",
-  updates
-});
-
-// Or using emit API
-ctx.actor.emit.to("default").emit("batch.update", {
-  updates
-});
+// Send as a single batched message via room
+await ctx.emit.toRoom("chat").emit("batch.update", { updates });
 ```
 
-### 4. Enable Hibernation
+### 3. Enable Hibernation
 
-Verani handles this automatically, but make sure you're not keeping the Actor awake unnecessarily:
+Verani handles this automatically, but make sure you're not keeping DOs awake unnecessarily:
 
 - Don't use `setInterval()` in the Actor
 - Don't keep long-running promises
 - Let the Actor sleep when idle
 
-### 5. Optimize Persisted State
+### 4. Optimize Persisted State
 
 When using state persistence:
 
@@ -82,35 +94,58 @@ state: {
   // Don't persist: typing indicators, cursor positions, etc.
 },
 persistedKeys: ["messageCount", "settings"],
-
-// Good: Batch state updates when possible
-ctx.actor.roomState.messageCount++;
-ctx.actor.roomState.lastActivity = new Date();
-// Both persisted, but consider batching if doing many updates
 ```
 
-## Scaling
+### 5. Use Rooms for Selective Broadcasting
 
-### Vertical Scaling (Per Actor)
+RoomDOs only broadcast to members:
 
-Each Actor can handle:
-- ~1,000 WebSocket connections comfortably
-- ~10,000 messages/second
+```typescript
+// Join specific rooms instead of one global room
+await ctx.actor.joinRoom("project-123");
 
-Beyond that, split into multiple Actors.
+// Broadcast only reaches room members
+await ctx.emit.toRoom("project-123").emit("update", data);
+```
 
-### Horizontal Scaling (Multiple Actors)
+## Scaling Characteristics
 
-Cloudflare automatically scales Actors:
-- Each Actor instance runs independently
-- Actors are distributed globally
-- No cross-Actor coordination needed
+### Per-Connection Architecture
 
-**Example:** 1 million users
+| Metric | Capacity |
+|--------|----------|
+| Users | Unlimited (1 DO per user) |
+| Messages/sec | Scales with users |
+| Memory | Distributed across DOs |
+| Hibernation | Per-user (efficient) |
 
-- User-based routing: 1 million Actors (1 per user)
-- Room-based routing: N Actors (1 per room)
-- Hybrid: Use both strategies
+### Legacy Architecture
+
+| Metric | Capacity |
+|--------|----------|
+| Connections/Actor | ~1,000 |
+| Messages/sec | ~10,000 per Actor |
+| Memory | All in one DO |
+| Hibernation | All-or-nothing |
+
+## Horizontal Scaling Example
+
+**1 million users with per-connection architecture:**
+
+```
+1,000,000 Users
+    ↓
+1,000,000 ConnectionDOs (1 per user)
+    ↓
+N RoomDOs (1 per room/channel)
+    ↓
+Automatic global distribution
+```
+
+Each ConnectionDO:
+- Handles 1 WebSocket
+- Hibernates independently when idle
+- Costs nothing when sleeping
 
 ## Cost Estimation
 

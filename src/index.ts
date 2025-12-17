@@ -2,26 +2,183 @@ import { Actor } from "@cloudflare/actors";
 import { presenceRoom } from "../examples/presence-room";
 import { CounterActor } from "../examples/persistence/counter-room";
 import { createActorHandler } from "./actor/actor-runtime";
+import { createConnectionHandler, defineConnection } from "./actor/connection-actor";
+import { createRoomHandler } from "./actor/room-actor";
 
+// ============================================================================
+// Legacy Examples (Global Router Pattern - Deprecated)
+// These use the old architecture where all connections go to a single DO.
+// Kept for backward compatibility.
+// ============================================================================
 export const PresenceExample = createActorHandler(presenceRoom);
 export class ChatExample extends Actor<Env> {}
 export class NotificationsExample extends Actor<Env> {}
 export { CounterActor };
 
-// Export default handler with routing logic
+// ============================================================================
+// New Architecture Examples (Per-Connection Pattern)
+// Each user gets their own ConnectionDO, with RoomDOs for coordination.
+// ============================================================================
+
+/**
+ * Extract userId from request
+ * Supports: ?token=user:xxx, ?userId=xxx, or generates random UUID
+ */
+function extractUserId(request: Request): string {
+	const url = new URL(request.url);
+
+	// Try token parameter (format: user:userId)
+	const token = url.searchParams.get("token");
+	if (token) {
+		const parts = token.split(":");
+		if (parts.length === 2 && parts[0] === "user") {
+			return parts[1];
+		}
+	}
+
+	// Try direct userId parameter
+	const userId = url.searchParams.get("userId");
+	if (userId) {
+		return userId;
+	}
+
+	// Fallback: generate a random userId
+	// Note: In production, you'd want to require authentication
+	return crypto.randomUUID();
+}
+
+/**
+ * ConnectionDO for per-user WebSocket connections
+ * Each user gets their own DO instance identified by userId
+ */
+const connectionDef = defineConnection({
+	name: "UserConnection",
+	websocketPath: "/ws",
+
+	extractMeta(req) {
+		const url = new URL(req.url);
+		const token = url.searchParams.get("token");
+		let userId = "anonymous";
+		let username = "anonymous";
+
+		if (token) {
+			const parts = token.split(":");
+			if (parts.length === 2 && parts[0] === "user") {
+				userId = parts[1];
+				username = parts[1];
+			}
+		}
+
+		return {
+			userId,
+			clientId: crypto.randomUUID(),
+			channels: ["default"],
+			username
+		} as any;
+	},
+
+	async onConnect(ctx) {
+		console.log(`[UserConnection] User ${ctx.meta.userId} connected`);
+
+		// Auto-join presence room
+		try {
+			await ctx.actor.joinRoom("presence", { username: (ctx.meta as any).username });
+		} catch (error) {
+			console.error("[UserConnection] Failed to join presence room:", error);
+		}
+	},
+
+	async onDisconnect(ctx) {
+		console.log(`[UserConnection] User ${ctx.meta.userId} disconnected`);
+		// Room leave is handled automatically in connection-actor.ts
+	}
+});
+
+// Register event handlers
+connectionDef.on("chat", async (ctx, data) => {
+	console.log(`[UserConnection] Chat message from ${ctx.meta.userId}:`, data);
+	// Broadcast to room via RPC
+	await ctx.emit.toRoom("chat").emit("chat:message", {
+		from: ctx.meta.userId,
+		text: data.text,
+		timestamp: Date.now()
+	});
+});
+
+connectionDef.on("presence.status", async (ctx, data) => {
+	// Update presence status in room
+	const roomStub = (ctx.actor as any).getRoomDO()?.get("presence");
+	if (roomStub) {
+		await roomStub.updateMemberMetadata(ctx.meta.userId, { status: data.status });
+		await roomStub.broadcast("presence.status", {
+			userId: ctx.meta.userId,
+			status: data.status,
+			timestamp: Date.now()
+		});
+	}
+});
+
+export const UserConnection = createConnectionHandler(connectionDef);
+
+/**
+ * RoomDO for presence coordination
+ * Manages room membership and broadcasts presence updates
+ */
+export const PresenceRoom = createRoomHandler({
+	name: "PresenceRoom",
+
+	async onJoin(roomState, userId, metadata) {
+		console.log(`[PresenceRoom] User ${userId} joined with metadata:`, metadata);
+	},
+
+	async onLeave(roomState, userId) {
+		console.log(`[PresenceRoom] User ${userId} left`);
+	}
+});
+
+/**
+ * RoomDO for chat coordination
+ */
+export const ChatRoom = createRoomHandler({
+	name: "ChatRoom"
+});
+
+// ============================================================================
+// Worker Fetch Handler
+// ============================================================================
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
 		const path = url.pathname;
 
+		// ====================================================================
+		// New Architecture Routes (Per-Connection Pattern)
+		// Route to per-user ConnectionDO using userId as the DO identifier
+		// ====================================================================
+
+		if (path.startsWith("/ws/v2/")) {
+			const userId = extractUserId(request);
+			console.log(`[Worker] Routing to ConnectionDO for user: ${userId}`);
+
+			// Get the user's dedicated ConnectionDO
+			const stub = UserConnection.get(userId);
+			return stub.fetch(request);
+		}
+
+		// ====================================================================
+		// Legacy Routes (Global Router Pattern - Deprecated)
+		// These use the old architecture where all connections go to one DO
+		// ====================================================================
 
 		if (path.startsWith("/ws/presence")) {
-			const stub = PresenceExample.get("")
+			// DEPRECATED: Global router pattern - all users share one DO
+			const stub = PresenceExample.get("");
 			return stub.fetch(request);
 		}
 
 		if (path.startsWith("/ws/counter")) {
-			const stub = CounterActor.get("")
+			// DEPRECATED: Global router pattern - all users share one DO
+			const stub = CounterActor.get("");
 			return stub.fetch(request);
 		}
 

@@ -6,41 +6,118 @@ How Verani works under the hood.
 
 **Make realtime on Cloudflare feel like Socket.io.**
 
-If you know Socket.io, you already know Verani. The difference: Verani handles Cloudflare Actor hibernation correctly.
+If you know Socket.io, you already know Verani. The difference: Verani handles Cloudflare Actor hibernation correctly and scales horizontally.
 
-## How It Works
+## Architecture Options
+
+Verani supports two architectural patterns:
+
+### 1. Per-Connection Architecture (Recommended)
+
+Each user gets their own Durable Object (ConnectionDO), with separate coordination DOs (RoomDO) for shared state.
 
 ```
-Client (VeraniClient)
-    ↓ WebSocket
-Cloudflare Worker
-    ↓ Routes to Actor
-Durable Object (Actor)
-    ↓ Calls your hooks
-Your Room Code
-```
-
-## Message Flow
-
-**Client → Server:**
-```
-client.emit("event", data)
-  → JSON encode
-  → WebSocket send
-  → Actor receives
-  → Call onMessage(ctx, frame)
-  → Your handler runs
+Client A ─► ConnectionDO(userA) ─┐
+                                 ├─► RoomDO("chat") ─► (membership + RPC fanout)
+Client B ─► ConnectionDO(userB) ─┤
+                                 │
+Client C ─► ConnectionDO(userC) ─┴─► RoomDO("presence") ─► (coordination)
 ```
 
-**Server → Client:**
+**Benefits:**
+- No single-threaded bottleneck
+- Horizontal scalability (each user = their own DO)
+- Cost-efficient (idle connections hibernate)
+- Message delivery via efficient RPC
+- Shared state in dedicated coordination DOs
+
+**Use `createConnectionHandler()` and `createRoomHandler()` for this pattern.**
+
+### 2. Legacy Global Router (Deprecated)
+
+All connections go to a single Durable Object:
+
 ```
-ctx.actor.emit.to("channel").emit("event", data)
-  → Filter sessions by channel/userId
-  → JSON encode
-  → WebSocket send to each session
-  → Client receives
-  → Dispatch to listeners
+Client A ─┐
+Client B ─┼─► Single Global DO (handles ALL connections)
+Client C ─┘    └─► sessions Map with ALL WebSockets
 ```
+
+**Problems:**
+- Single-threaded bottleneck
+- O(n) broadcast operations
+- Memory pressure from all connections in one DO
+- No horizontal scalability
+
+**Use `defineRoom()` and `createActorHandler()` for this pattern (not recommended for new projects).**
+
+## Per-Connection Flow
+
+### Connection Setup
+
+```
+1. Client connects to Worker
+2. Worker extracts userId from request
+3. Worker routes to ConnectionDO.get(userId)
+4. ConnectionDO owns the single WebSocket
+5. ConnectionDO joins RoomDOs as needed
+```
+
+### Message Flow (User-to-User via Room)
+
+```
+Client A sends message
+    ↓
+ConnectionDO(A) receives via WebSocket
+    ↓
+ConnectionDO(A) calls RoomDO.broadcast(event, data)
+    ↓
+RoomDO iterates members
+    ↓
+RoomDO calls ConnectionDO(B).deliverMessage(event, data) via RPC
+    ↓
+ConnectionDO(B) sends to its WebSocket
+    ↓
+Client B receives message
+```
+
+### Direct Messaging (User-to-User)
+
+```
+Client A sends { type: "dm", toUserId: "B", text: "Hi" }
+    ↓
+ConnectionDO(A) receives message
+    ↓
+ConnectionDO(A) calls ConnectionDO(B).deliverMessage(...) via RPC
+    ↓
+ConnectionDO(B) sends to its WebSocket
+    ↓
+Client B receives DM
+```
+
+## Durable Object Topology
+
+### ConnectionDO (One Per User)
+
+- **Identity:** `ConnectionDO.get(userId)`
+- **Owns:**
+  - Single WebSocket connection (hibernatable)
+  - Minimal session metadata
+  - Room membership (persisted)
+- **RPC Methods:**
+  - `deliverMessage(event, data)` - receive from other DOs
+  - `joinRoom(roomName)` / `leaveRoom(roomName)`
+
+### RoomDO (One Per Room/Channel)
+
+- **Identity:** `RoomDO.get(roomName)`
+- **Owns:**
+  - Member list (Set of userIds)
+  - Shared room state
+  - No WebSocket connections
+- **RPC Methods:**
+  - `join(userId)` / `leave(userId)`
+  - `broadcast(event, data)` - fan out to members
 
 ## Error Handling
 
@@ -50,15 +127,13 @@ ctx.actor.emit.to("channel").emit("event", data)
 - Client never sees server errors (security)
 - Automatic recovery when possible
 
-## What Verani Is Simple About
+## Design Principles
 
-1. **No global user registry** - You manage routing
-2. **No cross-actor messaging** - Each Actor is independent
-3. **No ordering guarantees** - WebSockets are unordered
-4. **No message persistence** - Messages are ephemeral
+1. **Per-user isolation** - Each user has their own DO
+2. **RPC for coordination** - DOs communicate via RPC, not shared state
+3. **Hibernation-friendly** - State automatically persisted and restored
+4. **No global bottleneck** - Horizontal scaling by design
 5. **JSON only** - Binary protocols are future work
-
-These constraints keep Verani simple and predictable.
 
 ## When to Use Verani
 
@@ -66,10 +141,9 @@ These constraints keep Verani simple and predictable.
 - You're on Cloudflare Workers/Pages
 - You want Socket.io-like simplicity
 - You need automatic hibernation handling
-- Your rooms are independent
+- You need horizontal scalability
 
 **Consider alternatives when:**
-- You need cross-room messaging (use Cloudflare Pub/Sub)
 - You need guaranteed ordering (use queues)
 - You're not on Cloudflare (use Socket.io, Ably, etc.)
 

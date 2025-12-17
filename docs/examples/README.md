@@ -2,6 +2,25 @@
 
 Common usage patterns and recipes for Verani.
 
+## Architecture Options
+
+Verani supports two architectures:
+
+### Per-Connection Architecture (Recommended)
+
+Each user gets their own Durable Object. See `examples/v2/` in the repository:
+
+- `presence-connection.ts` - Per-user presence connection handler
+- `presence-room-coordinator.ts` - Room coordinator for presence
+
+Use `createConnectionHandler()` and `createRoomHandler()` for this pattern.
+
+### Legacy Architecture
+
+All connections in a single Durable Object. The examples below use this pattern.
+
+Use `defineRoom()` and `createActorHandler()` for this pattern.
+
 ## Authentication Note
 
 Examples marked with:
@@ -11,7 +30,7 @@ Examples marked with:
 
 **For production apps**, always use authenticated examples. See [Security Guide - Authentication](../security/authentication.md) for implementation details.
 
-## Examples
+## Legacy Examples
 
 - [Basic Chat Room](./basic-chat.md) - Simple chat room example
 - [Socket.io-like API](./socket-io-like.md) - Event handlers and emit API
