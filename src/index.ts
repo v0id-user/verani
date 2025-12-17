@@ -3,7 +3,7 @@ import { presenceRoom } from "../examples/presence-room";
 import { CounterActor } from "../examples/persistence/counter-room";
 import { createActorHandler } from "./actor/actor-runtime";
 import { createConnectionHandler, defineConnection } from "./actor/connection-actor";
-import { createRoomHandler } from "./actor/room-actor";
+import { createRoomHandler, type RoomActorStub } from "./actor/room-actor";
 
 // ============================================================================
 // Legacy Examples (Global Router Pattern - Deprecated)
@@ -94,8 +94,8 @@ const connectionDef = defineConnection({
 	}
 });
 
-// Register event handlers
-connectionDef.on("chat", async (ctx, data) => {
+// Register event handlers with typed data
+connectionDef.on<{ text: string }>("chat", async (ctx, data) => {
 	console.log(`[UserConnection] Chat message from ${ctx.meta.userId}:`, data);
 	// Broadcast to room via RPC
 	await ctx.emit.toRoom("chat").emit("chat:message", {
@@ -105,9 +105,11 @@ connectionDef.on("chat", async (ctx, data) => {
 	});
 });
 
-connectionDef.on("presence.status", async (ctx, data) => {
+connectionDef.on<{ status: string }>("presence.status", async (ctx, data) => {
 	// Update presence status in room
-	const roomStub = (ctx.actor as any).getRoomDO()?.get("presence");
+	// Note: getRoomDO is available on the actor but not exposed in the public interface
+	const actor = ctx.actor as unknown as { getRoomDO?: () => { get: (name: string) => RoomActorStub } };
+	const roomStub = actor.getRoomDO?.()?.get("presence");
 	if (roomStub) {
 		await roomStub.updateMemberMetadata(ctx.meta.userId, { status: data.status });
 		await roomStub.broadcast("presence.status", {

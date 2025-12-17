@@ -5,9 +5,9 @@
 
 import { encodeFrame, encodeClientMessage as sharedEncodeClientMessage } from "../shared/encode";
 import { decodeFrame, decodeServerMessage as sharedDecodeServerMessage } from "../shared/decode";
-import type { ClientMessage, ServerMessage, MessageFrame } from "../shared/types";
+import type { ClientMessage, ServerMessage, MessageFrame, WebSocketRawData } from "../shared/types";
 
-export type { ClientMessage, ServerMessage, MessageFrame };
+export type { ClientMessage, ServerMessage, MessageFrame, WebSocketRawData };
 
 /**
  * Encodes a client message to send to the server
@@ -26,7 +26,7 @@ export function encodeClientMessage(msg: ClientMessage): string {
  * @param raw - Raw WebSocket message data
  * @returns Decoded message or null if invalid
  */
-export function decodeServerMessage(raw: any): MessageFrame | null {
+export function decodeServerMessage(raw: WebSocketRawData): MessageFrame | null {
   console.debug("[Verani:Protocol:Client] Decoding server message, raw length:", typeof raw === "string" ? raw.length : "unknown");
   const decoded = sharedDecodeServerMessage(raw);
   if (decoded) {

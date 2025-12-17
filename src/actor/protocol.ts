@@ -5,16 +5,16 @@
 
 import { decodeFrame as sharedDecodeFrame, decodeClientMessage } from "../shared/decode";
 import { encodeFrame as sharedEncodeFrame, encodeServerMessage } from "../shared/encode";
-import type { MessageFrame } from "../shared/types";
+import type { MessageFrame, WebSocketRawData } from "../shared/types";
 
-export type { MessageFrame };
+export type { MessageFrame, WebSocketRawData };
 
 /**
  * Decodes a frame received from a client
  * @param raw - Raw WebSocket message data
  * @returns Decoded MessageFrame or a fallback invalid frame
  */
-export function decodeFrame(raw: any): MessageFrame {
+export function decodeFrame(raw: WebSocketRawData): MessageFrame {
   console.debug("[Verani:Protocol:Actor] Decoding frame, raw length:", typeof raw === "string" ? raw.length : "unknown");
   const decoded = sharedDecodeFrame(raw);
   if (decoded) {

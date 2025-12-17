@@ -31,11 +31,11 @@ import type { MessageFrame, ConnectionMeta } from "../types";
  * @param data - Message data
  * @returns Number of sessions that received the message
  */
-export function sendToUser<TMeta extends ConnectionMeta>(
+export function sendToUser<TMeta extends ConnectionMeta, TData = unknown>(
 	sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }>,
 	userId: string,
 	channel: string,
-	data?: any
+	data?: TData
 ): number {
 	console.debug("[Verani:ActorRuntime] Sending to user:", userId, "on channel:", channel);
 	let sentCount = 0;

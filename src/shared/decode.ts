@@ -1,4 +1,4 @@
-import type { MessageFrame } from "./types";
+import type { MessageFrame, WebSocketRawData } from "./types";
 
 /**
  * Validates that a parsed object is a valid MessageFrame.
@@ -7,12 +7,13 @@ import type { MessageFrame } from "./types";
  * @param obj - The object to validate
  * @returns True if the object is a valid MessageFrame, false otherwise
  */
-function isValidFrame(obj: any): obj is MessageFrame {
+function isValidFrame(obj: unknown): obj is MessageFrame {
   return (
-    obj &&
+    obj !== null &&
     typeof obj === "object" &&
-    typeof obj.type === "string" &&
-    (obj.channel === undefined || typeof obj.channel === "string")
+    "type" in obj &&
+    typeof (obj as Record<string, unknown>).type === "string" &&
+    (!("channel" in obj) || typeof (obj as Record<string, unknown>).channel === "string")
   );
 }
 
@@ -24,11 +25,11 @@ function isValidFrame(obj: any): obj is MessageFrame {
  * @param raw - Raw data from WebSocket (string, ArrayBuffer, etc)
  * @returns Decoded MessageFrame or null if parsing or validation fails
  */
-export function decodeFrame(raw: any): MessageFrame | null {
+export function decodeFrame(raw: WebSocketRawData): MessageFrame | null {
   try {
     console.debug("[Verani:Decode] Decoding raw data");
     const str = typeof raw === "string" ? raw : raw.toString();
-    const parsed = JSON.parse(str);
+    const parsed: unknown = JSON.parse(str);
 
     if (!isValidFrame(parsed)) {
       console.warn("Invalid frame structure:", parsed);
@@ -50,7 +51,7 @@ export function decodeFrame(raw: any): MessageFrame | null {
  * @param raw - Raw data from client WebSocket
  * @returns Decoded message or null if invalid
  */
-export function decodeClientMessage(raw: any): MessageFrame | null {
+export function decodeClientMessage(raw: WebSocketRawData): MessageFrame | null {
   return decodeFrame(raw);
 }
 
@@ -61,6 +62,6 @@ export function decodeClientMessage(raw: any): MessageFrame | null {
  * @param raw - Raw data from server WebSocket
  * @returns Decoded message or null if invalid
  */
-export function decodeServerMessage(raw: any): MessageFrame | null {
+export function decodeServerMessage(raw: WebSocketRawData): MessageFrame | null {
   return decodeFrame(raw);
 }

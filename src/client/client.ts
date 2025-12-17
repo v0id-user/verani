@@ -182,7 +182,7 @@ export class VeraniClient {
    * @param event - Event type to listen for
    * @param callback - Callback function to invoke when event is received
    */
-  on(event: string, callback: (data: any) => void): void {
+  on<TData = unknown>(event: string, callback: (data: TData) => void): void {
     this.eventEmitter.on(event, callback);
   }
 
@@ -191,7 +191,7 @@ export class VeraniClient {
    * @param event - Event type to remove listener from
    * @param callback - Callback function to remove
    */
-  off(event: string, callback: (data: any) => void): void {
+  off<TData = unknown>(event: string, callback: (data: TData) => void): void {
     this.eventEmitter.off(event, callback);
   }
 
@@ -200,7 +200,7 @@ export class VeraniClient {
    * @param event - Event type to listen for
    * @param callback - Callback function to invoke once
    */
-  once(event: string, callback: (data: any) => void): void {
+  once<TData = unknown>(event: string, callback: (data: TData) => void): void {
     this.eventEmitter.once(event, callback);
   }
 
@@ -209,9 +209,9 @@ export class VeraniClient {
    * @param type - Message type
    * @param data - Optional message data
    */
-  emit(type: string, data?: any): void {
+  emit<TData = unknown>(type: string, data?: TData): void {
     console.debug("[Verani:Client] Emitting message, type:", type);
-    const msg: QueuedMessage = { type, data };
+    const msg: QueuedMessage<TData> = { type, data };
 
     if (this.isConnected()) {
       const ws = this.connectionHandler.getWebSocket();

@@ -153,7 +153,7 @@ export function createActorHandler<
 	/**
 	 * Called when a message is received from a WebSocket
 	 */
-	protected async onWebSocketMessage(ws: WebSocket, raw: any) {
+	protected async onWebSocketMessage(ws: WebSocket, raw: string | ArrayBuffer | ArrayBufferView) {
 		console.debug("[Verani:ActorRuntime] onWebSocketMessage method called");
 		await onWebSocketMessageImpl(this, roomDef, ws, raw);
 	}
@@ -184,7 +184,7 @@ export function createActorHandler<
 	 * @param opts - Broadcast options (filtering, exclusions)
 	 * @returns Number of connections that received the message
 	 */
-	broadcast(channel: string, data: any, opts?: BroadcastOptions): number {
+	broadcast<TData = unknown>(channel: string, data: TData, opts?: BroadcastOptions): number {
 		console.debug("[Verani:ActorRuntime] broadcast method called, channel:", channel);
 		return broadcastImpl(this.sessions, channel, data, opts);
 	}
@@ -225,7 +225,7 @@ export function createActorHandler<
 	 * @param data - Message data
 	 * @returns Number of sessions that received the message
 	 */
-	sendToUser(userId: string, channel: string, data?: any): number {
+	sendToUser<TData = unknown>(userId: string, channel: string, data?: TData): number {
 		console.debug("[Verani:ActorRuntime] sendToUser method called, userId:", userId, "channel:", channel);
 		return sendToUserImpl(this.sessions, userId, channel, data);
 	}
@@ -246,9 +246,9 @@ export function createActorHandler<
 	 * const sent = await stub.emitToChannel("default", "announcement", { text: "Hello!" });
 	 * ```
 	 */
-	emitToChannel(channel: string, event: string, data?: any): number {
+	emitToChannel<TData = unknown>(channel: string, event: string, data?: TData): number {
 		console.debug("[Verani:ActorRuntime] emitToChannel method called, channel:", channel, "event:", event);
-		const eventData = { type: event, ...data };
+		const eventData = { type: event, ...(data as object) };
 		return broadcastImpl(this.sessions, channel, eventData);
 	}
 
@@ -269,9 +269,9 @@ export function createActorHandler<
 	 * const sent = await stub.emitToUser("alice", "notification", { message: "Hello!" });
 	 * ```
 	 */
-	emitToUser(userId: string, event: string, data?: any): number {
+	emitToUser<TData = unknown>(userId: string, event: string, data?: TData): number {
 		console.debug("[Verani:ActorRuntime] emitToUser method called, userId:", userId, "event:", event);
-		const eventData = { type: event, ...data };
+		const eventData = { type: event, ...(data as object) };
 		const frame = { type: "event" as const, channel: "default", data: eventData };
 		const encoded = encodeFrame(frame);
 

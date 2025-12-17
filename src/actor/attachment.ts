@@ -1,34 +1,36 @@
-import type { ConnectionMeta } from "./types";
+import type { ConnectionMeta, VeraniActor } from "./types";
 
 /**
  * Validates that a ConnectionMeta object has all required fields
  * @param meta - The metadata to validate
  * @returns true if valid, false otherwise
  */
-export function isValidConnectionMeta(meta: any): meta is ConnectionMeta {
-  if (!meta || typeof meta !== 'object') {
+export function isValidConnectionMeta(meta: unknown): meta is ConnectionMeta {
+  if (meta === null || typeof meta !== 'object') {
     return false;
   }
+
+  const obj = meta as Record<string, unknown>;
 
   // Check required fields
-  if (typeof meta.userId !== 'string' || !meta.userId) {
-    console.debug("[Verani:Attachment] Invalid userId:", meta.userId);
+  if (typeof obj.userId !== 'string' || !obj.userId) {
+    console.debug("[Verani:Attachment] Invalid userId:", obj.userId);
     return false;
   }
 
-  if (typeof meta.clientId !== 'string' || !meta.clientId) {
-    console.debug("[Verani:Attachment] Invalid clientId:", meta.clientId);
+  if (typeof obj.clientId !== 'string' || !obj.clientId) {
+    console.debug("[Verani:Attachment] Invalid clientId:", obj.clientId);
     return false;
   }
 
-  if (!Array.isArray(meta.channels)) {
-    console.debug("[Verani:Attachment] Invalid channels (not an array):", meta.channels);
+  if (!Array.isArray(obj.channels)) {
+    console.debug("[Verani:Attachment] Invalid channels (not an array):", obj.channels);
     return false;
   }
 
   // Validate channels array contains only strings
-  if (!meta.channels.every((ch: any) => typeof ch === 'string')) {
-    console.debug("[Verani:Attachment] Invalid channels (contains non-string):", meta.channels);
+  if (!obj.channels.every((ch: unknown) => typeof ch === 'string')) {
+    console.debug("[Verani:Attachment] Invalid channels (contains non-string):", obj.channels);
     return false;
   }
 
@@ -57,7 +59,9 @@ export function storeAttachment(ws: WebSocket, meta: ConnectionMeta) {
  * @returns void - Sessions are added directly to actor.sessions Map
  * @throws Error if deserialization fails critically (individual failures are logged and skipped)
  */
-export function restoreSessions(actor: any) {
+export function restoreSessions<TMeta extends ConnectionMeta = ConnectionMeta>(
+  actor: { sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }> } & { ctx: { getWebSockets(): WebSocket[] } }
+): void {
   console.debug("[Verani:Attachment][restoreSessions] Restoring sessions from hibernation");
   let restoredCount = 0;
   let skippedCount = 0;
@@ -71,19 +75,22 @@ export function restoreSessions(actor: any) {
     }
 
     // Deserialize and validate attachment
-    const meta = ws.deserializeAttachment() as ConnectionMeta | undefined;
-    if (!meta) {
+    const rawMeta: unknown = ws.deserializeAttachment();
+    if (!rawMeta) {
       console.debug("[Verani:Attachment][restoreSessions] WebSocket has no attachment, skipping");
       skippedCount++;
       continue;
     }
 
     // Validate metadata structure
-    if (!isValidConnectionMeta(meta)) {
+    if (!isValidConnectionMeta(rawMeta)) {
       console.warn("[Verani:Attachment][restoreSessions] Invalid metadata structure, skipping session");
       skippedCount++;
       continue;
     }
+
+    // At this point, rawMeta is validated as ConnectionMeta, cast to TMeta
+    const meta = rawMeta as TMeta;
 
     console.debug("[Verani:Attachment][restoreSessions] Restored session:", { userId: meta.userId, clientId: meta.clientId });
     actor.sessions.set(ws, { ws, meta });

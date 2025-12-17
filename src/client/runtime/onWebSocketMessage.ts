@@ -1,4 +1,5 @@
 import { decodeServerMessage } from "../protocol";
+import type { WebSocketRawData } from "../protocol";
 import type { KeepaliveManager } from "./keepalive";
 import type { EventEmitter } from "./eventEmitter";
 
@@ -18,7 +19,7 @@ export function handleWebSocketMessage(
 ): void {
   console.debug("[Verani:Client] Message received, data length:", typeof ev.data === "string" ? ev.data.length : "unknown");
 
-  const msg = decodeServerMessage(ev.data);
+  const msg = decodeServerMessage(ev.data as WebSocketRawData);
   if (!msg) {
     console.debug("[Verani:Client] Failed to decode message");
     return;
@@ -33,13 +34,15 @@ export function handleWebSocketMessage(
   }
 
   // Extract the actual event type from wrapped broadcast messages
-  let eventType = msg.type;
-  let eventData = msg.data;
+  let eventType: string = msg.type;
+  let eventData: unknown = msg.data;
 
-  if (msg.type === "event" && msg.data && typeof msg.data === "object" && "type" in msg.data) {
+  // Check if this is a wrapped broadcast message with nested type
+  const msgData = msg.data as Record<string, unknown> | undefined;
+  if (msg.type === "event" && msgData && typeof msgData === "object" && "type" in msgData) {
     // This is a wrapped broadcast message - extract the real event type
-    eventType = msg.data.type;
-    eventData = msg.data;
+    eventType = msgData.type as string;
+    eventData = msgData;
     console.debug("[Verani:Client] Unwrapped event type:", eventType);
   }
 

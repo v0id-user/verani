@@ -9,7 +9,9 @@ import type {
 	BroadcastOptions,
 	AsyncEmitBuilder,
 	ConnectionEmit,
-	ConnectionActorStub
+	ConnectionActorStub,
+	RoomDOBinding,
+	ConnectionDOBinding
 } from "../types";
 import type { RoomActorStub } from "../room-actor";
 import { broadcast as broadcastImpl } from "./broadcast";
@@ -30,11 +32,11 @@ import { sendToUser as sendToUserImpl } from "./sendToUser";
  */
 export function createRpcRoomEmitBuilder(
 	roomName: string,
-	getRoomDO: () => any,
+	getRoomDO: () => RoomDOBinding | undefined,
 	exceptUserId?: string
 ): AsyncEmitBuilder {
 	return {
-		async emit(event: string, data?: any): Promise<number> {
+		async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
 			console.debug(`[Verani:Emit:RPC] Room emit: ${event} to room: ${roomName}`);
 
 			const RoomDO = getRoomDO();
@@ -65,10 +67,10 @@ export function createRpcRoomEmitBuilder(
  */
 export function createRpcUserEmitBuilder(
 	userId: string,
-	getConnectionDO: () => any
+	getConnectionDO: () => ConnectionDOBinding | undefined
 ): AsyncEmitBuilder {
 	return {
-		async emit(event: string, data?: any): Promise<number> {
+		async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
 			console.debug(`[Verani:Emit:RPC] User emit: ${event} to user: ${userId}`);
 
 			const ConnectionDO = getConnectionDO();
@@ -102,14 +104,14 @@ export function createRpcUserEmitBuilder(
 export function createConnectionEmit<TMeta extends ConnectionMeta, E>(
 	ws: WebSocket | null,
 	meta: TMeta,
-	getRoomDO: () => any,
-	getConnectionDO: () => any
+	getRoomDO: () => RoomDOBinding | undefined,
+	getConnectionDO: () => ConnectionDOBinding | undefined
 ): ConnectionEmit<TMeta, E> {
 	return {
 		/**
 		 * Emit to this connection's WebSocket
 		 */
-		emit(event: string, data?: any): void {
+		emit<TData = unknown>(event: string, data?: TData): void {
 			console.debug(`[Verani:Emit:Connection] Emit to self: ${event}`);
 
 			if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -117,14 +119,14 @@ export function createConnectionEmit<TMeta extends ConnectionMeta, E>(
 				return;
 			}
 
-			try {
-				const eventData = { type: event, ...data };
-				const frame = { type: "event", channel: "default", data: eventData };
-				ws.send(encodeFrame(frame));
-			} catch (error) {
-				console.error(`[Verani:Emit:Connection] Failed to emit to socket:`, error);
-			}
-		},
+		try {
+			const eventData = { type: event, ...(data as object) };
+			const frame = { type: "event", channel: "default", data: eventData };
+			ws.send(encodeFrame(frame));
+		} catch (error) {
+			console.error(`[Verani:Emit:Connection] Failed to emit to socket:`, error);
+		}
+	},
 
 		/**
 		 * Target a specific room or user for emitting
@@ -178,9 +180,9 @@ function createUserEmitBuilder<TMeta extends ConnectionMeta, E>(
 ): EmitBuilder<TMeta, E> {
 	console.debug("[Verani:Emit] createUserEmitBuilder for userId:", userId, "channel:", defaultChannel);
 	return {
-		emit(event: string, data?: any): number {
+		emit<TData = unknown>(event: string, data?: TData): number {
 			console.debug("[Verani:Emit] User emit:", event, "to userId:", userId);
-			const eventData = { type: event, ...data };
+			const eventData = { type: event, ...(data as object) };
 			return sendToUserImpl(sessions, userId, defaultChannel, eventData);
 		}
 	};
@@ -204,9 +206,9 @@ function createChannelEmitBuilder<TMeta extends ConnectionMeta, E>(
 ): EmitBuilder<TMeta, E> {
 	console.debug("[Verani:Emit] createChannelEmitBuilder for channel:", channel, "options:", opts);
 	return {
-		emit(event: string, data?: any): number {
+		emit<TData = unknown>(event: string, data?: TData): number {
 			console.debug("[Verani:Emit] Channel emit:", event, "to channel:", channel);
-			const eventData = { type: event, ...data };
+			const eventData = { type: event, ...(data as object) };
 			return broadcastImpl(sessions, channel, eventData, opts);
 		}
 	};
@@ -227,7 +229,7 @@ export function createSocketEmit<TMeta extends ConnectionMeta, E>(
 		/**
 		 * Emit to the current socket
 		 */
-		emit(event: string, data?: any): void {
+		emit<TData = unknown>(event: string, data?: TData): void {
 			console.debug(`[Verani:Emit] Socket emit: ${event}`);
 			if (ctx.ws.readyState !== WebSocket.OPEN) {
 				console.warn(`[Verani:Emit] Cannot emit to closed socket: ${event}`);
@@ -235,7 +237,7 @@ export function createSocketEmit<TMeta extends ConnectionMeta, E>(
 			}
 
 			try {
-				const eventData = { type: event, ...data };
+				const eventData = { type: event, ...(data as object) };
 				const frame = { type: "event", channel: defaultChannel, data: eventData };
 				ctx.ws.send(encodeFrame(frame));
 			} catch (error) {
@@ -288,9 +290,9 @@ export function createActorEmit<TMeta extends ConnectionMeta, E>(
 		/**
 		 * Broadcast to default channel
 		 */
-		emit(event: string, data?: any): number {
+		emit<TData = unknown>(event: string, data?: TData): number {
 			console.debug(`[Verani:Emit] Actor emit: ${event}`);
-			const eventData = { type: event, ...data };
+			const eventData = { type: event, ...(data as object) };
 			return broadcastImpl(actor.sessions, defaultChannel, eventData);
 		},
 

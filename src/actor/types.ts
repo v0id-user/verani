@@ -1,8 +1,53 @@
 import type { Actor } from "@cloudflare/actors";
-import type { ConnectionMeta, MessageFrame } from "../shared/types";
+import type { ConnectionMeta, MessageFrame, WebSocketRawData } from "../shared/types";
 import type { SafePersistOptions } from "./persist";
 
-export type { ConnectionMeta, MessageFrame };
+export type { ConnectionMeta, MessageFrame, WebSocketRawData };
+
+// ============================================================================
+// Durable Object Binding Types
+// ============================================================================
+
+/**
+ * Type for Durable Object namespace bindings.
+ * Provides proper typing for DO.get() and ID methods.
+ *
+ * @template TStub - The stub interface type returned by get()
+ */
+export interface DurableObjectBinding<TStub> {
+  get(id: DurableObjectId): TStub;
+  get(id: string): TStub;
+  idFromName(name: string): DurableObjectId;
+  idFromString(hexId: string): DurableObjectId;
+  newUniqueId(): DurableObjectId;
+}
+
+/**
+ * Type alias for ConnectionDO binding
+ */
+export type ConnectionDOBinding = DurableObjectBinding<ConnectionActorStub>;
+
+/**
+ * Type alias for RoomDO binding
+ */
+export type RoomDOBinding = DurableObjectBinding<RoomActorStub>;
+
+/**
+ * Stub interface for RoomDO - forward declaration
+ * Full definition is in room-actor.ts
+ */
+export interface RoomActorStub {
+  join(userId: string, metadata?: Record<string, unknown>): Promise<void>;
+  leave(userId: string): Promise<void>;
+  broadcast(event: string, data?: unknown, opts?: BroadcastOptions): Promise<number>;
+  getMembers(): Promise<RoomMember[]>;
+  getMemberCount(): Promise<number>;
+  hasMember(userId: string): Promise<boolean>;
+}
+
+// ============================================================================
+// Broadcast Options
+// ============================================================================
 
 // ============================================================================
 // Broadcast Options
@@ -99,14 +144,14 @@ export interface ConnectionActorStub {
    * @param data - Event data
    * @returns Promise resolving to true if delivered, false if connection is closed
    */
-  deliverMessage(event: string, data?: any): Promise<boolean>;
+  deliverMessage<TData = unknown>(event: string, data?: TData): Promise<boolean>;
 
   /**
    * Deliver a system event to this connection (presence updates, room events, etc.)
    * @param type - System event type
    * @param payload - Event payload
    */
-  deliverSystemEvent(type: string, payload?: any): Promise<void>;
+  deliverSystemEvent<TPayload = unknown>(type: string, payload?: TPayload): Promise<void>;
 
   /**
    * Get the userId this connection belongs to
@@ -175,7 +220,7 @@ export interface ActorStub {
 	 * await stub.emitToChannel("default", "announcement", { text: "Hello!" });
 	 * ```
 	 */
-	emitToChannel(channel: string, event: string, data?: any): Promise<number>;
+	emitToChannel<TData = unknown>(channel: string, event: string, data?: TData): Promise<number>;
 
 	/**
 	 * Socket.IO-like emit API: Emit an event to a specific user (all their sessions) via RPC.
@@ -188,7 +233,7 @@ export interface ActorStub {
 	 * await stub.emitToUser("alice", "notification", { message: "Hello!" });
 	 * ```
 	 */
-	emitToUser(userId: string, event: string, data?: any): Promise<number>;
+	emitToUser<TData = unknown>(userId: string, event: string, data?: TData): Promise<number>;
 
 	/**
 	 * @deprecated Use `emitToUser()` instead for Socket.IO-like API.
@@ -198,7 +243,7 @@ export interface ActorStub {
 	 * @param data - Message data
 	 * @returns Promise resolving to the number of sessions that received the message
 	 */
-	sendToUser(userId: string, channel: string, data?: any): Promise<number>;
+	sendToUser<TData = unknown>(userId: string, channel: string, data?: TData): Promise<number>;
 
 	/**
 	 * @deprecated Use `emitToChannel()` instead for Socket.IO-like API.
@@ -210,7 +255,7 @@ export interface ActorStub {
 	 * @param opts - Broadcast options (filtering by userIds or clientIds)
 	 * @returns Promise resolving to the number of connections that received the message
 	 */
-	broadcast(channel: string, data: any, opts?: RpcBroadcastOptions): Promise<number>;
+	broadcast<TData = unknown>(channel: string, data: TData, opts?: RpcBroadcastOptions): Promise<number>;
 
 	/**
 	 * Gets the total number of active sessions via RPC.
@@ -262,7 +307,7 @@ export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = 
    * Returns the number of connections the message was sent to.
    * @see @src/actor/actor-runtime.ts broadcast()
    */
-  broadcast(channel: string, data: any, opts?: BroadcastOptions): number;
+  broadcast<TData = unknown>(channel: string, data: TData, opts?: BroadcastOptions): number;
 
   /**
    * Returns the number of currently connected WebSocket sessions.
@@ -289,7 +334,7 @@ export interface VeraniActor<TMeta extends ConnectionMeta = ConnectionMeta, E = 
    * The message "type" is always "event" (see src/actor/actor-runtime.ts).
    * @see @src/actor/actor-runtime.ts sendToUser()
    */
-  sendToUser(userId: string, channel: string, data?: any): number;
+  sendToUser<TData = unknown>(userId: string, channel: string, data?: TData): number;
 
   /**
    * Validates and removes stale WebSocket sessions.
@@ -347,12 +392,12 @@ export interface ConnectionActor<TMeta extends ConnectionMeta = ConnectionMeta, 
    * Deliver a message to this connection's WebSocket
    * Called via RPC from RoomDO
    */
-  deliverMessage(event: string, data?: any): Promise<boolean>;
+  deliverMessage<TData = unknown>(event: string, data?: TData): Promise<boolean>;
 
   /**
    * Deliver a system event (presence, room events, etc.)
    */
-  deliverSystemEvent(type: string, payload?: any): Promise<void>;
+  deliverSystemEvent<TPayload = unknown>(type: string, payload?: TPayload): Promise<void>;
 
   /**
    * Join a room (register with RoomDO)
@@ -385,7 +430,7 @@ export interface ConnectionEmit<TMeta extends ConnectionMeta = ConnectionMeta, E
    * @param event - Event name
    * @param data - Event data
    */
-  emit(event: string, data?: any): void;
+  emit<TData = unknown>(event: string, data?: TData): void;
 
   /**
    * Target a specific room or user for emitting
@@ -419,15 +464,25 @@ export interface AsyncEmitBuilder {
    * @param data - Event data
    * @returns Promise resolving to number of recipients
    */
-  emit(event: string, data?: any): Promise<number>;
+  emit<TData = unknown>(event: string, data?: TData): Promise<number>;
 }
 
 /**
  * Event handler function type for socket.io-like event handling
+ *
+ * @template TMeta - Connection metadata type
+ * @template E - Environment type
+ * @template TState - Room state type
+ * @template TData - Event data type (defaults to unknown for type safety)
  */
-export type EventHandler<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown, TState extends Record<string, unknown> = Record<string, unknown>> = (
+export type EventHandler<
+  TMeta extends ConnectionMeta = ConnectionMeta,
+  E = unknown,
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TData = unknown
+> = (
   ctx: MessageContext<TMeta, E, TState>,
-  data: any
+  data: TData
 ) => void | Promise<void>;
 
 /**
@@ -439,14 +494,14 @@ export interface RoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta,
    * @param event - Event name (supports wildcard "*")
    * @param handler - Handler function
    */
-  on(event: string, handler: EventHandler<TMeta, E, TState>): void;
+  on<TData = unknown>(event: string, handler: EventHandler<TMeta, E, TState, TData>): void;
 
   /**
    * Remove an event handler
    * @param event - Event name
    * @param handler - Optional specific handler to remove, or remove all handlers for event
    */
-  off(event: string, handler?: EventHandler<TMeta, E, TState>): void;
+  off<TData = unknown>(event: string, handler?: EventHandler<TMeta, E, TState, TData>): void;
 
   /**
    * Emit an event to registered handlers
@@ -454,7 +509,7 @@ export interface RoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta,
    * @param ctx - Message context
    * @param data - Event data
    */
-  emit(event: string, ctx: MessageContext<TMeta, E, TState>, data: any): Promise<void>;
+  emit<TData = unknown>(event: string, ctx: MessageContext<TMeta, E, TState>, data: TData): Promise<void>;
 
   /**
    * Check if there are any handlers registered for a given event.
@@ -483,7 +538,7 @@ export interface EmitBuilder<TMeta extends ConnectionMeta = ConnectionMeta, E = 
    * @param data - Event data
    * @returns Number of connections that received the message
    */
-  emit(event: string, data?: any): number;
+  emit<TData = unknown>(event: string, data?: TData): number;
 }
 
 /**
@@ -496,7 +551,7 @@ export interface SocketEmit<TMeta extends ConnectionMeta = ConnectionMeta, E = u
    * @param event - Event name
    * @param data - Event data
    */
-  emit(event: string, data?: any): void;
+  emit<TData = unknown>(event: string, data?: TData): void;
 
   /**
    * Target a specific user or channel for emitting
@@ -517,7 +572,7 @@ export interface ActorEmit<TMeta extends ConnectionMeta = ConnectionMeta, E = un
    * @param data - Event data
    * @returns Number of connections that received the message
    */
-  emit(event: string, data?: any): number;
+  emit<TData = unknown>(event: string, data?: TData): number;
 
   /**
    * Target a specific channel for broadcasting

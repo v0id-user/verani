@@ -1,5 +1,5 @@
 import { decodeFrame, encodeFrame } from "../protocol";
-import type { RoomDefinition, MessageContext, MessageFrame, ConnectionMeta, VeraniActor } from "../types";
+import type { RoomDefinition, MessageContext, MessageFrame, ConnectionMeta, VeraniActor, WebSocketRawData } from "../types";
 import { createSocketEmit } from "./emit";
 
 /**
@@ -18,7 +18,7 @@ export async function onWebSocketMessage<TMeta extends ConnectionMeta, E>(
 	actor: VeraniActor<TMeta, E>,
 	room: RoomDefinition<TMeta, E>,
 	ws: WebSocket,
-	raw: any
+	raw: WebSocketRawData
 ): Promise<void> {
 	let session: { ws: WebSocket; meta: TMeta } | undefined;
 

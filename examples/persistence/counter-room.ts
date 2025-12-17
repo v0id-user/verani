@@ -41,7 +41,7 @@ export const counterRoom = defineRoom({
 });
 
 // Event: Increment the counter
-counterRoom.on("counter:increment", (ctx, data) => {
+counterRoom.on<{ amount?: number }>("counter:increment", (ctx, data) => {
   const amount = data?.amount ?? 1;
 
   ctx.actor.roomState.count += amount;
@@ -57,7 +57,7 @@ counterRoom.on("counter:increment", (ctx, data) => {
 });
 
 // Event: Decrement the counter
-counterRoom.on("counter:decrement", (ctx, data) => {
+counterRoom.on<{ amount?: number }>("counter:decrement", (ctx, data) => {
   const amount = data?.amount ?? 1;
 
   ctx.actor.roomState.count -= amount;
