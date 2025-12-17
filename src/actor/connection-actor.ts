@@ -270,10 +270,10 @@ export function createConnectionHandler<
 		private createEmit(): ConnectionEmit<TMeta, E> {
 			const self = this;
 
-			return {
-				emit<TData = unknown>(event: string, data?: TData): void {
-					self.sendToWebSocket(event, data);
-				},
+		return {
+			emit<TData = unknown>(event: string, data?: TData): void {
+				self.sendToWebSocket(event, data);
+			},
 
 				to(target: string): AsyncEmitBuilder {
 					// Check if target is a room or user

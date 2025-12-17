@@ -119,14 +119,14 @@ export function createConnectionEmit<TMeta extends ConnectionMeta, E>(
 				return;
 			}
 
-			try {
-				const eventData = { type: event, ...(data as object) };
-				const frame = { type: "event", channel: "default", data: eventData };
-				ws.send(encodeFrame(frame));
-			} catch (error) {
-				console.error(`[Verani:Emit:Connection] Failed to emit to socket:`, error);
-			}
-		},
+		try {
+			const eventData = { type: event, ...(data as object) };
+			const frame = { type: "event", channel: "default", data: eventData };
+			ws.send(encodeFrame(frame));
+		} catch (error) {
+			console.error(`[Verani:Emit:Connection] Failed to emit to socket:`, error);
+		}
+	},
 
 		/**
 		 * Target a specific room or user for emitting
