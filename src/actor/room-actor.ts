@@ -1,5 +1,5 @@
 import { Actor } from "@cloudflare/actors";
-import type { RoomCoordinatorDefinition, RoomMember, BroadcastOptions } from "./types";
+import type { RoomCoordinatorDefinition, RoomMember, BroadcastOptions, ConnectionDOBinding } from "./types";
 
 /**
  * Symbol keys for internal state
@@ -32,7 +32,7 @@ export interface RoomActorStub {
 	 * Broadcast a message to all members in the room
 	 * This triggers RPC calls to each member's ConnectionDO
 	 */
-	broadcast(event: string, data?: any, opts?: BroadcastOptions): Promise<number>;
+	broadcast<TData = unknown>(event: string, data?: TData, opts?: BroadcastOptions): Promise<number>;
 
 	/**
 	 * Get all current members of the room
@@ -124,11 +124,11 @@ export function createRoomHandler<E = unknown>(
 		 * Reference to ConnectionDO class for RPC calls
 		 * This will be injected via environment bindings
 		 */
-		private getConnectionDO(): any {
+		private getConnectionDO(): ConnectionDOBinding | undefined {
 			// Access the ConnectionDO binding from environment
 			// The binding name should match wrangler.toml configuration
-			const env = this.env as any;
-			return env.CONNECTION_DO || env.ConnectionDO || env.VERANI_CONNECTION;
+			const env = this.env as Record<string, unknown>;
+			return (env.CONNECTION_DO || env.ConnectionDO || env.VERANI_CONNECTION) as ConnectionDOBinding | undefined;
 		}
 
 		/**
@@ -243,7 +243,7 @@ export function createRoomHandler<E = unknown>(
 		 * @param opts - Broadcast options (exclude specific users, etc.)
 		 * @returns Number of members the message was sent to
 		 */
-		async broadcast(event: string, data?: any, opts?: BroadcastOptions): Promise<number> {
+		async broadcast<TData = unknown>(event: string, data?: TData, opts?: BroadcastOptions): Promise<number> {
 			console.debug(`[Verani:RoomDO] Broadcasting "${event}" to ${this[MEMBERS].size} members`);
 
 			const ConnectionDO = this.getConnectionDO();
@@ -256,7 +256,7 @@ export function createRoomHandler<E = unknown>(
 			const errors: Error[] = [];
 
 			// Iterate through members and send via RPC
-			for (const [userId, member] of this[MEMBERS].entries()) {
+			for (const [userId, _member] of this[MEMBERS].entries()) {
 				// Skip if userIds filter is specified and doesn't match
 				if (opts?.userIds && !opts.userIds.includes(userId)) {
 					continue;

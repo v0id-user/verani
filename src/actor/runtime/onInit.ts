@@ -30,9 +30,10 @@ export async function onInit<TMeta extends ConnectionMeta, E>(
 	}
 
 	// Restore sessions with separate error handling
+	// Cast actor to access protected ctx property from Actor base class
 	let restoreError: Error | undefined;
 	try {
-		restoreSessions(actor);
+		restoreSessions(actor as unknown as { sessions: typeof actor.sessions; ctx: { getWebSockets(): WebSocket[] } });
 		console.debug("[Verani:ActorRuntime] Sessions restored, count:", actor.sessions.size);
 	} catch (error) {
 		restoreError = error as Error;

@@ -55,14 +55,14 @@ export interface RoomDefinitionWithHandlers<TMeta extends ConnectionMeta = Conne
    * @param event - Event name
    * @param handler - Handler function
    */
-  on(event: string, handler: EventHandler<TMeta, E, TState>): void;
+  on<TData = unknown>(event: string, handler: EventHandler<TMeta, E, TState, TData>): void;
 
   /**
    * Remove an event handler (socket.io-like API)
    * @param event - Event name
    * @param handler - Optional specific handler to remove
    */
-  off(event: string, handler?: EventHandler<TMeta, E, TState>): void;
+  off<TData = unknown>(event: string, handler?: EventHandler<TMeta, E, TState, TData>): void;
 }
 
 /**
@@ -117,18 +117,18 @@ export function defineRoom<
     persistOptions: def.persistOptions,
     onPersistError: def.onPersistError,
     // Socket.io-like convenience methods
-    on(event: string, handler: EventHandler<TMeta, E, TState>): void {
+    on<TData = unknown>(event: string, handler: EventHandler<TMeta, E, TState, TData>): void {
       // Store in both eventEmitter (for current instance) and static storage (for persistence)
       eventEmitter.on(event, handler);
 
-      // Add to static storage
+      // Add to static storage (cast to base EventHandler for storage)
       if (!staticHandlers.has(event)) {
         staticHandlers.set(event, new Set());
       }
-      staticHandlers.get(event)!.add(handler);
+      staticHandlers.get(event)!.add(handler as EventHandler<TMeta, E, TState>);
       console.debug(`[Verani:Router] Registered handler for event: ${event} (stored statically)`);
     },
-    off(event: string, handler?: EventHandler<TMeta, E, TState>): void {
+    off<TData = unknown>(event: string, handler?: EventHandler<TMeta, E, TState, TData>): void {
       // Remove from both eventEmitter and static storage
       eventEmitter.off(event, handler);
 
@@ -136,7 +136,7 @@ export function defineRoom<
       const eventHandlers = staticHandlers.get(event);
       if (eventHandlers) {
         if (handler) {
-          eventHandlers.delete(handler);
+          eventHandlers.delete(handler as EventHandler<TMeta, E, TState>);
           console.debug(`[Verani:Router] Removed specific handler for event: ${event} (from static storage)`);
           if (eventHandlers.size === 0) {
             staticHandlers.delete(event);

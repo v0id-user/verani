@@ -287,7 +287,7 @@ export const presenceRoom = defineRoom<PresenceMeta>({
 });
 
 // Register event handlers (socket.io-like)
-presenceRoom.on("presence.status", async (ctx, data) => {
+presenceRoom.on<{ status: "online" | "away" | "busy" }>("presence.status", async (ctx, data) => {
   const { status } = data;
 
   // Validate status

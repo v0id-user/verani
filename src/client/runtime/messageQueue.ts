@@ -3,10 +3,12 @@ import { encodeClientMessage } from "../protocol";
 /**
  * Message to be sent, queued when connection is not ready.
  * Messages are automatically flushed when the connection is established.
+ *
+ * @template TData - Type of the message data payload
  */
-export interface QueuedMessage {
+export interface QueuedMessage<TData = unknown> {
   type: string;
-  data?: any;
+  data?: TData;
 }
 
 /**
@@ -15,7 +17,7 @@ export interface QueuedMessage {
  * when the connection is established. If the queue reaches maxQueueSize, oldest messages are dropped.
  */
 export class MessageQueue {
-  private queue: QueuedMessage[] = [];
+  private queue: QueuedMessage<unknown>[] = [];
 
   constructor(private maxQueueSize: number) {}
 
@@ -25,13 +27,13 @@ export class MessageQueue {
    *
    * @param msg - Message to queue
    */
-  queueMessage(msg: QueuedMessage): void {
+  queueMessage<TData = unknown>(msg: QueuedMessage<TData>): void {
     console.debug("[Verani:Client] Queuing message, type:", msg.type, "queue size:", this.queue.length);
     if (this.queue.length >= this.maxQueueSize) {
       console.warn("[Verani] Message queue full, dropping oldest message");
       this.queue.shift();
     }
-    this.queue.push(msg);
+    this.queue.push(msg as QueuedMessage<unknown>);
   }
 
   /**

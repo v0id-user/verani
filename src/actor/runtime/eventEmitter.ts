@@ -18,11 +18,11 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 	 * @param event - Event name (supports wildcard "*")
 	 * @param handler - Handler function
 	 */
-	on(event: string, handler: EventHandler<TMeta, E, TState>): void {
+	on<TData = unknown>(event: string, handler: EventHandler<TMeta, E, TState, TData>): void {
 		if (!this.handlers.has(event)) {
 			this.handlers.set(event, new Set());
 		}
-		this.handlers.get(event)!.add(handler);
+		this.handlers.get(event)!.add(handler as EventHandler<TMeta, E, TState>);
 		console.debug(`[Verani:EventEmitter] Registered handler for event: ${event}`);
 	}
 
@@ -31,14 +31,14 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 	 * @param event - Event name
 	 * @param handler - Optional specific handler to remove, or remove all handlers for event
 	 */
-	off(event: string, handler?: EventHandler<TMeta, E, TState>): void {
+	off<TData = unknown>(event: string, handler?: EventHandler<TMeta, E, TState, TData>): void {
 		const eventHandlers = this.handlers.get(event);
 		if (!eventHandlers) {
 			return;
 		}
 
 		if (handler) {
-			eventHandlers.delete(handler);
+			eventHandlers.delete(handler as EventHandler<TMeta, E, TState>);
 			console.debug(`[Verani:EventEmitter] Removed specific handler for event: ${event}`);
 			if (eventHandlers.size === 0) {
 				this.handlers.delete(event);
@@ -55,7 +55,7 @@ export class RoomEventEmitterImpl<TMeta extends ConnectionMeta = ConnectionMeta,
 	 * @param ctx - Message context
 	 * @param data - Event data
 	 */
-	async emit(event: string, ctx: MessageContext<TMeta, E, TState>, data: any): Promise<void> {
+	async emit<TData = unknown>(event: string, ctx: MessageContext<TMeta, E, TState>, data: TData): Promise<void> {
 		console.debug(`[Verani:EventEmitter] Emitting event: ${event}`);
 
 		// Get handlers for the specific event

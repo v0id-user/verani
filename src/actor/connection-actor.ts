@@ -4,7 +4,10 @@ import type {
 	ConnectionActorStub,
 	ConnectionEmit,
 	AsyncEmitBuilder,
-	BroadcastOptions
+	BroadcastOptions,
+	RoomDOBinding,
+	ConnectionDOBinding,
+	WebSocketRawData
 } from "./types";
 import type { RoomActorStub } from "./room-actor";
 import { storeAttachment } from "./attachment";
@@ -65,7 +68,7 @@ export interface ConnectionDefinition<
 	/**
 	 * Called when a message is received from the WebSocket
 	 */
-	onMessage?(ctx: ConnectionContext<TMeta, E, TState>, frame: any): void | Promise<void>;
+	onMessage?(ctx: ConnectionContext<TMeta, E, TState>, frame: unknown): void | Promise<void>;
 
 	/**
 	 * Called when an error occurs
@@ -75,12 +78,12 @@ export interface ConnectionDefinition<
 	/**
 	 * Called after waking from hibernation
 	 */
-	onHibernationRestore?(actor: any): void | Promise<void>;
+	onHibernationRestore?(actor: ConnectionHandlerInstance<TMeta, E, TState>): void | Promise<void>;
 
 	/**
 	 * Event handlers map (socket.io-like)
 	 */
-	handlers?: Map<string, (ctx: ConnectionContext<TMeta, E, TState>, data: any) => void | Promise<void>>;
+	handlers?: Map<string, (ctx: ConnectionContext<TMeta, E, TState>, data: unknown) => void | Promise<void>>;
 
 	/**
 	 * Initial state for this connection
@@ -104,6 +107,23 @@ export interface ConnectionDefinition<
 }
 
 /**
+ * Instance interface for ConnectionHandler actors
+ * Used for typing the actor parameter in lifecycle hooks
+ */
+export interface ConnectionHandlerInstance<
+	TMeta extends ConnectionMeta = ConnectionMeta,
+	E = unknown,
+	TState extends Record<string, unknown> = Record<string, unknown>
+> {
+	connectionState: TState;
+	isStateReady(): boolean;
+	getStorage(): DurableObjectStorage;
+	joinRoom(roomName: string, metadata?: Record<string, unknown>): Promise<void>;
+	leaveRoom(roomName: string): Promise<void>;
+	getRooms(): Promise<string[]>;
+}
+
+/**
  * Context provided to connection lifecycle hooks
  */
 export interface ConnectionContext<
@@ -112,7 +132,7 @@ export interface ConnectionContext<
 	TState extends Record<string, unknown> = Record<string, unknown>
 > {
 	/** The connection actor instance */
-	actor: any;
+	actor: ConnectionHandlerInstance<TMeta, E, TState>;
 	/** The WebSocket connection (may be null after disconnect) */
 	ws: WebSocket | null;
 	/** Connection metadata */
@@ -201,7 +221,7 @@ export function createConnectionHandler<
 		/**
 		 * Event handlers (socket.io-like)
 		 */
-		private handlers = new Map<string, (ctx: ConnectionContext<TMeta, E, TState>, data: any) => void | Promise<void>>();
+		private handlers = new Map<string, (ctx: ConnectionContext<TMeta, E, TState>, data: unknown) => void | Promise<void>>();
 
 		/**
 		 * Get persisted state
@@ -231,17 +251,17 @@ export function createConnectionHandler<
 		/**
 		 * Get RoomDO binding from environment
 		 */
-		private getRoomDO(): any {
-			const env = this.env as any;
-			return env.ROOM_DO || env.RoomDO || env.VERANI_ROOM;
+		private getRoomDO(): RoomDOBinding | undefined {
+			const env = this.env as Record<string, unknown>;
+			return (env.ROOM_DO || env.RoomDO || env.VERANI_ROOM) as RoomDOBinding | undefined;
 		}
 
 		/**
 		 * Get ConnectionDO binding from environment (for user-to-user messaging)
 		 */
-		private getConnectionDO(): any {
-			const env = this.env as any;
-			return env.CONNECTION_DO || env.ConnectionDO || env.VERANI_CONNECTION;
+		private getConnectionDO(): ConnectionDOBinding | undefined {
+			const env = this.env as Record<string, unknown>;
+			return (env.CONNECTION_DO || env.ConnectionDO || env.VERANI_CONNECTION) as ConnectionDOBinding | undefined;
 		}
 
 		/**
@@ -251,7 +271,7 @@ export function createConnectionHandler<
 			const self = this;
 
 			return {
-				emit(event: string, data?: any): void {
+				emit<TData = unknown>(event: string, data?: TData): void {
 					self.sendToWebSocket(event, data);
 				},
 
@@ -280,7 +300,7 @@ export function createConnectionHandler<
 		private createRoomEmitBuilder(roomName: string): AsyncEmitBuilder {
 			const self = this;
 			return {
-				async emit(event: string, data?: any): Promise<number> {
+				async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
 					const RoomDO = self.getRoomDO();
 					if (!RoomDO) {
 						console.error("[Verani:ConnectionDO] RoomDO binding not found");
@@ -307,7 +327,7 @@ export function createConnectionHandler<
 		private createUserEmitBuilder(userId: string): AsyncEmitBuilder {
 			const self = this;
 			return {
-				async emit(event: string, data?: any): Promise<number> {
+				async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
 					const ConnectionDO = self.getConnectionDO();
 					if (!ConnectionDO) {
 						console.error("[Verani:ConnectionDO] ConnectionDO binding not found");
@@ -329,7 +349,7 @@ export function createConnectionHandler<
 		/**
 		 * Send a message to this connection's WebSocket
 		 */
-		private sendToWebSocket(event: string, data?: any): boolean {
+		private sendToWebSocket<TData = unknown>(event: string, data?: TData): boolean {
 			const ws = this[WS];
 			if (!ws || ws.readyState !== WebSocket.OPEN) {
 				console.debug("[Verani:ConnectionDO] Cannot send - WebSocket not open");
@@ -337,7 +357,7 @@ export function createConnectionHandler<
 			}
 
 			try {
-				const eventData = { type: event, ...data };
+				const eventData = { type: event, ...(data as object) };
 				const frame = { type: "event", channel: "default", data: eventData };
 				ws.send(encodeFrame(frame));
 				return true;
@@ -487,7 +507,7 @@ export function createConnectionHandler<
 		/**
 		 * Handle WebSocket message
 		 */
-		protected async onWebSocketMessage(ws: WebSocket, raw: any) {
+		protected async onWebSocketMessage(ws: WebSocket, raw: WebSocketRawData) {
 			console.debug("[Verani:ConnectionDO] onWebSocketMessage called");
 
 			if (!this[META]) {
@@ -497,13 +517,16 @@ export function createConnectionHandler<
 
 			try {
 				// Parse message
-				const frame = typeof raw === "string" ? JSON.parse(raw) : raw;
-				const eventType = frame.data?.type || frame.type;
+				const str = typeof raw === "string" ? raw : raw.toString();
+				const frame: unknown = JSON.parse(str);
+				const frameObj = frame as Record<string, unknown>;
+				const frameData = frameObj.data as Record<string, unknown> | undefined;
+				const eventType = (frameData?.type || frameObj.type) as string;
 
 				// Check for registered handler
 				const handler = this.handlers.get(eventType);
 				if (handler) {
-					await handler(this.createContext(), frame.data);
+					await handler(this.createContext(), frameData);
 					return;
 				}
 
@@ -574,7 +597,7 @@ export function createConnectionHandler<
 		 * Deliver a message to this connection's WebSocket
 		 * Called via RPC from RoomDO during broadcast
 		 */
-		async deliverMessage(event: string, data?: any): Promise<boolean> {
+		async deliverMessage<TData = unknown>(event: string, data?: TData): Promise<boolean> {
 			console.debug(`[Verani:ConnectionDO] deliverMessage: ${event}`);
 			return this.sendToWebSocket(event, data);
 		}
@@ -582,7 +605,7 @@ export function createConnectionHandler<
 		/**
 		 * Deliver a system event (presence updates, room events, etc.)
 		 */
-		async deliverSystemEvent(type: string, payload?: any): Promise<void> {
+		async deliverSystemEvent<TPayload = unknown>(type: string, payload?: TPayload): Promise<void> {
 			console.debug(`[Verani:ConnectionDO] deliverSystemEvent: ${type}`);
 			this.sendToWebSocket(`system:${type}`, payload);
 		}
@@ -733,8 +756,8 @@ export function createConnectionHandler<
 		/**
 		 * Register an event handler (socket.io-like)
 		 */
-		on(event: string, handler: (ctx: ConnectionContext<TMeta, E, TState>, data: any) => void | Promise<void>): void {
-			this.handlers.set(event, handler);
+		on<TData = unknown>(event: string, handler: (ctx: ConnectionContext<TMeta, E, TState>, data: TData) => void | Promise<void>): void {
+			this.handlers.set(event, handler as (ctx: ConnectionContext<TMeta, E, TState>, data: unknown) => void | Promise<void>);
 		}
 
 		/**
@@ -763,7 +786,7 @@ export interface ConnectionDefinitionWithHandlers<
 	E = unknown,
 	TState extends Record<string, unknown> = Record<string, unknown>
 > extends ConnectionDefinition<TMeta, E, TState> {
-	on(event: string, handler: (ctx: ConnectionContext<TMeta, E, TState>, data: any) => void | Promise<void>): void;
+	on<TData = unknown>(event: string, handler: (ctx: ConnectionContext<TMeta, E, TState>, data: TData) => void | Promise<void>): void;
 	off(event: string): void;
 }
 
@@ -777,13 +800,13 @@ export function defineConnection<
 >(
 	def: ConnectionDefinition<TMeta, E, TState>
 ): ConnectionDefinitionWithHandlers<TMeta, E, TState> {
-	const handlers = new Map<string, (ctx: ConnectionContext<TMeta, E, TState>, data: any) => void | Promise<void>>();
+	const handlers = new Map<string, (ctx: ConnectionContext<TMeta, E, TState>, data: unknown) => void | Promise<void>>();
 
 	return {
 		...def,
 		handlers,
-		on(event: string, handler: (ctx: ConnectionContext<TMeta, E, TState>, data: any) => void | Promise<void>): void {
-			handlers.set(event, handler);
+		on<TData = unknown>(event: string, handler: (ctx: ConnectionContext<TMeta, E, TState>, data: TData) => void | Promise<void>): void {
+			handlers.set(event, handler as (ctx: ConnectionContext<TMeta, E, TState>, data: unknown) => void | Promise<void>);
 		},
 		off(event: string): void {
 			handlers.delete(event);

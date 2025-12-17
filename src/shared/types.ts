@@ -4,34 +4,44 @@
  */
 
 /**
+ * Proper type for raw WebSocket data.
+ * Represents all possible data types that can be received from a WebSocket.
+ */
+export type WebSocketRawData = string | ArrayBuffer | ArrayBufferView;
+
+/**
  * Base message frame structure used for all WebSocket communication.
  * All messages sent over WebSocket follow this structure.
+ *
+ * @template TData - Type of the data payload (defaults to unknown for type safety)
  */
-export interface MessageFrame {
+export interface MessageFrame<TData = unknown> {
   type: string;
   channel?: string;
-  data?: any;
+  data?: TData;
 }
+
+/**
+ * Backward-compatible alias for MessageFrame with unknown data.
+ * Use this when you need to explicitly indicate untyped data.
+ */
+export type UntypedMessageFrame = MessageFrame<unknown>;
 
 /**
  * Message sent from client to server.
  * Extends MessageFrame with no additional fields, but semantically represents client-originated messages.
+ *
+ * @template TData - Type of the data payload (defaults to unknown for type safety)
  */
-export interface ClientMessage extends MessageFrame {
-  type: string;
-  channel?: string;
-  data?: any;
-}
+export interface ClientMessage<TData = unknown> extends MessageFrame<TData> {}
 
 /**
  * Message sent from server to client.
  * Extends MessageFrame with no additional fields, but semantically represents server-originated messages.
+ *
+ * @template TData - Type of the data payload (defaults to unknown for type safety)
  */
-export interface ServerMessage extends MessageFrame {
-  type: string;
-  channel?: string;
-  data?: any;
-}
+export interface ServerMessage<TData = unknown> extends MessageFrame<TData> {}
 
 /**
  * Connection metadata attached to each WebSocket.

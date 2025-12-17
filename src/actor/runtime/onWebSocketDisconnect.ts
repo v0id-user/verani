@@ -8,7 +8,7 @@
  * For new projects, use the per-connection architecture:
  * - createConnectionHandler() from "../connection-actor"
  * - createRoomHandler() from "../room-actor"
- *
+ *`
  * The deprecation warnings on createSocketEmit() are expected and correct here.
  */
 import type { RoomDefinition, RoomContext, MessageContext, ConnectionMeta, VeraniActor, MessageFrame } from "../types";

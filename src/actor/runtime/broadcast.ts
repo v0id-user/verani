@@ -31,10 +31,10 @@ import type { MessageFrame, BroadcastOptions, ConnectionMeta } from "../types";
  * @param opts - Broadcast options (filtering, exclusions)
  * @returns Number of connections that received the message
  */
-export function broadcast<TMeta extends ConnectionMeta>(
+export function broadcast<TMeta extends ConnectionMeta, TData = unknown>(
 	sessions: Map<WebSocket, { ws: WebSocket; meta: TMeta }>,
 	channel: string,
-	data: any,
+	data: TData,
 	opts?: BroadcastOptions
 ): number {
 	console.debug("[Verani:ActorRuntime] Broadcasting to channel:", channel, "options:", opts);

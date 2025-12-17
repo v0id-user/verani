@@ -1,10 +1,15 @@
 /**
+ * Generic callback type for event listeners
+ */
+export type EventCallback<TData = unknown> = (data: TData) => void;
+
+/**
  * Manages event listeners and lifecycle events for the Verani client.
  * Provides methods to register, remove, and dispatch events.
  * Supports both regular event listeners and one-time listeners.
  */
 export class EventEmitter {
-  private listeners = new Map<string, Set<(data: any) => void>>();
+  private listeners = new Map<string, Set<EventCallback<unknown>>>();
 
   /**
    * Registers an event listener that will be called whenever the event is dispatched.
@@ -13,11 +18,11 @@ export class EventEmitter {
    * @param event - Event type to listen for
    * @param callback - Callback function to invoke when event is received
    */
-  on(event: string, callback: (data: any) => void): void {
+  on<TData = unknown>(event: string, callback: EventCallback<TData>): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(callback);
+    this.listeners.get(event)!.add(callback as EventCallback<unknown>);
   }
 
   /**
@@ -27,10 +32,10 @@ export class EventEmitter {
    * @param event - Event type to remove listener from
    * @param callback - Callback function to remove (must be the same function reference)
    */
-  off(event: string, callback: (data: any) => void): void {
+  off<TData = unknown>(event: string, callback: EventCallback<TData>): void {
     const set = this.listeners.get(event);
     if (set) {
-      set.delete(callback);
+      set.delete(callback as EventCallback<unknown>);
       if (set.size === 0) {
         this.listeners.delete(event);
       }
@@ -44,8 +49,8 @@ export class EventEmitter {
    * @param event - Event type to listen for
    * @param callback - Callback function to invoke once
    */
-  once(event: string, callback: (data: any) => void): void {
-    const wrapper = (data: any) => {
+  once<TData = unknown>(event: string, callback: EventCallback<TData>): void {
+    const wrapper: EventCallback<TData> = (data: TData) => {
       this.off(event, wrapper);
       callback(data);
     };
@@ -60,7 +65,7 @@ export class EventEmitter {
    * @param event - Lifecycle event name
    * @param data - Optional event data to pass to listeners
    */
-  emitLifecycleEvent(event: string, data?: any): void {
+  emitLifecycleEvent<TData = unknown>(event: string, data?: TData): void {
     const set = this.listeners.get(event);
     if (set) {
       console.debug("[Verani:Client] Emitting lifecycle event:", event, "to", set.size, "listeners");
@@ -82,7 +87,7 @@ export class EventEmitter {
    * @param eventType - Event type name
    * @param eventData - Event data to pass to listeners
    */
-  dispatch(eventType: string, eventData: any): void {
+  dispatch<TData = unknown>(eventType: string, eventData: TData): void {
     const set = this.listeners.get(eventType);
     if (set) {
       console.debug("[Verani:Client] Dispatching to", set.size, "listeners");
