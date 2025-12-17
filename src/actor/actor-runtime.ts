@@ -1,3 +1,21 @@
+/**
+ * @deprecated This module implements the LEGACY global router architecture.
+ *
+ * In the old pattern, ALL WebSocket connections are handled by a SINGLE Durable Object,
+ * creating a single-threaded bottleneck. This is an anti-pattern.
+ *
+ * NEW ARCHITECTURE (Recommended):
+ * - Use createConnectionHandler() from "./connection-actor" for per-user ConnectionDOs
+ * - Use createRoomHandler() from "./room-actor" for room coordination
+ * - Each user gets their own DO, with message delivery via RPC
+ *
+ * This module is kept for backward compatibility. Migrate to the new architecture
+ * for better scalability and cost efficiency.
+ *
+ * @see ./connection-actor.ts - Per-user connection handler
+ * @see ./room-actor.ts - Room coordination handler
+ */
+
 import { Actor, ActorConfiguration } from "@cloudflare/actors";
 import type { RoomDefinition, BroadcastOptions, ConnectionMeta, ActorStub } from "./types";
 import { cleanupStaleSessions as cleanupStaleSessionsImpl } from "./runtime/cleanupStaleSessions";

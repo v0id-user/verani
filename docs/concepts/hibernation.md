@@ -6,12 +6,51 @@ Understanding how Cloudflare Actors hibernate and how Verani handles it.
 
 Cloudflare Actors **hibernate** when idle to save resources. This means:
 
-1. **In-memory state is lost** (like the `sessions` Map)
+1. **In-memory state is lost** (like Maps and objects)
 2. **WebSocket connections stay alive** and can wake the Actor
-3. **You need to restore state** when the Actor wakes up
+3. **State needs to be restored** when the Actor wakes up
 4. **The Actor instance is recreated** - it's a fresh instance every time
 
-Verani solves this automatically:
+**Verani handles all of this automatically.** You don't need to worry about hibernation.
+
+## Per-Connection Architecture (Recommended)
+
+With the new per-connection architecture (`createConnectionHandler`), Verani automatically handles:
+
+- **WebSocket restoration** - Connection metadata restored from attachments
+- **Room membership persistence** - Rooms you've joined are saved and restored
+- **Room metadata persistence** - Metadata passed to `joinRoom()` is preserved
+- **Automatic room re-registration** - After wake, SDK re-joins all RoomDOs
+
+```typescript
+const connection = defineConnection({
+  async onConnect(ctx) {
+    // Join a room with metadata - this is automatically persisted
+    await ctx.actor.joinRoom("presence", {
+      username: ctx.meta.username,
+      status: "online"
+    });
+  },
+
+  // Optional: called after hibernation wake
+  // Room re-joining is already handled by the SDK!
+  async onHibernationRestore(actor) {
+    console.log("Restored from hibernation");
+    // Only use for custom post-wake logic
+  }
+});
+```
+
+**What the SDK handles automatically:**
+
+1. Restores WebSocket connection from hibernation
+2. Loads room membership from storage (with metadata)
+3. Re-registers with each RoomDO via RPC
+4. Calls your `onHibernationRestore` hook (optional)
+
+## Legacy Architecture
+
+With the legacy architecture (`defineRoom`), you need to handle some restoration manually:
 
 ```typescript
 // On connect: Store metadata in WebSocket attachment
@@ -27,7 +66,7 @@ restoreSessions(actor);
 
 ### Lost After Hibernation
 
-- **In-memory Maps** (like `sessions` Map - but restored automatically)
+- **In-memory Maps** (restored automatically by Verani)
 - **Dynamic closures** created at runtime
 - **Anonymous functions** stored in instance properties
 - **Runtime-generated handlers** that depend on instance state
@@ -36,9 +75,11 @@ restoreSessions(actor);
 ### Persists Across Hibernation
 
 - **WebSocket attachments** (metadata stored via `storeAttachment`)
-- **Static handler definitions** registered via `room.on()`
-- **Room definition** (it's at module scope, not instance scope)
-- **Persisted room state** (via `state` + `persistedKeys` in room definition)
+- **Room membership** (in per-connection architecture)
+- **Room join metadata** (in per-connection architecture)
+- **Static handler definitions** registered via `.on()`
+- **Room/Connection definition** (it's at module scope)
+- **Persisted state** (via `state` + `persistedKeys`)
 - **Durable Object storage** (if you use `getStorage()`)
 
 ## Event Handler Persistence

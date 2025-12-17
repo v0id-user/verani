@@ -14,12 +14,14 @@ Verani brings the familiar developer experience of Socket.io to Cloudflare's Dur
 
 ## Why Verani?
 
-- Familiar API: If you've used Socket.io, you already know how to use Verani
-- Hibernation support: Handles Cloudflare Actor hibernation automatically
-- Type safe: Built with TypeScript, full type safety throughout
-- Simple mental model: Rooms, channels, and broadcast semantics that just make sense
-- Modern DX: Automatic reconnection, error handling, and connection lifecycle management
-- Edge-ready: Built for Cloudflare Workers and Durable Objects
+- **Familiar API**: If you've used Socket.io, you already know how to use Verani
+- **Horizontally scalable**: Per-connection architecture - each user gets their own Durable Object
+- **Hibernation support**: Handles Cloudflare Actor hibernation automatically
+- **Type safe**: Built with TypeScript, full type safety throughout
+- **Simple mental model**: Connections, rooms, and broadcast semantics that just make sense
+- **Modern DX**: Automatic reconnection, error handling, and connection lifecycle management
+- **Edge-ready**: Built for Cloudflare Workers and Durable Objects
+- **Cost-efficient**: Idle connections hibernate and cost nothing
 
 ## Quick Start
 
@@ -39,38 +41,54 @@ cd my-verani-app
 npm install verani @cloudflare/actors
 ```
 
-### Step 2: Create Your Room
+### Step 2: Create Your Connection Handler
 
-Create `src/actors/chat.actor.ts`:
+Create `src/actors/connection.ts`:
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection, createConnectionHandler, createRoomHandler } from "verani";
 
-export const chatRoom = defineRoom({
-  onConnect(ctx) {
-    // Notify others when someone joins
-    ctx.actor.emit.to("default").emit("user.joined", {
-      userId: ctx.meta.userId
-    });
+// Define connection handler (one WebSocket per user)
+const userConnection = defineConnection({
+  name: "UserConnection",
+
+  extractMeta(req) {
+    const url = new URL(req.url);
+    const userId = url.searchParams.get("userId") || crypto.randomUUID();
+    return {
+      userId,
+      clientId: crypto.randomUUID(),
+      channels: ["default"]
+    };
   },
 
-  onDisconnect(ctx) {
-    // Notify others when someone leaves
-    ctx.actor.emit.to("default").emit("user.left", {
-      userId: ctx.meta.userId
-    });
+  async onConnect(ctx) {
+    console.log(`User ${ctx.meta.userId} connected`);
+    // Join chat room (persisted across hibernation)
+    await ctx.actor.joinRoom("chat");
+  },
+
+  async onDisconnect(ctx) {
+    console.log(`User ${ctx.meta.userId} disconnected`);
+    // Room leave is handled automatically
   }
 });
 
 // Handle messages (socket.io-like API)
-chatRoom.on("chat.message", (ctx, data) => {
-  // Broadcast to everyone in the "default" channel
-  ctx.actor.emit.to("default").emit("chat.message", {
+userConnection.on("chat.message", async (ctx, data) => {
+  // Broadcast to everyone in the chat room
+  await ctx.emit.toRoom("chat").emit("chat.message", {
     from: ctx.meta.userId,
     text: data.text,
     timestamp: Date.now()
   });
 });
+
+// Export the connection handler
+export const UserConnection = createConnectionHandler(userConnection);
+
+// Export the room coordinator
+export const ChatRoom = createRoomHandler({ name: "ChatRoom" });
 ```
 
 ### Step 3: Wire Up Your Worker
@@ -78,23 +96,23 @@ chatRoom.on("chat.message", (ctx, data) => {
 Update `src/index.ts`:
 
 ```typescript
-import { createActorHandler } from "verani";
-import { chatRoom } from "./actors/chat.actor";
+import { UserConnection, ChatRoom } from "./actors/connection";
 
-// Convert room definition to Durable Object class
-export const ChatRoom = createActorHandler(chatRoom);
+// Export Durable Object classes
+export { UserConnection, ChatRoom };
 
 // Route WebSocket connections
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(request.url);
-    
+
     if (url.pathname.startsWith("/ws")) {
-      // Get or create the Actor instance
-      const stub = ChatRoom.get("chat-room");
+      // Extract userId and route to user-specific DO
+      const userId = url.searchParams.get("userId") || crypto.randomUUID();
+      const stub = UserConnection.get(userId);
       return stub.fetch(request);
     }
-    
+
     return new Response("Not Found", { status: 404 });
   }
 };
@@ -109,26 +127,30 @@ Update `wrangler.jsonc`:
   "name": "my-verani-app",
   "main": "src/index.ts",
   "compatibility_date": "2024-01-01",
-  
+
   "durable_objects": {
     "bindings": [
       {
-        "class_name": "ChatRoom",  // Must match export name above
-        "name": "CHAT"              // Binding name (used internally by Cloudflare)
+        "class_name": "UserConnection",
+        "name": "CONNECTION_DO"
+      },
+      {
+        "class_name": "ChatRoom",
+        "name": "ROOM_DO"
       }
     ]
   },
-  
+
   "migrations": [
     {
-      "new_sqlite_classes": ["ChatRoom"],
+      "new_sqlite_classes": ["UserConnection", "ChatRoom"],
       "tag": "v1"
     }
   ]
 }
 ```
 
-Important: The export name `ChatRoom` must match `class_name` in `wrangler.jsonc`.
+Important: Export names must match `class_name` in `wrangler.jsonc`.
 
 ### Step 5: Build Your Client
 
@@ -181,27 +203,29 @@ Need more help? Check out the [Quick Start Guide](./docs/getting-started/quick-s
 
 ## Key Concepts
 
-- Room = A Durable Object that handles WebSocket connections
-- Channel = A group within a room (default: `"default"`)
-- Emit = Send messages (`ctx.actor.emit.to("channel").emit("event", data)`)
-- Hibernation = Handled automatically, no manual work needed
+- **ConnectionDO** = A Durable Object that owns ONE WebSocket per user
+- **RoomDO** = A Durable Object that coordinates room membership and broadcasts
+- **Emit** = Send messages (`ctx.emit.toRoom("chat").emit("event", data)`)
+- **Hibernation** = Handled automatically, state persisted and restored
 
 ## Features
 
 ### Server-Side
-- Socket.io-like API: `room.on()`, `ctx.actor.emit.to()`, familiar patterns
-- Lifecycle hooks: `onConnect`, `onDisconnect`, `onMessage` for full control
-- RPC support: Call Actor methods directly from Workers
-- Automatic hibernation: Handles Cloudflare Actor hibernation seamlessly
-- Persistent state: Built-in support for state that survives hibernation
-- Type safety: Full TypeScript support with type inference
+- **Per-connection DOs**: Each user gets their own Durable Object (horizontally scalable)
+- **Socket.io-like API**: `connection.on()`, `ctx.emit.toRoom()`, familiar patterns
+- **Room coordination**: RoomDOs manage membership and broadcast via RPC
+- **Lifecycle hooks**: `onConnect`, `onDisconnect`, `onMessage` for full control
+- **RPC support**: DO-to-DO communication for message delivery
+- **Automatic hibernation**: State persisted and restored automatically
+- **Persistent state**: Built-in support for state that survives hibernation
+- **Type safety**: Full TypeScript support with type inference
 
 ### Client-Side
-- Automatic reconnection: Exponential backoff with configurable retry logic
-- Message queueing: Messages queued when disconnected, sent on reconnect
-- Keepalive: Built-in ping/pong to detect dead connections
-- Event-based API: Familiar `on()`, `emit()`, `once()`, `off()` methods
-- Connection state: Track connection lifecycle (`connecting`, `connected`, `disconnected`)
+- **Automatic reconnection**: Exponential backoff with configurable retry logic
+- **Message queueing**: Messages queued when disconnected, sent on reconnect
+- **Keepalive**: Built-in ping/pong to detect dead connections
+- **Event-based API**: Familiar `on()`, `emit()`, `once()`, `off()` methods
+- **Connection state**: Track connection lifecycle (`connecting`, `connected`, `disconnected`)
 
 ## Try the Examples
 

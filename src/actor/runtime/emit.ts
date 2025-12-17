@@ -6,16 +6,166 @@ import type {
 	MessageContext,
 	VeraniActor,
 	ConnectionMeta,
-	BroadcastOptions
+	BroadcastOptions,
+	AsyncEmitBuilder,
+	ConnectionEmit,
+	ConnectionActorStub
 } from "../types";
+import type { RoomActorStub } from "../room-actor";
 import { broadcast as broadcastImpl } from "./broadcast";
 import { sendToUser as sendToUserImpl } from "./sendToUser";
+
+// ============================================================================
+// RPC-Based Emit Builders (New Architecture)
+// ============================================================================
+
+/**
+ * Creates an async emit builder that targets a room via RPC
+ * Used in the new per-connection DO architecture
+ *
+ * @param roomName - The room name to broadcast to
+ * @param getRoomDO - Function to get RoomDO binding
+ * @param exceptUserId - Optional userId to exclude from broadcast
+ * @returns AsyncEmitBuilder with async emit() method
+ */
+export function createRpcRoomEmitBuilder(
+	roomName: string,
+	getRoomDO: () => any,
+	exceptUserId?: string
+): AsyncEmitBuilder {
+	return {
+		async emit(event: string, data?: any): Promise<number> {
+			console.debug(`[Verani:Emit:RPC] Room emit: ${event} to room: ${roomName}`);
+
+			const RoomDO = getRoomDO();
+			if (!RoomDO) {
+				console.error("[Verani:Emit:RPC] RoomDO binding not found");
+				return 0;
+			}
+
+			try {
+				const roomStub = RoomDO.get(roomName) as RoomActorStub;
+				const opts: BroadcastOptions = exceptUserId ? { exceptUserId } : {};
+				return await roomStub.broadcast(event, data, opts);
+			} catch (error) {
+				console.error(`[Verani:Emit:RPC] Failed to broadcast to room ${roomName}:`, error);
+				return 0;
+			}
+		}
+	};
+}
+
+/**
+ * Creates an async emit builder that targets a user via RPC
+ * Used in the new per-connection DO architecture
+ *
+ * @param userId - The user ID to send to
+ * @param getConnectionDO - Function to get ConnectionDO binding
+ * @returns AsyncEmitBuilder with async emit() method
+ */
+export function createRpcUserEmitBuilder(
+	userId: string,
+	getConnectionDO: () => any
+): AsyncEmitBuilder {
+	return {
+		async emit(event: string, data?: any): Promise<number> {
+			console.debug(`[Verani:Emit:RPC] User emit: ${event} to user: ${userId}`);
+
+			const ConnectionDO = getConnectionDO();
+			if (!ConnectionDO) {
+				console.error("[Verani:Emit:RPC] ConnectionDO binding not found");
+				return 0;
+			}
+
+			try {
+				const userStub = ConnectionDO.get(userId) as ConnectionActorStub;
+				const success = await userStub.deliverMessage(event, data);
+				return success ? 1 : 0;
+			} catch (error) {
+				console.error(`[Verani:Emit:RPC] Failed to send to user ${userId}:`, error);
+				return 0;
+			}
+		}
+	};
+}
+
+/**
+ * Creates a connection-level emit API for the new per-connection architecture
+ * Routes to RoomDO or ConnectionDO via RPC
+ *
+ * @param ws - The WebSocket connection (may be null)
+ * @param meta - Connection metadata
+ * @param getRoomDO - Function to get RoomDO binding from environment
+ * @param getConnectionDO - Function to get ConnectionDO binding from environment
+ * @returns ConnectionEmit API
+ */
+export function createConnectionEmit<TMeta extends ConnectionMeta, E>(
+	ws: WebSocket | null,
+	meta: TMeta,
+	getRoomDO: () => any,
+	getConnectionDO: () => any
+): ConnectionEmit<TMeta, E> {
+	return {
+		/**
+		 * Emit to this connection's WebSocket
+		 */
+		emit(event: string, data?: any): void {
+			console.debug(`[Verani:Emit:Connection] Emit to self: ${event}`);
+
+			if (!ws || ws.readyState !== WebSocket.OPEN) {
+				console.warn(`[Verani:Emit:Connection] Cannot emit to closed socket: ${event}`);
+				return;
+			}
+
+			try {
+				const eventData = { type: event, ...data };
+				const frame = { type: "event", channel: "default", data: eventData };
+				ws.send(encodeFrame(frame));
+			} catch (error) {
+				console.error(`[Verani:Emit:Connection] Failed to emit to socket:`, error);
+			}
+		},
+
+		/**
+		 * Target a specific room or user for emitting
+		 * @param target - Room name (if starts with "room:") or userId
+		 */
+		to(target: string): AsyncEmitBuilder {
+			if (target.startsWith("room:")) {
+				return createRpcRoomEmitBuilder(target.slice(5), getRoomDO, meta.userId);
+			}
+			// Default to user targeting
+			return createRpcUserEmitBuilder(target, getConnectionDO);
+		},
+
+		/**
+		 * Target a specific room for broadcasting
+		 */
+		toRoom(roomName: string): AsyncEmitBuilder {
+			return createRpcRoomEmitBuilder(roomName, getRoomDO, meta.userId);
+		},
+
+		/**
+		 * Target a specific user for direct messaging
+		 */
+		toUser(userId: string): AsyncEmitBuilder {
+			return createRpcUserEmitBuilder(userId, getConnectionDO);
+		}
+	};
+}
+
+// ============================================================================
+// Legacy Local Emit Builders (Old Architecture - Deprecated)
+// These are kept for backward compatibility with the global router pattern.
+// New code should use createConnectionEmit() with RPC-based routing.
+// ============================================================================
 
 /**
  * Creates an emit builder that targets a specific user.
  * Messages sent through this builder will be delivered to all sessions belonging to the user
  * that are subscribed to the specified channel.
  *
+ * @deprecated Use createRpcUserEmitBuilder() for the new per-connection architecture
  * @param userId - The user ID to target
  * @param sessions - Map of WebSocket sessions
  * @param defaultChannel - The channel to send messages to
@@ -41,6 +191,7 @@ function createUserEmitBuilder<TMeta extends ConnectionMeta, E>(
  * Messages sent through this builder will be broadcast to all connections subscribed to the channel,
  * with optional filtering by userIds, clientIds, or exclusion of specific WebSockets.
  *
+ * @deprecated Use createRpcRoomEmitBuilder() for the new per-connection architecture
  * @param channel - The channel name to broadcast to
  * @param sessions - Map of WebSocket sessions
  * @param opts - Optional broadcast options for filtering (userIds, clientIds, except)
@@ -64,6 +215,8 @@ function createChannelEmitBuilder<TMeta extends ConnectionMeta, E>(
 /**
  * Creates a socket-level emit API for a specific connection context
  * Allows emitting to current socket, user, or channel
+ *
+ * @deprecated Use createConnectionEmit() for the new per-connection architecture
  */
 export function createSocketEmit<TMeta extends ConnectionMeta, E>(
 	ctx: MessageContext<TMeta, E>
@@ -123,6 +276,8 @@ export function createSocketEmit<TMeta extends ConnectionMeta, E>(
 /**
  * Creates an actor-level emit API for broadcasting
  * Allows broadcasting to channels
+ *
+ * @deprecated Use createConnectionEmit() for the new per-connection architecture
  */
 export function createActorEmit<TMeta extends ConnectionMeta, E>(
 	actor: VeraniActor<TMeta, E>

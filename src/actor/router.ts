@@ -1,3 +1,12 @@
+/**
+ * @deprecated This module implements the LEGACY global router architecture.
+ *
+ * Use defineConnection() from "./connection-actor" instead for the new
+ * per-connection architecture that eliminates the global router anti-pattern.
+ *
+ * @see ./connection-actor.ts - New per-connection handler
+ */
+
 import type { RoomDefinition, ConnectionMeta, EventHandler } from "./types";
 import { createRoomEventEmitter } from "./runtime/eventEmitter";
 

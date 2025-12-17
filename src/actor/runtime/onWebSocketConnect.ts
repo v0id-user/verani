@@ -1,5 +1,19 @@
+/**
+ * @fileoverview Legacy WebSocket connect handler for the global router architecture.
+ *
+ * This module is part of the LEGACY createActorHandler() system where all connections
+ * are handled by a single Durable Object. It intentionally uses deprecated functions
+ * like createSocketEmit() because this entire module is part of the deprecated architecture.
+ *
+ * For new projects, use the per-connection architecture:
+ * - createConnectionHandler() from "../connection-actor"
+ * - createRoomHandler() from "../room-actor"
+ *
+ * The deprecation warnings on createSocketEmit() are expected and correct here.
+ */
 import { storeAttachment } from "../attachment";
 import type { RoomDefinition, RoomContext, MessageContext, ConnectionMeta, VeraniActor, MessageFrame } from "../types";
+// Note: createSocketEmit is deprecated for NEW code, but this legacy module should continue using it
 import { createSocketEmit } from "./emit";
 
 /**
@@ -41,23 +55,26 @@ export async function onWebSocketConnect<TMeta extends ConnectionMeta, E>(
 		// Store attachment for hibernation survival
 		storeAttachment(ws, meta);
 
-		// Create a temporary message context for emit API creation
-		const tempMessageCtx: MessageContext<TMeta, E> = {
-			actor,
-			ws,
-			meta,
-			frame: { type: "connect" }
-		};
-
 		// Call user-defined onConnect hook BEFORE adding to sessions map
 		// This prevents orphaned sessions if onConnect throws
 		if (room.onConnect) {
 			console.debug("[Verani:ActorRuntime] Calling user onConnect hook");
+			// Create a temporary message context for emit API creation
+			// We need to create emit first, then reference it in the context
+			const tempMessageCtx = {
+				actor,
+				ws,
+				meta,
+				frame: { type: "connect" } as MessageFrame
+			} as MessageContext<TMeta, E>;
+			// Add emit to the context (createSocketEmit only reads actor.sessions, ws, and meta)
+			tempMessageCtx.emit = createSocketEmit(tempMessageCtx);
+
 			const ctx: RoomContext<TMeta, E> = {
 				actor,
 				ws,
 				meta,
-				emit: createSocketEmit(tempMessageCtx)
+				emit: tempMessageCtx.emit
 			};
 			await room.onConnect(ctx);
 			console.debug("[Verani:ActorRuntime] User onConnect hook completed");
@@ -72,17 +89,19 @@ export async function onWebSocketConnect<TMeta extends ConnectionMeta, E>(
 		// Call error handler if defined
 		if (room.onError && meta) {
 			try {
-				const tempMessageCtx: MessageContext<TMeta, E> = {
+				const tempMessageCtx = {
 					actor,
 					ws,
 					meta,
-					frame: { type: "error" }
-				};
+					frame: { type: "error" } as MessageFrame
+				} as MessageContext<TMeta, E>;
+				tempMessageCtx.emit = createSocketEmit(tempMessageCtx);
+
 				await room.onError(error as Error, {
 					actor,
 					ws,
 					meta,
-					emit: createSocketEmit(tempMessageCtx)
+					emit: tempMessageCtx.emit
 				});
 			} catch (errorHandlerError) {
 				console.error("[Verani] Error in onError handler:", errorHandlerError);

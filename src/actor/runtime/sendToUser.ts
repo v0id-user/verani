@@ -1,9 +1,31 @@
 import { encodeFrame } from "../protocol";
 import type { MessageFrame, ConnectionMeta } from "../types";
 
+// ============================================================================
+// Legacy Send To User (Global Router Pattern)
+// ============================================================================
+//
+// WARNING: This module is part of the DEPRECATED global router architecture.
+//
+// In the old pattern, all connections lived in one DO and we iterated
+// over local sessions to find the target user's connections.
+//
+// In the NEW per-connection architecture:
+// - Use ConnectionDO.get(userId).deliverMessage(event, data) via RPC
+// - Each user has their own ConnectionDO
+// - See: src/actor/connection-actor.ts
+//
+// This module is kept for backward compatibility.
+// ============================================================================
+
 /**
- * Sends a message to a specific user (all their sessions)
- * @param sessions - Map of WebSocket sessions
+ * Sends a message to a specific user (all their sessions).
+ *
+ * @deprecated This function is part of the legacy global router architecture.
+ * Use ctx.emit.toUser(userId).emit(event, data) in the new per-connection architecture,
+ * which uses RPC to deliver messages to the user's ConnectionDO.
+ *
+ * @param sessions - Map of WebSocket sessions (legacy: all connections in one DO)
  * @param userId - The user ID to send to
  * @param channel - The channel to send to
  * @param data - Message data

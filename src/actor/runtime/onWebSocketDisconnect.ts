@@ -1,4 +1,18 @@
+/**
+ * @fileoverview Legacy WebSocket disconnect handler for the global router architecture.
+ *
+ * This module is part of the LEGACY createActorHandler() system where all connections
+ * are handled by a single Durable Object. It intentionally uses deprecated functions
+ * like createSocketEmit() because this entire module is part of the deprecated architecture.
+ *
+ * For new projects, use the per-connection architecture:
+ * - createConnectionHandler() from "../connection-actor"
+ * - createRoomHandler() from "../room-actor"
+ *
+ * The deprecation warnings on createSocketEmit() are expected and correct here.
+ */
 import type { RoomDefinition, RoomContext, MessageContext, ConnectionMeta, VeraniActor, MessageFrame } from "../types";
+// Note: createSocketEmit is deprecated for NEW code, but this legacy module should continue using it
 import { createSocketEmit } from "./emit";
 
 /**
@@ -31,17 +45,19 @@ export async function onWebSocketDisconnect<TMeta extends ConnectionMeta, E>(
 		// Call user-defined onDisconnect hook
 		if (session && room.onDisconnect) {
 			console.debug("[Verani:ActorRuntime] Calling user onDisconnect hook");
-			const tempMessageCtx: MessageContext<TMeta, E> = {
+			const tempMessageCtx = {
 				actor,
 				ws,
 				meta: session.meta,
-				frame: { type: "disconnect" }
-			};
+				frame: { type: "disconnect" } as MessageFrame
+			} as MessageContext<TMeta, E>;
+			tempMessageCtx.emit = createSocketEmit(tempMessageCtx);
+
 			const ctx: RoomContext<TMeta, E> = {
 				actor,
 				ws,
 				meta: session.meta,
-				emit: createSocketEmit(tempMessageCtx)
+				emit: tempMessageCtx.emit
 			};
 			await room.onDisconnect(ctx);
 			console.debug("[Verani:ActorRuntime] User onDisconnect hook completed");

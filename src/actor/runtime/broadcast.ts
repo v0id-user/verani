@@ -1,9 +1,31 @@
 import { encodeFrame } from "../protocol";
 import type { MessageFrame, BroadcastOptions, ConnectionMeta } from "../types";
 
+// ============================================================================
+// Legacy Broadcast (Global Router Pattern)
+// ============================================================================
+//
+// WARNING: This module is part of the DEPRECATED global router architecture.
+//
+// In the old pattern, all WebSocket connections lived in a single Durable Object,
+// and this broadcast function iterated over all local sessions to send messages.
+//
+// In the NEW per-connection architecture:
+// - Each user has their own ConnectionDO (no local sessions map)
+// - Broadcasting is done via RoomDO.broadcast() -> ConnectionDO.deliverMessage() RPC
+// - See: src/actor/room-actor.ts and src/actor/connection-actor.ts
+//
+// This module is kept for backward compatibility with existing code using
+// createActorHandler(). New code should use createConnectionHandler() instead.
+// ============================================================================
+
 /**
- * Broadcasts a message to all connections in a channel
- * @param sessions - Map of WebSocket sessions
+ * Broadcasts a message to all connections in a channel.
+ *
+ * @deprecated This function is part of the legacy global router architecture.
+ * Use RoomDO.broadcast() in the new per-connection architecture.
+ *
+ * @param sessions - Map of WebSocket sessions (legacy: all connections in one DO)
  * @param channel - The channel to broadcast to
  * @param data - The data to send
  * @param opts - Broadcast options (filtering, exclusions)
