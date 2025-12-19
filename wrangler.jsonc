@@ -8,7 +8,7 @@
 	},
 	"migrations": [
 		{
-			"new_sqlite_classes": ["CounterActor", "ChatExample", "PresenceExample", "NotificationsExample"],
+			"new_sqlite_classes": ["CounterActor", "ChatExample", "PresenceExample", "NotificationsExample", "UserConnection", "PresenceRoom", "ChatRoom"],
 			"tag": "v1"
 		}
 	],
@@ -29,6 +29,18 @@
 		  {
 			"class_name": "NotificationsExample",
 			"name": "NotificationsExample"
+		  },
+		  {
+			"class_name": "UserConnection",
+			"name": "UserConnection"
+		  },
+		  {
+			"class_name": "PresenceRoom",
+			"name": "PresenceRoom"
+		  },
+		  {
+			"class_name": "ChatRoom",
+			"name": "ChatRoom"
 		  }
 		]
 	  }
