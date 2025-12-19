@@ -13,7 +13,7 @@
  * All WebSocket connections are owned by ConnectionDOs.
  */
 
-import { createRoomHandler } from "../../src/verani";
+import { createRoomHandler } from "../src/verani";
 
 /**
  * Presence Room Coordinator

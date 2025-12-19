@@ -1,28 +1,26 @@
 # Verani Examples
 
-Working examples demonstrating Verani's real-time capabilities.
+Working examples demonstrating Verani's real-time capabilities using the **per-connection architecture**.
+
+## Architecture
+
+Verani uses a per-connection Durable Object pattern where:
+- Each user gets their own **ConnectionDO** (identified by userId)
+- Room coordination is handled by separate **RoomDOs**
+- Message delivery uses DO-to-DO RPC
+
+This provides:
+- No single-threaded bottleneck
+- Horizontal scalability
+- Cost-efficient (idle connections hibernate)
+- No message fanout from a single DO
 
 ## Examples
 
-### 💬 Chat Room
-**Server**: `/chat` (WebSocket) | **Client**: `chat-client.ts`
+### Presence Tracking
 
-Real-time chat application with:
-- Message broadcasting
-- Typing indicators
-- Online user list
-- Join/leave notifications
-- Multi-user support
-
-**Usage**:
-```bash
-bun run examples/clients/chat-client.ts
-```
-
-Each instance generates a random username and automatically sends demo messages.
-
-### 👥 Presence Tracking
-**Server**: `/presence` (WebSocket) | **Client**: `presence-client.ts`
+**Server**: `presence-connection.ts` + `presence-room-coordinator.ts`
+**Client**: `clients/presence-client.ts`
 
 Track who's online with:
 - Real-time presence updates
@@ -36,47 +34,47 @@ Track who's online with:
 bun run examples/clients/presence-client.ts
 ```
 
-Each instance generates a random username and displays a live presence dashboard.
+### Chat Room
 
-### Notifications Feed
-**Server**: `/notifications` (WebSocket) | **Client**: `notifications-client.ts`
+**Server**: `chat-connection.ts` + `chat-room-coordinator.ts`
+**Client**: `clients/chat-client.ts`
 
-Personal notification stream with:
-- Per-user notification feed (1 Actor per user)
-- Push notifications
-- Read/unread tracking
-- Multi-device synchronization
-- Auto-simulated notifications
+Real-time chat application with:
+- Message broadcasting
+- Typing indicators
+- Online user list
+- Join/leave notifications
 
 **Usage**:
 ```bash
-bun run examples/clients/notifications-client.ts
+bun run examples/clients/chat-client.ts
 ```
 
-Each instance generates a random username and simulates notifications every 10 seconds.
+### Typed Echo (Type-Safe Contracts)
+
+**Server**: `typed/echo-server.ts`
+**Client**: `typed/echo-client.ts`
+
+Demonstrates tRPC-like type-safe contracts with:
+- Shared contract definitions
+- Full TypeScript type safety
+- Auto-completion for events
+
+**Usage**:
+```bash
+bun run examples/typed/echo-client.ts
+```
 
 ## Running Locally
 
 ### 1. Install Dependencies
 
-With npm:
-```bash
-npm install
-```
-
-With Bun (faster! ⚡):
 ```bash
 bun install
 ```
 
 ### 2. Start Development Server
 
-With npm:
-```bash
-npm run dev
-```
-
-With Bun:
 ```bash
 bun run dev
 ```
@@ -84,86 +82,131 @@ bun run dev
 Or directly with Wrangler:
 ```bash
 wrangler dev
-# or
-bunx wrangler dev
 ```
 
 The server will start at `http://localhost:8787`
 
 ### 3. Run Client Examples
 
-In a new terminal, run any of the TypeScript client examples:
+In a new terminal:
 
-**Chat Client**:
 ```bash
+# Presence Client
+bun run examples/clients/presence-client.ts
+
+# Chat Client
 bun run examples/clients/chat-client.ts
 ```
 
-**Presence Client**:
-```bash
-bun run examples/clients/presence-client.ts
-```
-
-**Notifications Client**:
-```bash
-bun run examples/clients/notifications-client.ts
-```
-
-Each client generates a random username using `crypto.randomUUID()`, so you can run multiple instances without conflicts.
+Each client generates a random username, so you can run multiple instances without conflicts.
 
 ### 4. Test Multi-Device
 
 Open multiple terminals running the same client to see real-time synchronization!
 
-For example, run the presence client in 3 different terminals to see multi-device tracking:
-
-```bash
-# Terminal 1
-bun run examples/clients/presence-client.ts
-
-# Terminal 2
-bun run examples/clients/presence-client.ts
-
-# Terminal 3
-bun run examples/clients/presence-client.ts
-```
-
-You'll see the device count increment as each connects!
-
-## Architecture
-
-### WebSocket Routing
-
-`src/index.ts` routes requests based on path:
+## File Structure
 
 ```
-/chat          → chatHandler (chatRoom Actor)
-/presence      → presenceHandler (presenceRoom Actor)
-/notifications → notificationsHandler (notificationsRoom Actor)
+examples/
+├── presence-connection.ts      # ConnectionDO for presence
+├── presence-room-coordinator.ts # RoomDO for presence coordination
+├── chat-connection.ts          # ConnectionDO for chat
+├── chat-room-coordinator.ts    # RoomDO for chat coordination
+├── clients/
+│   ├── presence-client.ts      # Interactive presence dashboard
+│   └── chat-client.ts          # Interactive chat client
+└── typed/
+    ├── echo-contract.ts        # Type-safe contract definition
+    ├── echo-server.ts          # Typed server implementation
+    └── echo-client.ts          # Typed client implementation
 ```
 
-### Room Definitions
+## WebSocket Endpoint
 
-Each example is defined as a Verani room in `examples/`:
+All connections go to: `/ws`
 
-- **`chat-room.ts`**: Chat room with message broadcasting
-- **`presence-room.ts`**: Presence tracking with multi-device support
-- **`notifications-room.ts`**: Personal notification feed
+Authentication via query param: `?token=user:username`
 
-### TypeScript Clients
+Example:
+```
+ws://localhost:8787/ws?token=user:alice
+```
 
-Interactive CLI clients using the VeraniClient SDK in `examples/clients/`:
+## API Overview
 
-- **`chat-client.ts`**: Interactive chat with readline input and colored output
-- **`presence-client.ts`**: Real-time presence dashboard with live updates
-- **`notifications-client.ts`**: Notification feed with command menu
+### Connection Handler (ConnectionDO)
 
-These clients demonstrate proper SDK usage including:
-- Connection lifecycle management (`onOpen`, `onClose`, `onError`, `onStateChange`)
-- Event listening (`client.on()`) and emitting (`client.emit()`)
-- Automatic reconnection handling
-- Message queueing when disconnected
-- State management and UI updates
+```typescript
+import { defineConnection, createConnectionHandler } from "verani";
+
+const myConnection = defineConnection({
+  name: "MyConnection",
+  websocketPath: "/ws",
+
+  extractMeta(req) {
+    return {
+      userId: extractUserId(req),
+      clientId: crypto.randomUUID(),
+      channels: ["default"]
+    };
+  },
+
+  async onConnect(ctx) {
+    await ctx.actor.joinRoom("lobby");
+    ctx.emit.emit("welcome", { userId: ctx.meta.userId });
+  },
+
+  async onDisconnect(ctx) {
+    // Room leave is automatic
+  }
+});
+
+// Register event handlers
+myConnection.on("chat", async (ctx, data) => {
+  await ctx.emit.toRoom("lobby").emit("chat:message", {
+    from: ctx.meta.userId,
+    text: data.text
+  });
+});
+
+export const UserConnection = createConnectionHandler(myConnection);
+```
+
+### Room Coordinator (RoomDO)
+
+```typescript
+import { createRoomHandler } from "verani";
+
+export const LobbyRoom = createRoomHandler({
+  name: "LobbyRoom",
+
+  async onJoin(roomState, userId, metadata) {
+    console.log(`User ${userId} joined`);
+  },
+
+  async onLeave(roomState, userId) {
+    console.log(`User ${userId} left`);
+  }
+});
+```
+
+### Client
+
+```typescript
+import { VeraniClient } from "verani/client";
+
+const client = new VeraniClient("ws://localhost:8787/ws?token=user:alice");
+
+client.onOpen(() => {
+  console.log("Connected!");
+});
+
+client.on("chat:message", (data) => {
+  console.log(`${data.from}: ${data.text}`);
+});
+
+client.emit("chat", { text: "Hello!" });
+```
 
 ## Authentication
 
@@ -173,257 +216,18 @@ All examples use simple token-based authentication:
 
 This is for **demonstration purposes only**. In production:
 
-1. Use proper JWT verification (see [`SECURITY.md`](../docs/SECURITY.md))
+1. Use proper JWT verification
 2. Verify token signatures
 3. Check expiration
 4. Validate user permissions
 
-### Example Production Auth
+## Documentation
 
-```typescript
-import jwt from "@tsndr/cloudflare-worker-jwt";
-
-export const secureRoom = defineRoom({
-  async extractMeta(req) {
-    const token = new URL(req.url).searchParams.get("token");
-
-    if (!token) {
-      throw new Error("Unauthorized");
-    }
-
-    // Verify JWT signature
-    const isValid = await jwt.verify(token, SECRET_KEY);
-    if (!isValid) {
-      throw new Error("Invalid token");
-    }
-
-    const payload = jwt.decode(token);
-
-    return {
-      userId: payload.sub,
-      clientId: crypto.randomUUID(),
-      channels: ["default"]
-    };
-  }
-});
-```
-
-## Deployment
-
-### 1. Update `wrangler.toml`
-
-```toml
-name = "verani-examples"
-main = "src/index.ts"
-compatibility_date = "2024-01-01"
-
-[[durable_objects.bindings]]
-name = "CHAT"
-class_name = "VeraniActorImpl"
-script_name = "verani-examples"
-
-[[durable_objects.bindings]]
-name = "PRESENCE"
-class_name = "VeraniActorImpl"
-script_name = "verani-examples"
-
-[[durable_objects.bindings]]
-name = "NOTIFICATIONS"
-class_name = "VeraniActorImpl"
-script_name = "verani-examples"
-
-[[migrations]]
-tag = "v1"
-new_classes = ["VeraniActorImpl"]
-```
-
-### 2. Deploy to Cloudflare
-
-```bash
-npx wrangler deploy
-# or
-bunx wrangler deploy
-```
-
-Your examples will be available at:
-```
-https://verani-examples.your-subdomain.workers.dev
-```
-
-## Customization
-
-### Add Your Own Example
-
-1. **Create room definition** in `examples/your-room.ts`:
-
-```typescript
-import { defineRoom } from "../src/verani";
-
-export const yourRoom = defineRoom({
-  name: "your-example",
-
-  onConnect(ctx) {
-    // Handle connection
-  },
-
-  onMessage(ctx, frame) {
-    // Handle messages
-  },
-
-  onDisconnect(ctx) {
-    // Handle disconnection
-  }
-});
-```
-
-2. **Add route** in `src/index.ts`:
-
-```typescript
-import { yourRoom } from "../examples/your-room";
-
-const yourHandler = createActorHandler(yourRoom);
-
-// In fetch():
-if (path.startsWith("/your-route")) {
-  return yourHandler.fetch(request, env, ctx);
-}
-```
-
-3. **Create TypeScript client** in `examples/clients/your-client.ts`:
-
-```typescript
-import { VeraniClient } from "../../src/client/client";
-
-const client = new VeraniClient("ws://localhost:8787/ws/your-route?token=user:test");
-
-client.onOpen(() => {
-  console.log("Connected!");
-});
-
-client.on("your.event", (data) => {
-  console.log("Received:", data);
-});
-
-client.emit("your.action", { /* data */ });
-```
-
-## Features Demonstrated
-
-### Core Verani Features (Server-Side)
-
-**Connection Lifecycle**
-- `onConnect`, `onMessage`, `onDisconnect` hooks
-- Connection metadata extraction
-- Session management
-
-**Broadcasting**
-- Broadcast to all connections
-- Broadcast with filters (`except`, `userIds`)
-- Channel-based routing
-
-**Hibernation Support**
-- WebSocket attachment persistence
-- Session restoration on wake
-- Automatic state recovery
-
-**Multi-Device Support**
-- Same user, multiple connections
-- Device tracking
-- Cross-device synchronization
-
-### SDK Features (Client-Side)
-
-**VeraniClient Usage**
-- WebSocket connection management
-- Event-based message handling (`on`, `emit`, `once`, `off`)
-- Automatic reconnection with exponential backoff
-- Connection state tracking (`connecting`, `connected`, `disconnected`)
-- Message queueing when disconnected
-
-**Lifecycle Callbacks**
-- `onOpen()` - Called when connection is established
-- `onClose()` - Called when connection closes
-- `onError()` - Called on connection errors
-- `onStateChange()` - Called on state transitions
-
-**Best Practices**
-- Try-catch around user hooks
-- Generic error messages to clients
-- Detailed server logging
-- Input validation
-- Interactive CLI interfaces with colored output
-
-## CLI Client Features
-
-Each TypeScript client demonstrates different interaction patterns:
-
-### Chat Client (`chat-client.ts`)
-- **Interactive input**: Type messages directly, press Enter to send
-- **Typing indicators**: Automatic typing indicator when you type
-- **Commands**:
-  - `/users` - List all online users
-  - `/help` - Show available commands
-  - `/quit` - Exit the chat
-- **Colored output**: Different colors for your messages vs others
-- **Real-time updates**: See messages, joins, and leaves instantly
-
-### Presence Client (`presence-client.ts`)
-- **Live dashboard**: Automatically refreshing presence view
-- **Multi-device tracking**: Shows device count per user
-- **Status indicators**: Visual status with emojis (🟢 online, 🟡 away, 🔴 busy)
-- **Stats display**: Total users, connections, and your devices
-- **Toast notifications**: Popup notifications when users join/leave
-
-### Notifications Client (`notifications-client.ts`)
-- **Interactive menu**: Command-based interface
-- **Commands**:
-  - `read <id>` - Mark notification as read
-  - `read-all` - Mark all as read
-  - `delete <id>` - Delete notification
-  - `simulate` - Create test notification
-  - `refresh` - Refresh display
-  - `quit` - Exit
-- **Notification types**: Info, success, warning, error
-- **Toast popups**: Beautiful notification toasts with borders
-- **Sync across devices**: Changes appear on all connected terminals
-
-## Troubleshooting
-
-### WebSocket Not Connecting
-
-1. Check that server is running: `wrangler dev` should be active
-2. Verify token format: `user:username`
-3. Check the client console output for connection errors
-4. Ensure using `ws://` for localhost (not `wss://`)
-
-### Messages Not Appearing
-
-1. Check WebSocket state in the client output
-2. Verify message format in console logs
-3. Check server logs: `wrangler tail` or check terminal running `wrangler dev`
-4. Try running with verbose logging
-
-### Presence Not Updating
-
-1. Make sure you're using the same username in multiple terminals
-2. Check device count is incrementing in the display
-3. Verify both clients are connected (check connection status)
-
-### Client Crashes or Errors
-
-1. Make sure you have Bun installed: `bun --version`
-2. Install dependencies: `bun install` in project root
-3. Check that you're passing the token argument correctly
-4. Look for TypeScript compilation errors
-
-## Next Steps
-
-- **[Getting Started](../docs/GETTING_STARTED.md)** - Build your first app
-- **[API Reference](../docs/API.md)** - Complete API docs
-- **[Security Guide](../docs/SECURITY.md)** - Production security
-- **[Deployment Guide](../docs/DEPLOYMENT.md)** - Deploy to Cloudflare
+- [Server API](../docs/api/server.md) - Server-side API reference
+- [Client API](../docs/api/client.md) - Client-side API reference
+- [Getting Started](../docs/GETTING_STARTED.md) - Build your first app
+- [Security Guide](../docs/SECURITY.md) - Production security
 
 ## License
 
 ISC
-

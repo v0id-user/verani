@@ -96,7 +96,7 @@ async function main() {
   console.log(`${colors.gray}Connecting as ${state.username}...${colors.reset}\n`);
 
   // Build WebSocket URL
-  const wsUrl = `ws://localhost:8787/ws/chat?token=${encodeURIComponent(token)}`;
+  const wsUrl = `ws://localhost:8787/ws?token=${encodeURIComponent(token)}`;
 
   // Create Verani client
   const client = new VeraniClient(wsUrl, {

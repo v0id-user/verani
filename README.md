@@ -126,7 +126,7 @@ Update `wrangler.jsonc`:
 {
   "name": "my-verani-app",
   "main": "src/index.ts",
-  "compatibility_date": "2024-01-01",
+  "compatibility_date": "2025-11-26",
 
   "durable_objects": {
     "bindings": [

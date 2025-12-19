@@ -1,20 +1,20 @@
 /**
- * Presence Connection Example (New Per-Connection Architecture)
+ * Presence Connection Example (Per-Connection Architecture)
  *
- * This example demonstrates the new per-connection DO pattern where:
+ * This example demonstrates the per-connection DO pattern where:
  * - Each user gets their own ConnectionDO (identified by userId)
  * - Room coordination is handled by separate RoomDOs
  * - Message delivery uses DO-to-DO RPC
  *
- * Benefits over the old global router pattern:
+ * Benefits:
  * - No single-threaded bottleneck
  * - Horizontal scalability
  * - Cost-efficient (idle connections hibernate)
  * - No message fanout from a single DO
  */
 
-import { defineConnection, createConnectionHandler } from "../../src/verani";
-import type { ConnectionMeta } from "../../src/verani";
+import { defineConnection, createConnectionHandler } from "../src/verani";
+import type { ConnectionMeta } from "../src/verani";
 
 /**
  * Extended metadata for presence tracking
