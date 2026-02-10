@@ -182,6 +182,8 @@ export const ChatRoom = createRoomHandler({
 });
 ```
 
+In the recommended per-connection architecture, a **RoomDO** created with `createRoomHandler()` is a **coordination Durable Object only**: it owns no WebSockets, tracks room membership, and fans out messages to `createConnectionHandler()`-based ConnectionDOs via RPC. It should be exported as its own Durable Object class (for example, `export const ChatRoom = createRoomHandler({ ... })`) so Wrangler can bind it separately from your per-user `UserConnection` DO.
+
 ### `RoomCoordinatorDefinition<E>`
 
 Configuration for a RoomDO.

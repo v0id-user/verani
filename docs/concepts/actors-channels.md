@@ -2,6 +2,13 @@
 
 The three core concepts of Verani.
 
+In the **per-connection architecture** (recommended), these map directly to concrete types:
+
+- **ConnectionDO** → created with `createConnectionHandler()`; owns a single WebSocket per user.
+- **RoomDO** → created with `createRoomHandler()`; owns no sockets, only room membership + coordination.
+
+See the [Quick Start](../getting-started/quick-start.md) for a minimal example using `UserConnection` (ConnectionDO) and `ChatRoom` (RoomDO).
+
 ## 1. Actors = Isolated Realtime Containers
 
 Think of each Actor instance as a **self-contained realtime room**.
@@ -58,16 +65,19 @@ ctx.actor.emit.to("game-state").emit("score", { score: 100 });
 
 ## Summary
 
-Remember these three mental models:
+Remember these mental models:
 
-1. **Actor = Room**: Each Actor is an isolated realtime container
-2. **Channels = Sub-rooms**: Filter messages within an Actor
-3. **Attachments = Hibernation Survival**: WebSocket metadata persists
+1. **ConnectionDO = Per-user Actor**: Created via `createConnectionHandler()`, owns one WebSocket and per-user state, joins rooms and emits events.
+2. **RoomDO = Coordinator Actor**: Created via `createRoomHandler()`, tracks which users are in each room and fans out messages to their ConnectionDOs via RPC.
+3. **Channels = Sub-rooms**: Filter messages within an Actor (for example, per-topic channels inside a room).
+4. **Attachments = Hibernation Survival**: WebSocket metadata persists across hibernation.
 
 Everything else follows from these principles.
 
 ## Related Documentation
 
+- [Quick Start](../getting-started/quick-start.md) - End-to-end example using `UserConnection` and `ChatRoom`
+- [Server API](../api/server.md) - Full API documentation for `createConnectionHandler()` and `createRoomHandler()`
 - [Architecture](./architecture.md) - System architecture
 - [Hibernation](./hibernation.md) - Hibernation behavior
 - [Isolation](./isolation.md) - Isolation strategies

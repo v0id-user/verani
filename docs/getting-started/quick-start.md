@@ -65,6 +65,11 @@ export const UserConnection = createConnectionHandler(userConnection);
 export const ChatRoom = createRoomHandler({ name: "ChatRoom" });
 ```
 
+At this point you have defined **two different Durable Object classes**:
+
+- **`UserConnection` (ConnectionDO)**: one instance per user, owns that user's **single WebSocket** and any per-user state. It calls `ctx.actor.joinRoom("chat")` and uses `ctx.emit.toRoom("chat")` to talk to rooms.
+- **`ChatRoom` (RoomDO)**: one instance per room name (for example, `"chat"`), owns **no WebSockets at all**. It keeps track of which users are in the room and fans out messages to their `UserConnection` instances via RPC.
+
 ## Step 3: Export the DO Classes
 
 Update `src/index.ts`:
@@ -92,7 +97,11 @@ export default {
 };
 ```
 
-**Important**: Export names must match `class_name` in `wrangler.jsonc`.
+**Important**:
+
+- Export names must match `class_name` in `wrangler.jsonc` for **both** `UserConnection` and `ChatRoom`.
+- `UserConnection.get(userId)` is what you use in `fetch()` to route each WebSocket upgrade to a **per-user ConnectionDO**.
+- `ChatRoom` is exported so Wrangler can bind it as a separate Durable Object; you typically **don't call** `ChatRoom.get("chat")` directly in app code. Instead, `ctx.actor.joinRoom("chat")` and `ctx.emit.toRoom("chat")` use the RoomDO under the hood to manage membership and broadcasting.
 
 ## Step 4: Configure Wrangler
 
@@ -173,7 +182,7 @@ You now have a working realtime chat app. Open multiple browser tabs and watch m
 ## Key Concepts
 
 - **ConnectionDO** = A Durable Object that owns ONE WebSocket per user
-- **RoomDO** = A Durable Object that coordinates room membership and broadcasts
+- **RoomDO** = A Durable Object that coordinates room membership and broadcasts **without owning sockets** (it talks to ConnectionDOs via RPC)
 - **joinRoom()** = Join a room (membership persisted across hibernation)
 - **Emit** = Send messages (`ctx.emit.toRoom("chat").emit("event", data)`)
 - **on()** = Listen for events (`connection.on("event", handler)`)
