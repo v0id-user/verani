@@ -11,32 +11,36 @@ See the [Quick Start](../getting-started/quick-start.md) for a minimal example u
 
 ## 1. Actors = Isolated Realtime Containers
 
-Think of each Actor instance as a **self-contained realtime room**.
+An **Actor** is a single Durable Object instance. In the per-connection architecture you typically have _two kinds_ of actors working together:
+
+- **ConnectionDO** (per user) – owns exactly one WebSocket and per-user state.
+- **RoomDO** (per room) – owns no WebSockets; tracks membership and coordinates fanout.
 
 ```
-+---------------------------------------+
-| Actor Instance (Durable Object)       |
-|                                       |
-|   [WebSocket]  [WebSocket]  [WebSocket]
-|    User A       User B       User C   |
-|                                       |
-|   Memory: Sessions Map                |
-|   Hibernation: Attachments            |
-+---------------------------------------+
++----------------------+      +----------------------+
+| ConnectionDO(userA)  |      | ConnectionDO(userB)  |
+|  [WebSocket A]       |      |  [WebSocket B]       |
++----------------------+      +----------------------+
+              \                       /
+               \                     /
+                v                   v
+              +---------------------------+
+              | RoomDO("chat")           |
+              | Members: userA, userB... |
+              +---------------------------+
 ```
 
-**Key insight**: You control isolation by how you route requests to Actors.
+**Key insight**: You still control isolation by how you route requests to Actors, but now:
 
-- **Chat room**: Route by room ID → everyone in room shares Actor
-- **User feed**: Route by user ID → each user gets their own Actor
-- **Game session**: Route by game ID → players in same game share Actor
+- **Per-user connection**: Route by **user ID** → each user gets their own ConnectionDO.
+- **Shared room state**: Route by **room ID** → one RoomDO per room coordinates membership and broadcasts to ConnectionDOs.
 
-## 2. Channels = Sub-rooms Within an Actor
+## 2. Channels = Sub-rooms Within a Room
 
-Inside a single Actor, connections can subscribe to different **channels** for selective message delivery.
+Inside a single **RoomDO instance** (for example, `RoomDO("game-room-123")`), members can subscribe to different **channels** for selective message delivery.
 
 ```
-Actor: "game-room-123"
+RoomDO("game-room-123")
 |
 +-- Channel: "default"
 |   +-- User A
@@ -61,7 +65,7 @@ ctx.actor.emit.to("game-state").emit("score", { score: 100 });
 // ctx.actor.broadcast("game-state", { score: 100 });
 ```
 
-**Default behavior**: Every connection starts in the `["default"]` channel.
+**Default behavior**: Every connection starts in the `["default"]` channel for a given room, and you can move it into additional channels (for example, `"chat"` vs `"game-state"`) to control which broadcasts it receives.
 
 ## Summary
 
