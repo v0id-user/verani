@@ -24,7 +24,13 @@ export const docsRoutes = new Elysia()
 		});
 	})
 	.get("/docs/*", ({ params, set }) => {
-		const path = params["*"];
+		let path = params["*"];
+
+		// Support both `/docs/foo/bar` and `/docs/foo/bar.md`
+		if (path.endsWith(".md")) {
+			path = path.slice(0, -3);
+		}
+
 		const urlPath = `/docs/${path}`;
 
 		const doc = loadDoc(urlPath);
