@@ -11,10 +11,10 @@ By default, Verani accepts WebSocket connections at `/ws`. You can customize thi
 - HTTP 404 for wrong paths with the correct path information
 
 ```typescript
-import { defineRoom, createActorHandler } from "verani";
+import { defineConnection, createConnectionHandler } from "verani";
 
 // Chat room at /chat
-export const chatRoom = defineRoom({
+export const chatConnection = defineConnection({
   name: "chat",
   websocketPath: "/chat", // Custom path
 
@@ -28,7 +28,7 @@ export const chatRoom = defineRoom({
 });
 
 // Presence room at /presence
-export const presenceRoom = defineRoom({
+export const presenceConnection = defineConnection({
   name: "presence",
   websocketPath: "/presence", // Different path
 
@@ -38,10 +38,8 @@ export const presenceRoom = defineRoom({
 });
 
 // Create handlers
-const ChatRoom = createActorHandler(chatRoom);
-const PresenceRoom = createActorHandler(presenceRoom);
-
-export { ChatRoom, PresenceRoom };
+export const ChatConnection = createConnectionHandler(chatConnection);
+export const PresenceConnection = createConnectionHandler(presenceConnection);
 ```
 
 **Worker routing:**
@@ -53,13 +51,13 @@ export default {
 
     // Route to chat room
     if (url.pathname.startsWith("/chat")) {
-      const stub = ChatRoom.get("chat-instance");
+      const stub = ChatConnection.get("chat-instance");
       return stub.fetch(request);
     }
 
     // Route to presence room
     if (url.pathname.startsWith("/presence")) {
-      const stub = PresenceRoom.get("presence-instance");
+      const stub = PresenceConnection.get("presence-instance");
       return stub.fetch(request);
     }
 
@@ -89,13 +87,13 @@ const presenceClient = new VeraniClient("wss://example.com/presence?userId=alice
 Let users join different channels within the same room.
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection } from "verani";
 
 interface ChannelMeta extends ConnectionMeta {
   subscribedChannels: Set<string>;
 }
 
-export const multiChannelRoom = defineRoom<ChannelMeta>({
+export const multiChannelConnection = defineConnection<ChannelMeta>({
   extractMeta(req) {
     const url = new URL(req.url);
     return {
@@ -108,7 +106,7 @@ export const multiChannelRoom = defineRoom<ChannelMeta>({
 });
 
 // Register event handlers (socket.io-like)
-multiChannelRoom.on("channel.join", (ctx, data) => {
+multiChannelConnection.on("channel.join", (ctx, data) => {
   const { channel } = data;
 
   if (!ctx.meta.channels.includes(channel)) {
@@ -122,7 +120,7 @@ multiChannelRoom.on("channel.join", (ctx, data) => {
   }
 });
 
-multiChannelRoom.on("channel.leave", (ctx, data) => {
+multiChannelConnection.on("channel.leave", (ctx, data) => {
   const { channel } = data;
   const idx = ctx.meta.channels.indexOf(channel);
 
@@ -137,7 +135,7 @@ multiChannelRoom.on("channel.leave", (ctx, data) => {
   }
 });
 
-multiChannelRoom.on("channel.message", (ctx, data) => {
+multiChannelConnection.on("channel.message", (ctx, data) => {
   const { channel, text } = data;
 
   // Verify user is in channel

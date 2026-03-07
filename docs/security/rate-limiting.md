@@ -15,7 +15,7 @@ const RATE_LIMIT = {
   MAX_MESSAGES: 30   // 30 messages per minute
 };
 
-export const rateLimitedRoom = defineRoom<RateLimitMeta>({
+export const rateLimitedRoom = defineConnection<RateLimitMeta>({
   name: "rate-limited",
   websocketPath: "/ws",
 
@@ -68,7 +68,7 @@ rateLimitedRoom.on("chat.message", (ctx, data) => {
 Use Cloudflare KV or Durable Object storage:
 
 ```typescript
-export const globalRateLimitRoom = defineRoom({
+export const globalRateLimitRoom = defineConnection({
   name: "global-rate-limited",
   websocketPath: "/ws"
 });

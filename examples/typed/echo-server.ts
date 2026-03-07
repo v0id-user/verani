@@ -1,10 +1,10 @@
 /**
- * Echo Server - Type-safe room example
+ * Echo Server - Type-safe connection example
  *
  * A simple echo server that responds to messages.
  * Uses "verani/typed" (server entry point with Cloudflare dependencies).
  */
-import { createTypedRoom, createActorHandler } from "../../src/typed";
+import { createTypedConnection, createConnectionHandler } from "../../src/typed";
 import type { ConnectionMeta } from "../../src/typed";
 import { echoContract } from "./echo-contract";
 
@@ -13,8 +13,8 @@ interface EchoMeta extends ConnectionMeta {
   connectedAt: number;
 }
 
-// Create the typed room
-const echoRoom = createTypedRoom<typeof echoContract, EchoMeta>(echoContract, {
+// Create the typed connection
+const echoConnection = createTypedConnection<typeof echoContract, EchoMeta>(echoContract, {
   name: "echo",
   websocketPath: "/ws/echo",
 
@@ -43,7 +43,7 @@ const echoRoom = createTypedRoom<typeof echoContract, EchoMeta>(echoContract, {
 });
 
 // Handle client events with full type safety (Socket.io-like API)
-echoRoom.on("echo.send", (ctx, data) => {
+echoConnection.on("echo.send", (ctx, data) => {
   // data is typed as { message: string }
   console.log(`[Echo] Received from ${ctx.meta.userId}: ${data.message}`);
 
@@ -55,6 +55,6 @@ echoRoom.on("echo.send", (ctx, data) => {
 });
 
 // Export for Cloudflare Workers
-export const EchoRoom = createActorHandler(echoRoom.definition);
-export { echoRoom };
+export const EchoConnection = createConnectionHandler(echoConnection.definition);
+export { echoConnection };
 

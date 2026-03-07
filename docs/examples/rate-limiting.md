@@ -3,14 +3,14 @@
 **Public** - Limit messages per user to prevent spam.
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection } from "verani";
 
 interface RateLimitMeta extends ConnectionMeta {
   messageCount: number;
   lastReset: number;
 }
 
-export const rateLimitedRoom = defineRoom<RateLimitMeta>({
+export const rateLimitedConnection = defineConnection<RateLimitMeta>({
   extractMeta(req) {
     const url = new URL(req.url);
     return {
@@ -24,7 +24,7 @@ export const rateLimitedRoom = defineRoom<RateLimitMeta>({
 });
 
 // Rate limiting middleware using wildcard handler (socket.io-like)
-rateLimitedRoom.on("*", (ctx, data) => {
+rateLimitedConnection.on("*", (ctx, data) => {
   const now = Date.now();
   const meta = ctx.meta;
 
@@ -48,7 +48,7 @@ rateLimitedRoom.on("*", (ctx, data) => {
 });
 
 // Register event handlers for specific events
-rateLimitedRoom.on("chat.message", (ctx, data) => {
+rateLimitedConnection.on("chat.message", (ctx, data) => {
   // Rate limit check already done by wildcard handler
   // Process message using emit API
   ctx.actor.emit.to("default").emit("chat.message", {

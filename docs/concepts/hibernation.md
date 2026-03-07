@@ -48,20 +48,6 @@ const connection = defineConnection({
 3. Re-registers with each RoomDO via RPC
 4. Calls your `onHibernationRestore` hook (optional)
 
-## Legacy Architecture
-
-With the legacy architecture (`defineRoom`), you need to handle some restoration manually:
-
-```typescript
-// On connect: Store metadata in WebSocket attachment
-storeAttachment(ws, { userId, clientId, channels });
-
-// On wake: Restore all sessions from attachments
-restoreSessions(actor);
-```
-
-**Mental model**: Think of attachments as "sticky notes" on each WebSocket that survive hibernation.
-
 ## What Gets Lost vs What Persists
 
 ### Lost After Hibernation
@@ -84,24 +70,24 @@ restoreSessions(actor);
 
 ## Event Handler Persistence
 
-Event handlers registered via `room.on()` **automatically persist** across hibernation because they're stored statically in the room definition (at module scope), not in the Actor instance.
+Event handlers registered via `connection.on()` **automatically persist** across hibernation because they're stored statically in the connection definition (at module scope), not in the Actor instance.
 
 ```typescript
-const room = defineRoom({
+const connection = defineConnection({
   name: "chat",
   websocketPath: "/ws"
 });
 
 // These handlers are stored statically and survive hibernation
-room.on("chat.message", (ctx, data) => {
-  ctx.actor.emit.to("default").emit("chat.message", {
+connection.on("chat.message", (ctx, data) => {
+  ctx.emit.toRoom("chat").emit("chat.message", {
     from: ctx.meta.userId,
     text: data.text
   });
 });
 
-room.on("user.typing", (ctx, data) => {
-  ctx.actor.emit.to("default").emit("user.typing", {
+connection.on("user.typing", (ctx, data) => {
+  ctx.emit.toRoom("chat").emit("user.typing", {
     userId: ctx.meta.userId
   });
 });
@@ -109,8 +95,8 @@ room.on("user.typing", (ctx, data) => {
 
 **How it works:**
 
-1. Handlers are stored in `room._staticHandlers` (at module scope)
-2. When the Actor wakes from hibernation, `onInit` rebuilds the eventEmitter's handler map from static storage
+1. Handlers are stored in `connection._staticHandlers` (at module scope)
+2. When the Actor wakes from hibernation, handlers are rebuilt from static storage
 3. Handlers work exactly as before - no code changes needed
 
 **This is similar to Express/Elysia/Fastify routing** - routes are code-defined, not runtime-generated, so they survive restarts and hibernation.
@@ -139,9 +125,9 @@ Instead, use static handlers:
 
 ```typescript
 // GOOD: Static handler definition
-const room = defineRoom({ /* ... */ });
+const connection = defineConnection({ /* ... */ });
 
-room.on("event", (ctx, data) => {
+connection.on("event", (ctx, data) => {
   // Handler is static - works after hibernation
   const storage = ctx.actor.getStorage();
   // Use storage for persistence, not instance state

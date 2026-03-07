@@ -5,14 +5,14 @@
  * For client-side code (browsers, React Native, etc.), use "verani/typed/client" instead.
  *
  * This module provides:
- * - `createTypedRoom()` - Type-safe room creation for Cloudflare Actors
- * - `createActorHandler()` - Actor handler for Cloudflare Workers
+ * - `createTypedConnection()` - Type-safe connection creation for Cloudflare Actors
+ * - `createConnectionHandler()` - Connection handler for Cloudflare Workers
  * - All shared types (contracts, payloads, validation)
  *
  * @example
  * ```typescript
  * // Server code (Cloudflare Workers)
- * import { defineContract, payload, createTypedRoom, createActorHandler } from "verani/typed";
+ * import { defineContract, payload, createTypedConnection, createConnectionHandler } from "verani/typed";
  *
  * const chatContract = defineContract({
  *   serverEvents: {
@@ -23,18 +23,19 @@
  *   },
  * });
  *
- * const room = createTypedRoom(chatContract, {
+ * const connection = createTypedConnection(chatContract, {
  *   websocketPath: "/ws/chat",
- *   onConnect(ctx) {
+ *   async onConnect(ctx) {
  *     ctx.emit("chat.message", { from: "system", text: "Welcome!" });
+ *     await ctx.actor.joinRoom("chat");
  *   },
  * });
  *
- * room.on("message.send", (ctx, data) => {
+ * connection.on("message.send", (ctx, data) => {
  *   ctx.emit("chat.message", { from: ctx.meta.userId, text: data.text });
  * });
  *
- * export const ChatRoom = createActorHandler(room.definition);
+ * export const ChatConnection = createConnectionHandler(connection.definition);
  * ```
  *
  * @packageDocumentation
@@ -101,16 +102,21 @@ export type {
 // Server-Only Exports (Cloudflare Workers/Actors)
 // ============================================================================
 
-export { createTypedRoom } from "./server";
+export { createTypedConnection, createTypedRoom } from "./server";
 
 export type {
+  TypedConnection,
   TypedRoom,
+  TypedConnectionConfig,
   TypedRoomConfig,
+  TypedConnectionContext,
   TypedRoomContext,
   TypedMessageContext,
   TypedEventHandler,
+  TypedConnectionEmit,
   TypedSocketEmit,
   TypedActorEmit,
+  TypedAsyncEmitBuilder,
   TypedEmitBuilder,
 } from "./server";
 
@@ -125,11 +131,9 @@ export {
 // Re-exports from Verani Core (Cloudflare Workers/Actors)
 // ============================================================================
 
-export { createActorHandler } from "../actor/actor-runtime";
+export { createConnectionHandler } from "../actor/connection-actor";
 
 export type {
   ConnectionMeta,
-  VeraniActor,
-  RoomDefinition,
-  ActorStub,
+  ConnectionActorStub,
 } from "../actor/types";

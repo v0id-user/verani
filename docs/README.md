@@ -10,9 +10,7 @@ Complete documentation for Verani, a realtime framework for Cloudflare Workers.
 
 ## API Reference
 
-- [Server API](./api/server.md) - Server-side API documentation
-  - Per-Connection Architecture (recommended): `createConnectionHandler`, `createRoomHandler`
-  - Legacy Architecture: `defineRoom`, `createActorHandler`
+- [Server API](./api/server.md) - Server-side API documentation (`createConnectionHandler`, `createRoomHandler`)
 - [Client API](./api/client.md) - Client-side API documentation
 - [Typed API](./api/typed.md) - **Type-safe contracts** (tRPC-like)
 - [Types](./api/types.md) - Type definitions
@@ -40,7 +38,7 @@ See [Examples Index](./examples/README.md) for all examples.
 
 ## Concepts
 
-- [Architecture](./concepts/architecture.md) - System architecture and design (per-connection vs legacy)
+- [Architecture](./concepts/architecture.md) - System architecture and design
 - [Typed Contracts](./concepts/typed-contracts.md) - **Understanding serverEvents vs clientEvents**
 - [Actors and Channels](./concepts/actors-channels.md) - Core concepts
 - [Emits and Channels](./concepts/emits-channels.md) - Emit patterns and targeting

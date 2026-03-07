@@ -1,6 +1,6 @@
 /**
  * Actor-side protocol utilities
- * Re-exports from shared protocol modules for backwards compatibility
+ * Re-exports from shared protocol modules
  */
 
 import { decodeFrame as sharedDecodeFrame, decodeClientMessage } from "../shared/decode";
@@ -22,7 +22,7 @@ export function decodeFrame(raw: WebSocketRawData): MessageFrame {
   } else {
     console.debug("[Verani:Protocol:Actor] Decode failed, returning invalid frame");
   }
-  // Return invalid frame as fallback for backward compatibility
+  // Return invalid frame as fallback
   return decoded ?? { type: "invalid" };
 }
 

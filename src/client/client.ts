@@ -8,7 +8,6 @@ import { EventEmitter } from "./runtime/eventEmitter";
 import { ConnectionHandler } from "./runtime/connection";
 import type { ConnectionStateInfo, ConnectionPromiseState, IsConnectingRef } from "./types";
 
-// Re-export VeraniClientOptions for backward compatibility
 export type { VeraniClientOptions };
 export type { ConnectionStateInfo, ConnectionPromiseState, ConnectionTimeoutState, IsConnectingRef } from "./types";
 

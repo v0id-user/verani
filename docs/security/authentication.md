@@ -9,7 +9,7 @@ Authentication verifies **who the user is**. Verani handles authentication in th
 ## Public Rooms (No Authentication)
 
 ```typescript
-export const publicRoom = defineRoom({
+export const publicConnection = defineConnection({
   name: "public-room",
   websocketPath: "/ws"
   // Uses default extractMeta
@@ -61,7 +61,7 @@ client.emit("auth", { token });
 ### Step 3: Server Verifies Token
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection } from "verani";
 
 // You'll need a proper JWT library
 // npm install @tsndr/cloudflare-worker-jwt
@@ -73,7 +73,7 @@ interface AuthMeta extends ConnectionMeta {
   verified: boolean;
 }
 
-export const secureRoom = defineRoom<AuthMeta>({
+export const secureConnection = defineConnection<AuthMeta>({
   async extractMeta(req) {
     const url = new URL(req.url);
     const token = url.searchParams.get("token");
@@ -128,7 +128,7 @@ export const secureRoom = defineRoom<AuthMeta>({
 If you have session cookies:
 
 ```typescript
-export const sessionRoom = defineRoom({
+export const sessionConnection = defineConnection({
   name: "session-room",
   websocketPath: "/ws",
   
@@ -167,7 +167,7 @@ export const sessionRoom = defineRoom({
 For server-to-server or mobile apps:
 
 ```typescript
-export const apiKeyRoom = defineRoom({
+export const apiKeyConnection = defineConnection({
   name: "api-key-room",
   websocketPath: "/ws",
   

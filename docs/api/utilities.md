@@ -34,14 +34,6 @@ Stores metadata in WebSocket attachment for hibernation survival.
 
 ---
 
-## `restoreSessions(actor: VeraniActor)`
-
-Restores sessions from WebSocket attachments after hibernation.
-
-**Note:** Called automatically in `onInit()`.
-
----
-
 ## Related Documentation
 
 - [Server API](./server.md) - Server-side API reference

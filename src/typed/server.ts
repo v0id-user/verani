@@ -1,36 +1,42 @@
 /**
  * Type-Safe Server Integration for Verani
  *
- * Provides createTypedRoom() which wraps defineRoom() with full type safety
+ * Provides createTypedConnection() which wraps defineConnection() with full type safety
  * for event handlers and emit operations based on a contract definition.
  *
  * @example
  * ```typescript
- * const room = createTypedRoom(chatContract, {
+ * const connection = createTypedConnection(chatContract, {
  *   websocketPath: "/ws/chat",
  *   extractMeta(req) {
  *     return { userId: "...", clientId: "...", channels: ["default"] };
  *   },
- *   onConnect(ctx) {
+ *   async onConnect(ctx) {
  *     ctx.emit("user.joined", { userId: ctx.meta.userId });
+ *     await ctx.actor.joinRoom("chat");
  *   },
  * });
  *
- * room.on("message.send", (ctx, data) => {
+ * connection.on("message.send", (ctx, data) => {
  *   ctx.emit("chat.message", { from: ctx.meta.userId, text: data.text });
  * });
+ *
+ * export const ChatConnection = createConnectionHandler(connection.definition);
  * ```
  *
  * @packageDocumentation
  */
 
-import { defineRoom } from "../actor/router";
+import { defineConnection } from "../actor/connection-actor";
 import type {
-  RoomDefinition,
-  RoomContext as BaseRoomContext,
-  MessageContext as BaseMessageContext,
-  VeraniActor,
+  ConnectionDefinition,
+  ConnectionContext as BaseConnectionContext,
+  ConnectionHandlerInstance,
+} from "../actor/connection-actor";
+import type {
   ConnectionMeta,
+  ConnectionEmit,
+  AsyncEmitBuilder,
 } from "../actor/types";
 import type { Contract } from "./contract";
 import type {
@@ -52,83 +58,73 @@ import {
 // ============================================================================
 
 /**
- * Typed emit builder for targeting specific scopes.
+ * Typed async emit builder for targeting specific scopes.
  */
-export interface TypedEmitBuilder<
+export interface TypedAsyncEmitBuilder<
   C extends Contract,
   TMeta extends ConnectionMeta,
 > {
   /**
-   * Emit a typed server event to the targeted scope.
+   * Emit a typed server event to the targeted scope via RPC.
    * @param event - Server event name (constrained by contract)
    * @param data - Event payload (type-checked against contract)
    */
-  emit<E extends ServerEventNames<C>>(event: E, data: ServerPayload<C, E>): number;
+  emit<E extends ServerEventNames<C>>(event: E, data: ServerPayload<C, E>): Promise<number>;
 }
 
 /**
- * Typed socket-level emit API.
- * Available on context for emitting to current socket, user, or channel.
+ * Typed connection-level emit API.
+ * Available on context for emitting to current socket, rooms, or users.
  */
-export interface TypedSocketEmit<
+export interface TypedConnectionEmit<
   C extends Contract,
   TMeta extends ConnectionMeta,
 > {
   /**
-   * Emit a typed server event to the current socket.
+   * Emit a typed server event to this connection's WebSocket.
    * @param event - Server event name (constrained by contract)
    * @param data - Event payload (type-checked against contract)
    */
   <E extends ServerEventNames<C>>(event: E, data: ServerPayload<C, E>): void;
 
   /**
-   * Target a specific user or channel for emitting.
-   * @param target - User ID or channel name
+   * Target a specific room or user for emitting.
+   * @param target - Room name (if starts with "room:") or userId
    */
-  to(target: string): TypedEmitBuilder<C, TMeta>;
+  to(target: string): TypedAsyncEmitBuilder<C, TMeta>;
+
+  /**
+   * Target a specific room for broadcasting.
+   * @param roomName - Room name
+   */
+  toRoom(roomName: string): TypedAsyncEmitBuilder<C, TMeta>;
+
+  /**
+   * Target a specific user for direct messaging.
+   * @param userId - User ID
+   */
+  toUser(userId: string): TypedAsyncEmitBuilder<C, TMeta>;
 }
 
 /**
- * Typed actor-level emit API.
- * Available on actor for broadcasting to channels.
+ * Typed connection context with contract-aware emit.
  */
-export interface TypedActorEmit<
-  C extends Contract,
-  TMeta extends ConnectionMeta,
-> {
-  /**
-   * Broadcast a typed server event to the default channel.
-   * @param event - Server event name (constrained by contract)
-   * @param data - Event payload (type-checked against contract)
-   */
-  <E extends ServerEventNames<C>>(event: E, data: ServerPayload<C, E>): number;
-
-  /**
-   * Target a specific channel for broadcasting.
-   * @param channel - Channel name
-   */
-  to(channel: InferChannels<C> | (string & {})): TypedEmitBuilder<C, TMeta>;
-}
-
-/**
- * Typed room context with contract-aware emit.
- */
-export interface TypedRoomContext<
+export interface TypedConnectionContext<
   C extends Contract,
   TMeta extends ConnectionMeta = ConnectionMeta,
   E = unknown,
+  TState extends Record<string, unknown> = Record<string, unknown>,
 > {
-  /** The actor instance handling this connection */
-  actor: VeraniActor<TMeta, E> & {
-    /** Typed emit API for broadcasting */
-    emit: TypedActorEmit<C, TMeta>;
-  };
-  /** The WebSocket connection */
-  ws: WebSocket;
+  /** The connection actor instance */
+  actor: ConnectionHandlerInstance<TMeta, E, TState>;
+  /** The WebSocket connection (may be null after disconnect) */
+  ws: WebSocket | null;
   /** Connection metadata */
   meta: TMeta;
-  /** Typed socket-level emit API */
-  emit: TypedSocketEmit<C, TMeta>;
+  /** Typed connection-level emit API */
+  emit: TypedConnectionEmit<C, TMeta>;
+  /** Persisted state */
+  state: TState;
 }
 
 /**
@@ -138,7 +134,8 @@ export interface TypedMessageContext<
   C extends Contract,
   TMeta extends ConnectionMeta = ConnectionMeta,
   E = unknown,
-> extends TypedRoomContext<C, TMeta, E> {
+  TState extends Record<string, unknown> = Record<string, unknown>,
+> extends TypedConnectionContext<C, TMeta, E, TState> {
   /** The received message frame */
   frame: {
     type: string;
@@ -148,18 +145,19 @@ export interface TypedMessageContext<
 }
 
 // ============================================================================
-// Typed Room Definition
+// Typed Connection Definition
 // ============================================================================
 
 /**
- * Configuration for a typed room.
+ * Configuration for a typed connection.
  */
-export interface TypedRoomConfig<
+export interface TypedConnectionConfig<
   C extends Contract,
   TMeta extends ConnectionMeta = ConnectionMeta,
   E = unknown,
+  TState extends Record<string, unknown> = Record<string, unknown>,
 > {
-  /** Optional room name for debugging */
+  /** Optional name for debugging */
   name?: string;
 
   /** WebSocket upgrade path (default: "/ws") */
@@ -173,22 +171,32 @@ export interface TypedRoomConfig<
   /**
    * Called when a new WebSocket connection is established.
    */
-  onConnect?(ctx: TypedRoomContext<C, TMeta, E>): void | Promise<void>;
+  onConnect?(ctx: TypedConnectionContext<C, TMeta, E, TState>): void | Promise<void>;
 
   /**
    * Called when a WebSocket connection is closed.
    */
-  onDisconnect?(ctx: TypedRoomContext<C, TMeta, E>): void | Promise<void>;
+  onDisconnect?(ctx: TypedConnectionContext<C, TMeta, E, TState>): void | Promise<void>;
 
   /**
    * Called when an error occurs in a lifecycle hook.
    */
-  onError?(error: Error, ctx: TypedRoomContext<C, TMeta, E>): void | Promise<void>;
+  onError?(error: Error, ctx: TypedConnectionContext<C, TMeta, E, TState>): void | Promise<void>;
 
   /**
    * Called after actor wakes from hibernation.
    */
-  onHibernationRestore?(actor: VeraniActor<TMeta, E>): void | Promise<void>;
+  onHibernationRestore?(actor: ConnectionHandlerInstance<TMeta, E, TState>): void | Promise<void>;
+
+  /**
+   * Initial state for this connection.
+   */
+  state?: TState;
+
+  /**
+   * Keys to persist to storage.
+   */
+  persistedKeys?: (string & keyof TState)[];
 }
 
 /**
@@ -196,21 +204,23 @@ export interface TypedRoomConfig<
  */
 export type TypedEventHandler<
   C extends Contract,
-  E extends ClientEventNames<C>,
+  EV extends ClientEventNames<C>,
   TMeta extends ConnectionMeta = ConnectionMeta,
   TEnv = unknown,
+  TState extends Record<string, unknown> = Record<string, unknown>,
 > = (
-  ctx: TypedMessageContext<C, TMeta, TEnv>,
-  data: ClientPayload<C, E>,
+  ctx: TypedMessageContext<C, TMeta, TEnv, TState>,
+  data: ClientPayload<C, EV>,
 ) => void | Promise<void>;
 
 /**
- * Typed room with contract-aware event handling (Socket.io-like API).
+ * Typed connection with contract-aware event handling (Socket.io-like API).
  */
-export interface TypedRoom<
+export interface TypedConnection<
   C extends Contract,
   TMeta extends ConnectionMeta = ConnectionMeta,
   E = unknown,
+  TState extends Record<string, unknown> = Record<string, unknown>,
 > {
   /**
    * Register a typed event handler for a client event.
@@ -221,7 +231,7 @@ export interface TypedRoom<
    *
    * @example
    * ```typescript
-   * room.on("message.send", (ctx, data) => {
+   * connection.on("message.send", (ctx, data) => {
    *   // data: { text: string } - inferred from contract!
    *   ctx.emit("chat.message", { from: ctx.meta.userId, text: data.text });
    * });
@@ -229,7 +239,7 @@ export interface TypedRoom<
    */
   on<TEvent extends ClientEventNames<C>>(
     event: TEvent,
-    handler: TypedEventHandler<C, TEvent, TMeta, E>,
+    handler: TypedEventHandler<C, TEvent, TMeta, E, TState>,
   ): void;
 
   /**
@@ -239,16 +249,16 @@ export interface TypedRoom<
    */
   off<TEvent extends ClientEventNames<C>>(
     event: TEvent,
-    handler?: TypedEventHandler<C, TEvent, TMeta, E>,
+    handler?: TypedEventHandler<C, TEvent, TMeta, E, TState>,
   ): void;
 
   /**
-   * The underlying room definition for use with createActorHandler.
+   * The underlying connection definition for use with createConnectionHandler.
    */
-  readonly definition: RoomDefinition<TMeta, E>;
+  readonly definition: ConnectionDefinition<TMeta, E, TState>;
 
   /**
-   * The contract this room is based on.
+   * The contract this connection is based on.
    */
   readonly contract: C;
 }
@@ -258,71 +268,52 @@ export interface TypedRoom<
 // ============================================================================
 
 /**
- * Creates a typed emit wrapper around the base emit API.
+ * Creates a typed emit wrapper around the base connection emit API.
  * This preserves runtime behavior while adding compile-time type checking.
  */
-function createTypedSocketEmit<C extends Contract, TMeta extends ConnectionMeta>(
-  baseEmit: BaseRoomContext<TMeta>["emit"],
-): TypedSocketEmit<C, TMeta> {
+function createTypedConnectionEmit<C extends Contract, TMeta extends ConnectionMeta>(
+  baseEmit: ConnectionEmit<TMeta>,
+): TypedConnectionEmit<C, TMeta> {
   const emit = ((event: string, data: unknown) => {
     baseEmit.emit(event, data);
-  }) as TypedSocketEmit<C, TMeta>;
+  }) as TypedConnectionEmit<C, TMeta>;
 
   emit.to = (target: string) => {
     const builder = baseEmit.to(target);
     return {
       emit: (event: string, data: unknown) => builder.emit(event, data),
-    } as TypedEmitBuilder<C, TMeta>;
+    } as TypedAsyncEmitBuilder<C, TMeta>;
   };
 
-  return emit;
-}
-
-/**
- * Creates a typed actor emit wrapper.
- */
-function createTypedActorEmit<C extends Contract, TMeta extends ConnectionMeta, E>(
-  actor: VeraniActor<TMeta, E>,
-): TypedActorEmit<C, TMeta> {
-  const emit = ((event: string, data: unknown) => {
-    return actor.emit.emit(event, data);
-  }) as TypedActorEmit<C, TMeta>;
-
-  emit.to = (channel: string) => {
-    const builder = actor.emit.to(channel);
+  emit.toRoom = (roomName: string) => {
+    const builder = baseEmit.toRoom(roomName);
     return {
       emit: (event: string, data: unknown) => builder.emit(event, data),
-    } as TypedEmitBuilder<C, TMeta>;
+    } as TypedAsyncEmitBuilder<C, TMeta>;
+  };
+
+  emit.toUser = (userId: string) => {
+    const builder = baseEmit.toUser(userId);
+    return {
+      emit: (event: string, data: unknown) => builder.emit(event, data),
+    } as TypedAsyncEmitBuilder<C, TMeta>;
   };
 
   return emit;
 }
 
 /**
- * Wraps a base context with typed emit.
+ * Wraps a base connection context with typed emit.
  */
-function wrapContext<C extends Contract, TMeta extends ConnectionMeta, E>(
-  baseCtx: BaseRoomContext<TMeta, E>,
-): TypedRoomContext<C, TMeta, E> {
+function wrapContext<C extends Contract, TMeta extends ConnectionMeta, E, TState extends Record<string, unknown>>(
+  baseCtx: BaseConnectionContext<TMeta, E, TState>,
+): TypedConnectionContext<C, TMeta, E, TState> {
   return {
-    actor: Object.assign({}, baseCtx.actor, {
-      emit: createTypedActorEmit<C, TMeta, E>(baseCtx.actor),
-    }),
+    actor: baseCtx.actor,
     ws: baseCtx.ws,
     meta: baseCtx.meta,
-    emit: createTypedSocketEmit<C, TMeta>(baseCtx.emit),
-  };
-}
-
-/**
- * Wraps a message context with typed emit.
- */
-function wrapMessageContext<C extends Contract, TMeta extends ConnectionMeta, E>(
-  baseCtx: BaseMessageContext<TMeta, E>,
-): TypedMessageContext<C, TMeta, E> {
-  return {
-    ...wrapContext<C, TMeta, E>(baseCtx),
-    frame: baseCtx.frame,
+    emit: createTypedConnectionEmit<C, TMeta>(baseCtx.emit),
+    state: baseCtx.state,
   };
 }
 
@@ -331,16 +322,16 @@ function wrapMessageContext<C extends Contract, TMeta extends ConnectionMeta, E>
 // ============================================================================
 
 /**
- * Creates a type-safe room based on a contract definition.
+ * Creates a type-safe connection based on a contract definition.
  *
- * This wraps the base `defineRoom()` function and adds:
+ * This wraps the base `defineConnection()` function and adds:
  * - Typed `on()` method for registering event handlers
  * - Typed `emit` on context for sending server events
  * - Compile-time validation of event names and payloads
  *
  * @param contract - The contract defining events and payloads
- * @param config - Room configuration (lifecycle hooks, metadata extraction)
- * @returns A typed room with contract-aware APIs
+ * @param config - Connection configuration (lifecycle hooks, metadata extraction)
+ * @returns A typed connection with contract-aware APIs
  *
  * @example
  * ```typescript
@@ -353,41 +344,45 @@ function wrapMessageContext<C extends Contract, TMeta extends ConnectionMeta, E>
  *   },
  * });
  *
- * const room = createTypedRoom(chatContract, {
+ * const connection = createTypedConnection(chatContract, {
  *   websocketPath: "/ws/chat",
- *   onConnect(ctx) {
+ *   async onConnect(ctx) {
  *     ctx.emit("chat.message", { from: "system", text: "Welcome!" });
+ *     await ctx.actor.joinRoom("chat");
  *   },
  * });
  *
- * room.on("message.send", (ctx, data) => {
+ * connection.on("message.send", (ctx, data) => {
  *   ctx.emit("chat.message", { from: ctx.meta.userId, text: data.text });
  * });
  *
- * export default createActorHandler(room.definition);
+ * export const ChatConnection = createConnectionHandler(connection.definition);
  * ```
  */
-export function createTypedRoom<
+export function createTypedConnection<
   C extends Contract,
   TMeta extends ConnectionMeta = ConnectionMeta,
   E = unknown,
+  TState extends Record<string, unknown> = Record<string, unknown>,
 >(
   contract: C,
-  config: TypedRoomConfig<C, TMeta, E>,
-): TypedRoom<C, TMeta, E> {
-  // Create the underlying room definition
-  const baseRoom = defineRoom<TMeta, E>({
+  config: TypedConnectionConfig<C, TMeta, E, TState>,
+): TypedConnection<C, TMeta, E, TState> {
+  // Create the underlying connection definition
+  const baseConnection = defineConnection<TMeta, E, TState>({
     name: config.name,
     websocketPath: config.websocketPath ?? "/ws",
     extractMeta: config.extractMeta,
+    state: config.state,
+    persistedKeys: config.persistedKeys,
     onConnect: config.onConnect
-      ? (ctx) => config.onConnect!(wrapContext<C, TMeta, E>(ctx))
+      ? (ctx) => config.onConnect!(wrapContext<C, TMeta, E, TState>(ctx))
       : undefined,
     onDisconnect: config.onDisconnect
-      ? (ctx) => config.onDisconnect!(wrapContext<C, TMeta, E>(ctx))
+      ? (ctx) => config.onDisconnect!(wrapContext<C, TMeta, E, TState>(ctx))
       : undefined,
     onError: config.onError
-      ? (error, ctx) => config.onError!(error, wrapContext<C, TMeta, E>(ctx))
+      ? (error, ctx) => config.onError!(error, wrapContext<C, TMeta, E, TState>(ctx))
       : undefined,
     onHibernationRestore: config.onHibernationRestore,
   });
@@ -396,14 +391,18 @@ export function createTypedRoom<
   const hasValidation = isValidatedContract(contract);
   const onValidationError = hasValidation ? getValidationErrorHandler(contract) : undefined;
 
-  // Create the typed room wrapper
-  const typedRoom: TypedRoom<C, TMeta, E> = {
+  // Create the typed connection wrapper
+  const typedConnection: TypedConnection<C, TMeta, E, TState> = {
     on<TEvent extends ClientEventNames<C>>(
       event: TEvent,
-      handler: TypedEventHandler<C, TEvent, TMeta, E>,
+      handler: TypedEventHandler<C, TEvent, TMeta, E, TState>,
     ): void {
-      baseRoom.on(event, (ctx, data) => {
-        const typedCtx = wrapMessageContext<C, TMeta, E>(ctx);
+      baseConnection.on(event, (ctx: BaseConnectionContext<TMeta, E, TState>, data: unknown) => {
+        const typedCtx = wrapContext<C, TMeta, E, TState>(ctx);
+        const messageCtx: TypedMessageContext<C, TMeta, E, TState> = {
+          ...typedCtx,
+          frame: { type: event as string, data },
+        };
 
         // Apply validation if contract has validators
         if (hasValidation) {
@@ -420,30 +419,41 @@ export function createTypedRoom<
               // Validation failed - don't call handler
               return;
             }
-            return handler(typedCtx, validated as ClientPayload<C, TEvent>);
+            return handler(messageCtx, validated as ClientPayload<C, TEvent>);
           }
         }
 
-        return handler(typedCtx, data as ClientPayload<C, TEvent>);
+        return handler(messageCtx, data as ClientPayload<C, TEvent>);
       });
     },
 
     off<TEvent extends ClientEventNames<C>>(
       event: TEvent,
-      _handler?: TypedEventHandler<C, TEvent, TMeta, E>,
+      _handler?: TypedEventHandler<C, TEvent, TMeta, E, TState>,
     ): void {
       // Note: We can't match the exact handler since we wrap it,
       // so we remove all handlers for the event
-      baseRoom.off(event);
+      baseConnection.off(event as string);
     },
 
     get definition() {
-      return baseRoom as unknown as RoomDefinition<TMeta, E>;
+      return baseConnection as unknown as ConnectionDefinition<TMeta, E, TState>;
     },
 
     contract,
   };
 
-  return typedRoom;
+  return typedConnection;
 }
 
+// Keep backward-compatible alias
+export { createTypedConnection as createTypedRoom };
+
+// Re-export types with backward-compatible aliases
+export type { TypedConnectionConfig as TypedRoomConfig };
+export type { TypedConnectionContext as TypedRoomContext };
+export type { TypedConnection as TypedRoom };
+export type { TypedConnectionEmit as TypedSocketEmit };
+export type { TypedAsyncEmitBuilder as TypedEmitBuilder };
+// Legacy alias - not applicable to new architecture
+export type TypedActorEmit<C extends Contract, TMeta extends ConnectionMeta> = TypedConnectionEmit<C, TMeta>;

@@ -24,7 +24,7 @@ Channels are sub-rooms within an Actor that enable selective message delivery. E
 When a connection is established, the `extractMeta()` function sets the initial channels:
 
 ```typescript
-const room = defineRoom({
+const connection = defineConnection({
   extractMeta(req) {
     const url = new URL(req.url);
     return {
@@ -47,7 +47,7 @@ When broadcasting to a channel, only connections whose `meta.channels` array inc
 ctx.actor.emit.to("game-state").emit("score", { score: 100 });
 ```
 
-The broadcast implementation filters sessions by checking `meta.channels.includes(channel)` before sending. See [src/actor/runtime/broadcast.ts](../src/actor/runtime/broadcast.ts) for implementation details.
+The broadcast implementation filters sessions by checking `meta.channels.includes(channel)` before sending.
 
 ## Server-Side Emits
 
@@ -55,14 +55,14 @@ Verani provides two levels of emit APIs on the server: **socket-level** (for ind
 
 ### Socket-Level Emits (`ctx.emit`)
 
-Available in message context (`MessageContext`) within lifecycle hooks and event handlers.
+Available in connection context within lifecycle hooks and event handlers.
 
 #### Emit to Current Socket
 
 Send a message only to the current connection:
 
 ```typescript
-room.on("chat.message", (ctx, data) => {
+connection.on("chat.message", (ctx, data) => {
   // Send acknowledgment to sender only
   ctx.emit.emit("message.received", { id: data.id });
 });
@@ -73,7 +73,7 @@ room.on("chat.message", (ctx, data) => {
 Broadcast to a channel, excluding the current socket:
 
 ```typescript
-room.on("chat.message", (ctx, data) => {
+connection.on("chat.message", (ctx, data) => {
   // Broadcast to "default" channel, excluding sender
   ctx.emit.to("default").emit("chat.message", {
     from: ctx.meta.userId,
@@ -82,14 +82,14 @@ room.on("chat.message", (ctx, data) => {
 });
 ```
 
-**How it works**: If the target matches one of the current user's channels, it broadcasts to that channel excluding the current socket. See [src/actor/runtime/emit.ts](../src/actor/runtime/emit.ts) `createSocketEmit()` lines 80-99.
+**How it works**: If the target matches one of the current user's channels, it broadcasts to that channel excluding the current socket.
 
 #### Emit to User
 
 Send a message to all sessions belonging to a specific user:
 
 ```typescript
-room.on("private.message", (ctx, data) => {
+connection.on("private.message", (ctx, data) => {
   // Send to specific user (all their sessions)
   ctx.emit.to(data.targetUserId).emit("private.message", {
     from: ctx.meta.userId,
@@ -112,7 +112,7 @@ This requirement ensures that users are in the same logical space before they ca
 
 **Server:**
 ```typescript
-room.on("direct.message", (ctx, data) => {
+connection.on("direct.message", (ctx, data) => {
   // Send to specific user (all their sessions)
   // Uses default channel - recipient must be subscribed to it
   const sentCount = ctx.emit.to(data.targetUserId).emit("direct.message", {
@@ -151,7 +151,7 @@ client.on("direct.message", (data) => {
 If you want more control over which channel to use for direct messages:
 
 ```typescript
-room.on("direct.message", (ctx, data) => {
+connection.on("direct.message", (ctx, data) => {
   // Send to user on a specific channel
   const sentCount = ctx.actor.sendToUser(
     data.targetUserId,
@@ -188,7 +188,7 @@ Available on the Actor instance for broadcasting to channels.
 Broadcast to all connections in the default channel:
 
 ```typescript
-room.on("announcement", (ctx, data) => {
+connection.on("announcement", (ctx, data) => {
   // Broadcast to default channel
   const sentCount = ctx.actor.emit.emit("announcement", {
     message: data.message
@@ -202,7 +202,7 @@ room.on("announcement", (ctx, data) => {
 Broadcast to a specific channel:
 
 ```typescript
-room.on("game.update", (ctx, data) => {
+connection.on("game.update", (ctx, data) => {
   // Broadcast to "game-state" channel
   const sentCount = ctx.actor.emit.to("game-state").emit("game.update", {
     state: data.state
@@ -215,7 +215,7 @@ room.on("game.update", (ctx, data) => {
 
 ### Broadcast Options
 
-When using the legacy `broadcast()` method or RPC, you can filter by additional criteria:
+When using the `broadcast()` method or RPC, you can filter by additional criteria:
 
 ```typescript
 // Filter by user IDs
@@ -235,28 +235,6 @@ ctx.actor.broadcast("default", data, {
 ```
 
 **Note**: The `except` option is not available over RPC since WebSocket objects cannot be serialized.
-
-### Implementation Details
-
-**Socket Emit**: [src/actor/runtime/emit.ts](../src/actor/runtime/emit.ts) `createSocketEmit()`
-- Creates emit API for a specific connection context
-- Determines if `to()` target is a channel or userId by checking `ctx.meta.channels`
-- Uses `sendToUser()` for userId targets or `broadcast()` for channel targets
-
-**Actor Emit**: [src/actor/runtime/emit.ts](../src/actor/runtime/emit.ts) `createActorEmit()`
-- Creates emit API for actor-level broadcasting
-- Always uses `broadcast()` for channel targeting
-
-**Broadcast**: [src/actor/runtime/broadcast.ts](../src/actor/runtime/broadcast.ts)
-- Filters sessions by channel subscription (`meta.channels.includes(channel)`)
-- Applies optional filters (userIds, clientIds, except)
-- Automatically cleans up stale/closed connections
-- Returns count of successful sends
-
-**SendToUser**: [src/actor/runtime/sendToUser.ts](../src/actor/runtime/sendToUser.ts)
-- Sends to all sessions of a user that are subscribed to the specified channel
-- Filters by `meta.userId === userId && meta.channels.includes(channel)`
-- Automatically cleans up failed sessions
 
 ## Client-Side Emits
 
@@ -393,7 +371,7 @@ The client unwraps this to extract the actual event type from `data.type` before
 #### Socket Emit to Current Connection
 
 ```typescript
-room.on("ping", (ctx, data) => {
+connection.on("ping", (ctx, data) => {
   // Send response only to sender
   ctx.emit.emit("pong", { timestamp: Date.now() });
 });
@@ -402,7 +380,7 @@ room.on("ping", (ctx, data) => {
 #### Socket Emit to Channel (Excluding Sender)
 
 ```typescript
-room.on("chat.message", (ctx, data) => {
+connection.on("chat.message", (ctx, data) => {
   // Broadcast to channel, excluding sender
   ctx.emit.to("default").emit("chat.message", {
     from: ctx.meta.userId,
@@ -415,7 +393,7 @@ room.on("chat.message", (ctx, data) => {
 #### Socket Emit to User (1-to-1 Messaging)
 
 ```typescript
-room.on("private.message", (ctx, data) => {
+connection.on("private.message", (ctx, data) => {
   // Send to specific user (all their sessions)
   // Both users must be in same Actor and subscribed to common channel
   const sentCount = ctx.emit.to(data.targetUserId).emit("private.message", {
@@ -442,7 +420,7 @@ room.on("private.message", (ctx, data) => {
 #### Actor Emit to Default Channel
 
 ```typescript
-room.on("announcement", (ctx, data) => {
+connection.on("announcement", (ctx, data) => {
   // Broadcast to all connections in default channel
   const count = ctx.actor.emit.emit("announcement", {
     message: data.message,
@@ -455,7 +433,7 @@ room.on("announcement", (ctx, data) => {
 #### Actor Emit to Specific Channel
 
 ```typescript
-room.on("game.state", (ctx, data) => {
+connection.on("game.state", (ctx, data) => {
   // Broadcast to game-state channel
   ctx.actor.emit.to("game-state").emit("game.state", {
     state: data.state,
@@ -467,7 +445,7 @@ room.on("game.state", (ctx, data) => {
 #### Broadcast with Filtering Options
 
 ```typescript
-room.on("admin.broadcast", (ctx, data) => {
+connection.on("admin.broadcast", (ctx, data) => {
   // Broadcast to specific users only
   ctx.actor.broadcast("default", {
     type: "admin.message",
@@ -581,15 +559,8 @@ client.on("chat.message", (data) => {
 
 ## Key Implementation Files
 
-- **Server emit logic**: [src/actor/runtime/emit.ts](../src/actor/runtime/emit.ts)
-  - `createSocketEmit()` - Socket-level emit API
-  - `createActorEmit()` - Actor-level emit API
-
-- **Broadcast logic**: [src/actor/runtime/broadcast.ts](../src/actor/runtime/broadcast.ts)
-  - Channel filtering and session management
-
-- **SendToUser logic**: [src/actor/runtime/sendToUser.ts](../src/actor/runtime/sendToUser.ts)
-  - User-targeted message delivery
+- **Connection emit logic**: [src/actor/connection-actor.ts](../src/actor/connection-actor.ts)
+  - Connection-level emit API with RPC-based room/user targeting
 
 - **Client emit**: [src/client/client.ts](../src/client/client.ts)
   - `emit()` method with message queueing

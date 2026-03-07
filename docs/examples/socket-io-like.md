@@ -16,15 +16,15 @@ Event handlers take priority when registered. Both can coexist.
 ### Registering Handlers
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection } from "verani";
 
-const room = defineRoom({
+const connection = defineConnection({
   name: "chat",
   websocketPath: "/ws"
 });
 
 // Register event handlers
-room.on("chat.message", (ctx, data) => {
+connection.on("chat.message", (ctx, data) => {
   // Broadcast to all in default channel
   ctx.actor.emit.to("default").emit("chat.message", {
     from: ctx.meta.userId,
@@ -33,7 +33,7 @@ room.on("chat.message", (ctx, data) => {
   });
 });
 
-room.on("user.typing", (ctx, data) => {
+connection.on("user.typing", (ctx, data) => {
   // Broadcast typing indicator
   ctx.actor.emit.to("default").emit("user.typing", {
     userId: ctx.meta.userId,
@@ -45,11 +45,11 @@ room.on("user.typing", (ctx, data) => {
 ### Handler Context
 
 Event handlers receive:
-- `ctx: MessageContext` - Full context with actor, websocket, metadata, and emit API
+- `ctx: ConnectionContext` - Full context with actor, websocket, metadata, and emit API
 - `data: any` - The data from the message frame
 
 ```typescript
-room.on("custom.event", (ctx, data) => {
+connection.on("custom.event", (ctx, data) => {
   // Access context properties
   const { actor, ws, meta, emit } = ctx;
   
@@ -81,7 +81,7 @@ onConnect(ctx) {
   });
 }
 
-room.on("ping", (ctx, data) => {
+connection.on("ping", (ctx, data) => {
   // Respond to ping
   ctx.emit.emit("pong", { timestamp: Date.now() });
 });
@@ -90,7 +90,7 @@ room.on("ping", (ctx, data) => {
 #### Emit to a User
 
 ```typescript
-room.on("notification.update", (ctx, data) => {
+connection.on("notification.update", (ctx, data) => {
   const userId = data.userId;
   if (!userId) {
     throw new Error("Missing userId");
@@ -107,7 +107,7 @@ room.on("notification.update", (ctx, data) => {
 #### Emit to a Channel
 
 ```typescript
-room.on("channel.message", (ctx, data) => {
+connection.on("channel.message", (ctx, data) => {
   const channel = data.channel || "default";
   
   // Broadcast to channel
@@ -127,7 +127,7 @@ Broadcast to channels from the actor level.
 #### Broadcast to Default Channel
 
 ```typescript
-room.on("announcement", (ctx, data) => {
+connection.on("announcement", (ctx, data) => {
   // Broadcast to all in default channel
   const sentCount = ctx.actor.emit.emit("announcement", {
     message: data.message,
@@ -141,7 +141,7 @@ room.on("announcement", (ctx, data) => {
 #### Broadcast to Specific Channel
 
 ```typescript
-room.on("room.message", (ctx, data) => {
+connection.on("room.message", (ctx, data) => {
   const roomId = data.roomId;
   
   // Broadcast to specific room/channel
@@ -156,13 +156,13 @@ room.on("room.message", (ctx, data) => {
 ## Complete Example: Notification System
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection } from "verani";
 
 interface NotificationMeta extends ConnectionMeta {
   username: string;
 }
 
-const notificationRoom = defineRoom<NotificationMeta>({
+const notificationConnection = defineConnection<NotificationMeta>({
   name: "notifications",
   websocketPath: "/ws/notifications",
   
@@ -191,7 +191,7 @@ const notificationRoom = defineRoom<NotificationMeta>({
 });
 
 // Handle notification updates
-notificationRoom.on("notification.update", (ctx, data) => {
+notificationConnection.on("notification.update", (ctx, data) => {
   const userId = data.userId;
   if (!userId) {
     throw new Error("Missing userId");
@@ -205,7 +205,7 @@ notificationRoom.on("notification.update", (ctx, data) => {
 });
 
 // Handle marking notifications as read
-notificationRoom.on("notification.mark-read", (ctx, data) => {
+notificationConnection.on("notification.mark-read", (ctx, data) => {
   // Broadcast read status to all user's sessions
   ctx.emit.to(ctx.meta.userId).emit("notification.read", {
     notificationId: data.id,
@@ -214,7 +214,7 @@ notificationRoom.on("notification.mark-read", (ctx, data) => {
 });
 
 // Handle broadcasting announcements
-notificationRoom.on("admin.announcement", (ctx, data) => {
+notificationConnection.on("admin.announcement", (ctx, data) => {
   // Only admins can broadcast
   if (ctx.meta.role !== "admin") {
     ctx.emit.emit("error", { message: "Unauthorized" });
@@ -236,7 +236,7 @@ Register a handler for all events:
 
 ```typescript
 // Log all events
-room.on("*", (ctx, data) => {
+connection.on("*", (ctx, data) => {
   console.log(`Event: ${ctx.frame.type}`, {
     userId: ctx.meta.userId,
     data
@@ -244,7 +244,7 @@ room.on("*", (ctx, data) => {
 });
 
 // Rate limiting for all events
-room.on("*", async (ctx, data) => {
+connection.on("*", async (ctx, data) => {
   const userId = ctx.meta.userId;
   const rateLimitKey = `rate:${userId}`;
   
@@ -269,13 +269,13 @@ const messageHandler = (ctx, data) => {
 };
 
 // Register
-room.on("chat.message", messageHandler);
+connection.on("chat.message", messageHandler);
 
 // Remove specific handler
-room.off("chat.message", messageHandler);
+connection.off("chat.message", messageHandler);
 
 // Remove all handlers for event
-room.off("chat.message");
+connection.off("chat.message");
 ```
 
 ## Mixing Event Handlers and onMessage
@@ -283,7 +283,7 @@ room.off("chat.message");
 You can use both patterns together. Event handlers take priority:
 
 ```typescript
-const room = defineRoom({
+const connection = defineConnection({
   name: "chat",
   websocketPath: "/ws",
   
@@ -298,12 +298,12 @@ const room = defineRoom({
 });
 
 // Register handlers
-room.on("chat.message", (ctx, data) => {
+connection.on("chat.message", (ctx, data) => {
   // This will be called instead of onMessage
   ctx.actor.emit.to("default").emit("chat.message", data);
 });
 
-room.on("ping", (ctx, data) => {
+connection.on("ping", (ctx, data) => {
   // This will be called instead of onMessage
   ctx.emit.emit("pong", { timestamp: Date.now() });
 });
@@ -317,9 +317,9 @@ room.on("ping", (ctx, data) => {
 
 ```typescript
 // Good: Clear event-based structure
-room.on("user.join", handleUserJoin);
-room.on("user.leave", handleUserLeave);
-room.on("message.send", handleMessageSend);
+connection.on("user.join", handleUserJoin);
+connection.on("user.leave", handleUserLeave);
+connection.on("message.send", handleMessageSend);
 
 // Avoid: Everything in onMessage
 onMessage(ctx, frame) {
@@ -344,7 +344,7 @@ ctx.actor.broadcast("default", data);
 ### 3. Handle Errors Gracefully
 
 ```typescript
-room.on("notification.update", (ctx, data) => {
+connection.on("notification.update", (ctx, data) => {
   try {
     const userId = data.userId;
     if (!userId) {
@@ -367,11 +367,11 @@ interface ChatMeta extends ConnectionMeta {
   username: string;
 }
 
-const room = defineRoom<ChatMeta>({
+const connection = defineConnection<ChatMeta>({
   // ...
 });
 
-room.on("chat.message", (ctx, data: { text: string }) => {
+connection.on("chat.message", (ctx, data: { text: string }) => {
   // ctx.meta is typed as ChatMeta
   // data is typed as { text: string }
   ctx.actor.emit.to("default").emit("chat.message", {
@@ -400,7 +400,7 @@ onMessage(ctx, frame) {
 
 **After:**
 ```typescript
-room.on("chat.message", (ctx, data) => {
+connection.on("chat.message", (ctx, data) => {
   ctx.actor.emit.to("default").emit("chat.message", {
     from: ctx.meta.userId,
     text: data.text

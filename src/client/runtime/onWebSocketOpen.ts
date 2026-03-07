@@ -16,7 +16,7 @@ import type { ConnectionTimeoutState, ConnectionPromiseState } from "../types";
  * @param ws - The WebSocket connection that opened
  * @param connectionPromise - Promise state to resolve
  * @param eventEmitter - Event emitter for lifecycle events
- * @param onOpenCallback - Optional user callback for backward compatibility
+ * @param onOpenCallback - Optional user callback
  */
 export function handleWebSocketOpen(
   connectionTimeout: ConnectionTimeoutState,
@@ -52,7 +52,7 @@ export function handleWebSocketOpen(
   eventEmitter.emitLifecycleEvent("open");
   eventEmitter.emitLifecycleEvent("connected");
 
-  // Call user callback (for backward compatibility)
+  // Call user callback
   onOpenCallback?.();
 }
 

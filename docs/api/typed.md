@@ -19,7 +19,7 @@ The typed module has **three separate entry points** to prevent dependency leaka
 The typed abstraction layer consists of:
 
 - **Contract**: Single source of truth defining all events and their payloads
-- **Typed Server**: `createTypedRoom()` with typed `handle()` and `emit`
+- **Typed Server**: `createTypedConnection()` with typed `handle()` and `emit`
 - **Typed Client**: `createTypedClient()` with typed `on()` and `emit()`
 - **Validation**: Optional runtime validation with Zod integration (automatic when enabled)
 
@@ -52,11 +52,11 @@ export const chatContract = defineContract({
 });
 ```
 
-### 2. Create Typed Server Room
+### 2. Create Typed Server Connection
 
 ```typescript
 // rooms/chat.ts
-import { createTypedRoom, createActorHandler } from "verani/typed";
+import { createTypedConnection, createConnectionHandler } from "verani/typed";
 import type { ConnectionMeta } from "verani/typed";
 import { chatContract } from "../contracts/chat";
 
@@ -64,7 +64,7 @@ interface ChatMeta extends ConnectionMeta {
   username: string;
 }
 
-const room = createTypedRoom<typeof chatContract, ChatMeta>(chatContract, {
+const connection = createTypedConnection<typeof chatContract, ChatMeta>(chatContract, {
   websocketPath: "/ws/chat",
 
   extractMeta(req) {
@@ -99,7 +99,7 @@ const room = createTypedRoom<typeof chatContract, ChatMeta>(chatContract, {
 });
 
 // Handle client events with fully typed data
-room.on("message.send", (ctx, data) => {
+connection.on("message.send", (ctx, data) => {
   // data: { text: string } - inferred from contract!
   ctx.actor.emit.to("default").emit("chat.message", {
     from: ctx.meta.userId,
@@ -108,13 +108,13 @@ room.on("message.send", (ctx, data) => {
   });
 });
 
-room.on("typing.start", (ctx, data) => {
+connection.on("typing.start", (ctx, data) => {
   // data: { conversationId: string }
   console.log(`${ctx.meta.userId} started typing in ${data.conversationId}`);
 });
 
 // Export for Cloudflare Workers
-export const ChatRoom = createActorHandler(room.definition);
+export const ChatConnection = createConnectionHandler(connection.definition);
 ```
 
 ### 3. Create Typed Client
@@ -219,9 +219,9 @@ if (isContract(maybeContract)) {
 
 ## Server API
 
-### `createTypedRoom(contract, config)`
+### `createTypedConnection(contract, config)`
 
-Creates a type-safe room based on a contract.
+Creates a type-safe connection based on a contract.
 
 **Type Parameters:**
 
@@ -237,25 +237,25 @@ Creates a type-safe room based on a contract.
 **Config Options:**
 
 ```typescript
-interface TypedRoomConfig<C, TMeta, E> {
+interface TypedConnectionConfig<C, TMeta, E> {
   name?: string;                    // Room name for debugging
   websocketPath?: string;           // WebSocket path (default: "/ws")
   extractMeta?(req: Request): TMeta | Promise<TMeta>;
-  onConnect?(ctx: TypedRoomContext<C, TMeta, E>): void | Promise<void>;
-  onDisconnect?(ctx: TypedRoomContext<C, TMeta, E>): void | Promise<void>;
-  onError?(error: Error, ctx: TypedRoomContext<C, TMeta, E>): void | Promise<void>;
-  onHibernationRestore?(actor: VeraniActor<TMeta, E>): void | Promise<void>;
+  onConnect?(ctx: TypedConnectionContext<C, TMeta, E>): void | Promise<void>;
+  onDisconnect?(ctx: TypedConnectionContext<C, TMeta, E>): void | Promise<void>;
+  onError?(error: Error, ctx: TypedConnectionContext<C, TMeta, E>): void | Promise<void>;
+  onHibernationRestore?(actor: ConnectionHandlerInstance<TMeta, E>): void | Promise<void>;
 }
 ```
 
-**Returns:** `TypedRoom<C, TMeta, E>`
+**Returns:** `TypedConnection<C, TMeta, E>`
 
-### `room.on(event, handler)`
+### `connection.on(event, handler)`
 
 Registers a typed event handler for a client event (Socket.io-like API).
 
 ```typescript
-room.on("message.send", (ctx, data) => {
+connection.on("message.send", (ctx, data) => {
   // data is typed as { text: string }
   // ctx.emit only accepts serverEvents
   ctx.emit("chat.message", {
@@ -266,28 +266,28 @@ room.on("message.send", (ctx, data) => {
 });
 ```
 
-### `room.off(event)`
+### `connection.off(event)`
 
 Removes all event handlers for an event.
 
 ```typescript
-room.off("message.send");
+connection.off("message.send");
 ```
 
-### `room.definition`
+### `connection.definition`
 
-The underlying room definition for use with `createActorHandler()`.
+The underlying room definition for use with `createConnectionHandler()`.
 
 ```typescript
-export const ChatRoom = createActorHandler(room.definition);
+export const ChatConnection = createConnectionHandler(connection.definition);
 ```
 
-### `room.contract`
+### `connection.contract`
 
 Access to the contract this room is based on.
 
 ```typescript
-console.log(room.contract.serverEvents);
+console.log(connection.contract.serverEvents);
 ```
 
 ### Typed Context
@@ -295,13 +295,12 @@ console.log(room.contract.serverEvents);
 The context passed to lifecycle hooks and handlers includes typed emit:
 
 ```typescript
-interface TypedRoomContext<C, TMeta, E> {
-  actor: VeraniActor<TMeta, E> & {
-    emit: TypedActorEmit<C, TMeta>;
-  };
-  ws: WebSocket;
+interface TypedConnectionContext<C, TMeta, E, TState> {
+  actor: ConnectionHandlerInstance<TMeta, E, TState>;
+  ws: WebSocket | null;
   meta: TMeta;
-  emit: TypedSocketEmit<C, TMeta>;
+  emit: TypedConnectionEmit<C, TMeta>;
+  state: TState;
 }
 ```
 
@@ -449,7 +448,7 @@ const validatedContract = withValidation(chatContract, {
 });
 
 // Use with typed room - validation runs automatically in handlers
-const room = createTypedRoom(validatedContract, { ... });
+const room = createTypedConnection(validatedContract, { ... });
 
 // Use with typed client - validation runs automatically in listeners
 const client = createTypedClient(validatedContract, url);
@@ -581,7 +580,7 @@ interface AppMeta extends ConnectionMeta {
   sessionId: string;
 }
 
-const room = createTypedRoom<typeof contract, AppMeta>(contract, {
+const room = createTypedConnection<typeof contract, AppMeta>(contract, {
   extractMeta(req) {
     // Return AppMeta
   },

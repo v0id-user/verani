@@ -12,7 +12,7 @@ A chat room example with authentication, message broadcasting, typing indicators
 - Join/leave notifications
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection } from "verani";
 import type { ConnectionMeta } from "verani";
 
 interface ChatMeta extends ConnectionMeta {
@@ -31,7 +31,7 @@ function validateToken(token: string): { userId: string; username: string } | nu
   return null;
 }
 
-export const chatRoom = defineRoom<ChatMeta>({
+export const chatConnection = defineConnection<ChatMeta>({
   name: "chat-example",
   websocketPath: "/ws/chat",
 
@@ -98,7 +98,7 @@ export const chatRoom = defineRoom<ChatMeta>({
 });
 
 // Register event handlers (socket.io-like)
-chatRoom.on("chat.message", (ctx, data) => {
+chatConnection.on("chat.message", (ctx, data) => {
   const { text } = data;
 
   // Validate message
@@ -124,7 +124,7 @@ chatRoom.on("chat.message", (ctx, data) => {
   console.log(`[Chat] ${ctx.meta.username}: ${sanitized}`);
 });
 
-chatRoom.on("chat.typing", (ctx, data) => {
+chatConnection.on("chat.typing", (ctx, data) => {
   // Broadcast typing indicator using emit API
   ctx.actor.emit.to("default").emit("chat.typing", {
     from: ctx.meta.userId,
@@ -133,7 +133,7 @@ chatRoom.on("chat.typing", (ctx, data) => {
   });
 });
 
-chatRoom.on("users.list", (ctx, data) => {
+chatConnection.on("users.list", (ctx, data) => {
   // Send current user list using emit API
   const onlineUsers = ctx.actor.getConnectedUserIds();
   ctx.emit.emit("users.sync", {

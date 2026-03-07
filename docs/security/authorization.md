@@ -9,7 +9,7 @@ interface AuthorizedMeta extends ConnectionMeta {
   role: "user" | "moderator" | "admin";
 }
 
-export const rbacRoom = defineRoom<AuthorizedMeta>({
+export const rbacRoom = defineConnection<AuthorizedMeta>({
   name: "rbac-room",
   websocketPath: "/ws",
   
@@ -68,7 +68,7 @@ const PERMISSIONS = {
   MANAGE_ROOM: "room:manage"
 } as const;
 
-export const permissionRoom = defineRoom<PermissionMeta>({
+export const permissionRoom = defineConnection<PermissionMeta>({
   name: "permission-room",
   websocketPath: "/ws",
   
@@ -101,7 +101,7 @@ permissionRoom.on("message.delete", (ctx, data) => {
 Check if user owns/can access specific resources:
 
 ```typescript
-export const resourceRoom = defineRoom({
+export const resourceRoom = defineConnection({
   name: "resource-room",
   websocketPath: "/ws"
   // Register event handlers (socket.io-like)

@@ -8,11 +8,7 @@ How Verani works under the hood.
 
 If you know Socket.io, you already know Verani. The difference: Verani handles Cloudflare Actor hibernation correctly and scales horizontally.
 
-## Architecture Options
-
-Verani supports two architectural patterns:
-
-### 1. Per-Connection Architecture (Recommended)
+## Architecture
 
 Each user gets their own Durable Object (ConnectionDO), with separate coordination DOs (RoomDO) for shared state.
 
@@ -24,32 +20,14 @@ Client B ─► ConnectionDO(userB) ─┤
 Client C ─► ConnectionDO(userC) ─┴─► RoomDO("presence") ─► (coordination)
 ```
 
-**Benefits:**
+**Key properties:**
 - No single-threaded bottleneck
 - Horizontal scalability (each user = their own DO)
 - Cost-efficient (idle connections hibernate)
 - Message delivery via efficient RPC
 - Shared state in dedicated coordination DOs
 
-**Use `createConnectionHandler()` and `createRoomHandler()` for this pattern.**
-
-### 2. Legacy Global Router (Deprecated)
-
-All connections go to a single Durable Object:
-
-```
-Client A ─┐
-Client B ─┼─► Single Global DO (handles ALL connections)
-Client C ─┘    └─► sessions Map with ALL WebSockets
-```
-
-**Problems:**
-- Single-threaded bottleneck
-- O(n) broadcast operations
-- Memory pressure from all connections in one DO
-- No horizontal scalability
-
-**Use `defineRoom()` and `createActorHandler()` for this pattern (not recommended for new projects).**
+**Use `createConnectionHandler()` and `createRoomHandler()` to set up this architecture.**
 
 ## Per-Connection Flow
 

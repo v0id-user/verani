@@ -56,18 +56,17 @@ Since Actors are Durable Objects, you can call their methods remotely from Worke
 **From a Worker HTTP endpoint (Socket.IO-like API - Recommended):**
 
 ```typescript
-import { createActorHandler } from "verani";
-import { chatRoom } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
+import { createConnectionHandler } from "verani";
+import { chatConnection } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
 
-const ChatRoom = createActorHandler(chatRoom);
-export { ChatRoom };
+export const ChatConnection = createConnectionHandler(chatConnection);
 
 // In your Worker fetch handler
 if (url.pathname === "/api/notify") {
   const { userId, message } = await request.json();
 
   // Get Actor stub (simple - just pass the ID string)
-  const stub = ChatRoom.get("chat-room");
+  const stub = ChatConnection.get("chat-room");
 
   // Socket.IO-like RPC API - direct method call
   const sentCount = await stub.emitToUser(userId, "notification", {
@@ -91,7 +90,7 @@ const sentCount = await stub.sendToUser(userId, "default", {
 **From inside a lifecycle hook (direct call):**
 
 ```typescript
-room.on("chat.message", (ctx, data) => {
+connection.on("chat.message", (ctx, data) => {
   // Direct call - synchronous, full access to emit API
   ctx.actor.emit.to("default").emit("chat.message", {
     from: ctx.meta.userId,
@@ -111,9 +110,9 @@ room.on("chat.message", (ctx, data) => {
 
 ## Key RPC Concepts
 
-1. **Actor Stub**: Obtained via `ActorHandlerClass.get(id)` - provides RPC interface
-   - Export: `export const ChatRoom = createActorHandler(chatRoom);` (variable name must match wrangler.jsonc `class_name`)
-   - Usage: `const stub = ChatRoom.get("room-id");`
+1. **Actor Stub**: Obtained via `ConnectionHandlerClass.get(id)` - provides RPC interface
+   - Export: `export const ChatConnection = createConnectionHandler(chatConnection);` (variable name must match wrangler.jsonc `class_name`)
+   - Usage: `const stub = ChatConnection.get("room-id");`
 2. **Promise Wrapping**: All RPC methods return Promises, even if underlying method is sync
 3. **Serialization**: Only serializable types can be passed/returned over RPC
 4. **Actor ID Consistency**: Use the same ID string for WebSocket connections and RPC calls to reach the same Actor instance
@@ -163,7 +162,7 @@ await stub.emitToChannel("default", "announcement", {
 **Coordinate between Actors:**
 ```typescript
 // From Actor A, call Actor B using Socket.IO-like API
-const otherStub = OtherRoom.get("other-room-id");
+const otherStub = OtherConnection.get("other-room-id");
 await otherStub.emitToUser(userId, "message", message);
 
 // Legacy API

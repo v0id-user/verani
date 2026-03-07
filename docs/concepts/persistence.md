@@ -17,7 +17,7 @@ You could manually use `getStorage().put()` and `getStorage().get()`, but this i
 Define your state once, mark which keys to persist, and Verani handles the rest:
 
 ```typescript
-const gameRoom = defineRoom({
+const gameConnection = defineConnection({
   websocketPath: "/ws/game",
   
   // Define your room's state
@@ -31,8 +31,8 @@ const gameRoom = defineRoom({
   persistedKeys: ["messageCount", "settings"],
   
   onConnect(ctx) {
-    // Access state via ctx.actor.roomState
-    ctx.actor.roomState.messageCount++;
+    // Access state via ctx.actor.state
+    ctx.state.messageCount++;
     // ↑ Automatically persisted!
   }
 });
@@ -52,7 +52,7 @@ const gameRoom = defineRoom({
                                                           │
                         ┌──────────────────┐              ▼
                         │  Proxy Tracks    │◀────┬───────────────────┐
-                        │  Changes         │     │  roomState ready  │
+                        │  Changes         │     │  state ready  │
                         └────────┬─────────┘     └───────────────────┘
                                  │
                                  ▼
@@ -117,29 +117,29 @@ onPersistError(key, error) {
 
 ## Accessing State
 
-State is available via `ctx.actor.roomState` in all lifecycle hooks:
+State is available via `ctx.actor.state` in all lifecycle hooks:
 
 ```typescript
-const room = defineRoom({
+const connection = defineConnection({
   state: { score: 0 },
   persistedKeys: ["score"],
   
   onConnect(ctx) {
-    console.log("Current score:", ctx.actor.roomState.score);
+    console.log("Current score:", ctx.state.score);
   },
   
   onMessage(ctx, frame) {
     if (frame.data.type === "score") {
-      ctx.actor.roomState.score += frame.data.points;
+      ctx.state.score += frame.data.points;
       // Automatically persisted!
     }
   }
 });
 
-room.on("game.point", (ctx, data) => {
-  ctx.actor.roomState.score += data.points;
+connection.on("game.point", (ctx, data) => {
+  ctx.state.score += data.points;
   ctx.emit.to("default").emit("score.update", {
-    score: ctx.actor.roomState.score
+    score: ctx.state.score
   });
 });
 ```
@@ -151,8 +151,8 @@ State is loaded asynchronously during `onInit`. Use `isStateReady()` if you need
 ```typescript
 onConnect(ctx) {
   if (ctx.actor.isStateReady()) {
-    // Safe to access roomState
-    console.log(ctx.actor.roomState.counter);
+    // Safe to access state
+    console.log(ctx.state.counter);
   }
 }
 ```
@@ -194,9 +194,9 @@ state: {
 ## Full Example: Persistent Counter Room
 
 ```typescript
-import { defineRoom, createActorHandler } from "verani";
+import { defineConnection, createConnectionHandler } from "verani";
 
-const counterRoom = defineRoom({
+const counterConnection = defineConnection({
   name: "counter",
   websocketPath: "/ws/counter",
   
@@ -221,34 +221,34 @@ const counterRoom = defineRoom({
   onConnect(ctx) {
     // Send current count to new connections
     ctx.emit.emit("counter.sync", {
-      count: ctx.actor.roomState.count,
-      lastUpdatedBy: ctx.actor.roomState.lastUpdatedBy
+      count: ctx.state.count,
+      lastUpdatedBy: ctx.state.lastUpdatedBy
     });
   }
 });
 
-counterRoom.on("counter.increment", (ctx, data) => {
+counterConnection.on("counter.increment", (ctx, data) => {
   const delta = data.amount ?? 1;
-  ctx.actor.roomState.count += delta;
-  ctx.actor.roomState.lastUpdatedBy = ctx.meta.userId;
+  ctx.state.count += delta;
+  ctx.state.lastUpdatedBy = ctx.meta.userId;
   
   // Broadcast to all clients
   ctx.actor.emit.to("default").emit("counter.update", {
-    count: ctx.actor.roomState.count,
+    count: ctx.state.count,
     updatedBy: ctx.meta.userId
   });
 });
 
-counterRoom.on("counter.reset", (ctx) => {
-  ctx.actor.roomState.count = 0;
-  ctx.actor.roomState.lastUpdatedBy = ctx.meta.userId;
+counterConnection.on("counter.reset", (ctx) => {
+  ctx.state.count = 0;
+  ctx.state.lastUpdatedBy = ctx.meta.userId;
   
   ctx.actor.emit.to("default").emit("counter.reset", {
     resetBy: ctx.meta.userId
   });
 });
 
-export const CounterActor = createActorHandler(counterRoom);
+export const CounterActor = createConnectionHandler(counterConnection);
 ```
 
 ## Related Documentation

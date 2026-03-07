@@ -16,10 +16,10 @@ These three must match:
 
 ```typescript
 // src/index.ts
-import { createActorHandler } from "verani";
+import { createConnectionHandler } from "verani";
 import { chatRoom } from "./actors/chat.actor";
 
-const ChatRoom = createActorHandler(chatRoom);
+const ChatRoom = createConnectionHandler(chatRoom);
 export { ChatRoom };
 ```
 
@@ -72,8 +72,8 @@ export default {
 
 ```typescript
 // src/index.ts
-export const ChatRoom = createActorHandler(chatRoom);
-export const PresenceRoom = createActorHandler(presenceRoom);
+export const ChatRoom = createConnectionHandler(chatRoom);
+export const PresenceRoom = createConnectionHandler(presenceRoom);
 ```
 
 ```jsonc
@@ -121,7 +121,7 @@ ChatRoom.get(`user:${userId}`);
 - Fix: Missing export: `export { ChatRoom };`
 
 **"Generic type 'Actor<E>' requires 1 type argument"**
-- Fix: Use `createActorHandler()` correctly
+- Fix: Use `createConnectionHandler()` correctly
 
 ## Related
 
