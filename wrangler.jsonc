@@ -8,28 +8,12 @@
 	},
 	"migrations": [
 		{
-			"new_sqlite_classes": ["CounterActor", "ChatExample", "PresenceExample", "NotificationsExample", "UserConnection", "PresenceRoom", "ChatRoom"],
+			"new_sqlite_classes": ["UserConnection", "PresenceRoom", "ChatRoom"],
 			"tag": "v1"
 		}
 	],
 	"durable_objects": {
 		"bindings": [
-		  {
-			"class_name": "CounterActor",
-			"name": "CounterActor"
-		  },
-		  {
-			"class_name": "ChatExample",
-			"name": "ChatExample"
-		  },
-		  {
-			"class_name": "PresenceExample",
-			"name": "PresenceExample"
-		  },
-		  {
-			"class_name": "NotificationsExample",
-			"name": "NotificationsExample"
-		  },
 		  {
 			"class_name": "UserConnection",
 			"name": "UserConnection"
