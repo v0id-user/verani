@@ -30,13 +30,13 @@ class MyActor extends Actor {
 
 ## 3. Handler Definitions (Survives Hibernation)
 
-Event handlers registered via `room.on()` are stored statically at module scope, not in the Actor instance.
+Event handlers registered via `connection.on()` are stored statically at module scope, not in the Actor instance.
 
 ```typescript
-const room = defineRoom({ /* ... */ });
+const connection = defineConnection({ /* ... */ });
 
 // These handlers persist across hibernation automatically
-room.on("chat.message", (ctx, data) => {
+connection.on("chat.message", (ctx, data) => {
   // Handler logic
 });
 ```
@@ -45,20 +45,20 @@ room.on("chat.message", (ctx, data) => {
 
 **Important**: Handlers are automatically rebuilt when the Actor wakes from hibernation. You don't need to do anything - just define them statically in your code.
 
-## 4. Persisted Room State (Survives Hibernation)
+## 4. Persisted Connection State (Survives Hibernation)
 
-Declared in your room definition and automatically persisted to Durable Object storage.
+Declared in your connection definition and automatically persisted to Durable Object storage.
 
 ```typescript
-const room = defineRoom({
+const connection = defineConnection({
   state: {
     messageCount: 0,
     settings: { maxUsers: 100 }
   },
   persistedKeys: ["messageCount", "settings"],
-  
+
   onConnect(ctx) {
-    ctx.actor.roomState.messageCount++;
+    ctx.state.messageCount++;
     // Automatically persisted!
   }
 });
@@ -86,8 +86,8 @@ const msg = await ctx.actor.getStorage().get("lastMessage");
 |------------|---------------------|--------|
 | Connection Metadata | Yes | `ctx.meta` |
 | Ephemeral Actor State | No | Class properties |
-| Handler Definitions | Yes | `room.on()` |
-| Persisted Room State | Yes | `ctx.actor.roomState` |
+| Handler Definitions | Yes | `connection.on()` |
+| Persisted Connection State | Yes | `ctx.state` |
 | Manual Durable Storage | Yes | `ctx.actor.getStorage()` |
 
 ## Related Documentation

@@ -8,7 +8,7 @@
  */
 
 // ============================================================================
-// New Architecture - Per-Connection DOs (Recommended)
+// Per-Connection Architecture
 // ============================================================================
 
 // Connection handler (one WebSocket per DO)
@@ -34,7 +34,7 @@ export type {
   RoomHandlerClass
 } from "./actor/room-actor";
 
-// New architecture types
+// Architecture types
 export type {
   RoomMember,
   RoomCoordinatorDefinition,
@@ -42,40 +42,15 @@ export type {
   ConnectionActor,
   ConnectionEmit,
   AsyncEmitBuilder,
-  VeraniEnv
-} from "./actor/types";
-
-// ============================================================================
-// Legacy Architecture - Global Router (Deprecated)
-// ============================================================================
-
-/** @deprecated Use createConnectionHandler instead */
-export { defineRoom } from "./actor/router";
-
-/** @deprecated Use createConnectionHandler instead */
-export { createActorHandler } from "./actor/actor-runtime";
-
-export { storeAttachment, restoreSessions } from "./actor/attachment";
-
-// Legacy types (kept for backward compatibility)
-export type {
+  VeraniEnv,
   ConnectionMeta,
   MessageFrame,
   BroadcastOptions,
-  RpcBroadcastOptions,
-  /** @deprecated Use ConnectionActor instead */
-  VeraniActor,
-  RoomContext,
-  MessageContext,
-  RoomDefinition,
-  /** @deprecated Use ConnectionActorStub instead */
-  ActorStub
+  RpcBroadcastOptions
 } from "./actor/types";
 
-/** @deprecated Use ConnectionHandlerClass instead */
-export type {
-  ActorHandlerClass
-} from "./actor/actor-runtime";
+// Attachment utilities
+export { storeAttachment } from "./actor/attachment";
 
 // ============================================================================
 // State Persistence - Safe wrapper for @Persist decorator

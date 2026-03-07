@@ -9,7 +9,7 @@
 - Tracks multiple devices per user
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection } from "verani";
 import type { ConnectionMeta } from "verani";
 
 interface PresenceMeta extends ConnectionMeta {
@@ -44,7 +44,7 @@ function getDeviceInfo(req: Request): string {
   return "desktop";
 }
 
-export const presenceRoom = defineRoom<PresenceMeta>({
+export const presenceConnection = defineConnection<PresenceMeta>({
   name: "presence-example",
   websocketPath: "/ws/presence",
 
@@ -244,7 +244,7 @@ export const presenceRoom = defineRoom<PresenceMeta>({
 });
 
 // Register event handlers (socket.io-like)
-presenceRoom.on("presence.status", async (ctx, data) => {
+presenceConnection.on("presence.status", async (ctx, data) => {
   const { status } = data;
 
   // Validate status
@@ -280,7 +280,7 @@ presenceRoom.on("presence.status", async (ctx, data) => {
   });
 });
 
-presenceRoom.on("presence.list", async (ctx, data) => {
+presenceConnection.on("presence.list", async (ctx, data) => {
   // Load presence list from storage (source of truth)
   const allUsers = await loadAllPresenceFromStorage(ctx.actor.getStorage());
 

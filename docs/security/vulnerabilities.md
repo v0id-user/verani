@@ -9,7 +9,7 @@ Common security vulnerabilities and how to prevent them.
 **Solution**: Verify `Origin` header:
 
 ```typescript
-export const secureRoom = defineRoom({
+export const secureRoom = defineConnection({
   name: "secure-room",
   websocketPath: "/ws",
   
@@ -41,7 +41,7 @@ export const secureRoom = defineRoom({
 **Solution**: Always sanitize before broadcasting:
 
 ```typescript
-export const secureRoom = defineRoom({
+export const secureRoom = defineConnection({
   name: "secure-chat",
   websocketPath: "/ws"
 });

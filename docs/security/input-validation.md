@@ -5,7 +5,7 @@
 ## Message Type Validation
 
 ```typescript
-export const validatedRoom = defineRoom({
+export const validatedRoom = defineConnection({
   name: "validated-room",
   websocketPath: "/ws"
 });
@@ -33,7 +33,7 @@ validatedRoom.on("channel.leave", (ctx, data) => {
 ## Data Validation
 
 ```typescript
-export const chatRoom = defineRoom({
+export const chatRoom = defineConnection({
   name: "chat",
   websocketPath: "/ws"
 });
@@ -79,7 +79,7 @@ const ChatMessageSchema = z.object({
   replyTo: z.string().uuid().optional()
 });
 
-export const zodRoom = defineRoom({
+export const zodRoom = defineConnection({
   name: "zod-chat",
   websocketPath: "/ws"
 });

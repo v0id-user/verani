@@ -9,9 +9,9 @@ Since Actors are Durable Objects, you can call their methods remotely using RPC.
 **Room Definition:**
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection } from "verani";
 
-export const notificationsRoom = defineRoom({
+export const notificationsConnection = defineConnection({
   name: "notifications",
   websocketPath: "/notifications",
 
@@ -29,11 +29,10 @@ export const notificationsRoom = defineRoom({
 **Worker with RPC Endpoint:**
 
 ```typescript
-import { createActorHandler } from "verani";
-import { notificationsRoom } from "./actors/notifications.actor"; // Suggested: src/actors/ folder (optional)
+import { createConnectionHandler } from "verani";
+import { notificationsConnection } from "./actors/notifications.actor"; // Suggested: src/actors/ folder (optional)
 
-const NotificationsRoom = createActorHandler(notificationsRoom);
-export { NotificationsRoom };
+export const NotificationsConnection = createConnectionHandler(notificationsConnection);
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -41,7 +40,7 @@ export default {
 
     // WebSocket connections
     if (url.pathname.startsWith("/notifications")) {
-      const stub = NotificationsRoom.get("notifications");
+      const stub = NotificationsConnection.get("notifications");
       return stub.fetch(request);
     }
 
@@ -56,7 +55,7 @@ export default {
       const { userId, message, type = "info" } = await request.json();
 
       // Get Actor stub (variable name must match wrangler.jsonc class_name)
-      const stub = NotificationsRoom.get(`notifications:${userId}`);
+      const stub = NotificationsConnection.get(`notifications:${userId}`);
 
       // Send notification via RPC (Socket.IO-like API - direct method call)
       const sentCount = await stub.emitToUser(userId, "notification", {
@@ -98,7 +97,7 @@ Get real-time statistics about connected users:
 ```typescript
 // In your Worker fetch handler
 if (url.pathname === "/api/stats") {
-  const stub = NotificationsRoom.get("notifications");
+  const stub = NotificationsConnection.get("notifications");
 
   // Query actor state via RPC
   const [count, userIds] = await Promise.all([
@@ -119,17 +118,16 @@ if (url.pathname === "/api/stats") {
 Send announcements to all users in a channel:
 
 ```typescript
-import { createActorHandler } from "verani";
-import { chatRoom } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
+import { createConnectionHandler } from "verani";
+import { chatConnection } from "./actors/chat.actor"; // Suggested: src/actors/ folder (optional)
 
-const ChatRoom = createActorHandler(chatRoom);
-export { ChatRoom };
+export const ChatConnection = createConnectionHandler(chatConnection);
 
 // Webhook handler for external events
 if (url.pathname === "/webhook/announcement" && request.method === "POST") {
   const { announcement, channel = "default", targetUsers } = await request.json();
 
-  const stub = ChatRoom.get("chat-room");
+  const stub = ChatConnection.get("chat-room");
 
   // Broadcast via RPC (Socket.IO-like API - direct method call)
   // Note: For user filtering, use legacy broadcast() API
@@ -177,7 +175,7 @@ export default {
 
     // Send to each user's notification Actor
     for (const userId of usersToNotify) {
-      const stub = NotificationsRoom.get(`notifications:${userId}`);
+      const stub = NotificationsConnection.get(`notifications:${userId}`);
 
       // Socket.IO-like API - direct method call
       await stub.emitToUser(userId, "daily-digest", {
@@ -194,18 +192,17 @@ export default {
 Call Actor methods from other Actors:
 
 ```typescript
-import { createActorHandler } from "verani";
-import { otherRoom } from "./actors/other.actor"; // Suggested: src/actors/ folder (optional)
+import { createConnectionHandler } from "verani";
+import { otherConnection } from "./actors/other.actor"; // Suggested: src/actors/ folder (optional)
 
-const OtherRoom = createActorHandler(otherRoom);
-export { OtherRoom };
+export const OtherConnection = createConnectionHandler(otherConnection);
 
 // In one Actor's event handler (socket.io-like)
-room.on("cross-room-message", async (ctx, data) => {
+connection.on("cross-room-message", async (ctx, data) => {
   const { targetRoom, targetUser, message } = data;
 
   // Get another Actor's stub
-  const targetStub = OtherRoom.get(targetRoom);
+  const targetStub = OtherConnection.get(targetRoom);
 
   // Send message via RPC (Socket.IO-like API - direct method call)
   await targetStub.emitToUser(targetUser, "cross-room", {

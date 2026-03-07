@@ -55,12 +55,12 @@ export const chatContract = defineContract({
 **Server code (Cloudflare Workers):**
 
 ```typescript
-// server/room.ts - only runs on Cloudflare
-import { createTypedRoom, createActorHandler } from "verani/typed";
+// server/connection.ts - only runs on Cloudflare
+import { createTypedConnection, createConnectionHandler } from "verani/typed";
 import { chatContract } from "../contracts/chat";
 
-const room = createTypedRoom(chatContract, { ... });
-export const ChatRoom = createActorHandler(room.definition);
+const connection = createTypedConnection(chatContract, { ... });
+export const ChatConnection = createConnectionHandler(connection.definition);
 ```
 
 **Client code (Browser/Node.js):**
@@ -91,7 +91,7 @@ const echoContract = defineContract({
 **Server handlers are typed (Socket.io-like):**
 
 ```typescript
-echoRoom.on("echo.send", (ctx, data) => {
+echoConnection.on("echo.send", (ctx, data) => {
   // data: { message: string } - inferred!
   ctx.emit("echo.response", { message: data.message, timestamp: Date.now() });
 });

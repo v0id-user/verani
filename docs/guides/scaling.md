@@ -37,27 +37,9 @@ export default {
 };
 ```
 
-### Legacy Global Router (Not Recommended for Scale)
-
-The legacy `defineRoom()` + `createActorHandler()` pattern puts all connections in one DO:
-
-```typescript
-// LEGACY: All connections in one DO - bottleneck!
-const stub = ChatRoom.get(""); // Same DO for everyone
-```
-
-**Limits:**
-- ~1,000 WebSocket connections per Actor
-- ~10,000 messages/second per Actor
-- Single-threaded bottleneck
-
 ## Performance Tips
 
-### 1. Use Per-Connection Architecture
-
-The single biggest performance improvement. See above.
-
-### 2. Batch Messages
+### 1. Batch Messages
 
 Send multiple updates in one message:
 
@@ -118,15 +100,6 @@ await ctx.emit.toRoom("project-123").emit("update", data);
 | Messages/sec | Scales with users |
 | Memory | Distributed across DOs |
 | Hibernation | Per-user (efficient) |
-
-### Legacy Architecture
-
-| Metric | Capacity |
-|--------|----------|
-| Connections/Actor | ~1,000 |
-| Messages/sec | ~10,000 per Actor |
-| Memory | All in one DO |
-| Hibernation | All-or-nothing |
 
 ## Horizontal Scaling Example
 

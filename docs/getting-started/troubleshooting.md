@@ -68,13 +68,9 @@ const client = new VeraniClient(url, {
 3. Use `onPersistError` hook to catch errors
 
 ```typescript
-const room = defineRoom({
+const connection = defineConnection({
   state: { count: 0 },
   persistedKeys: ["count"], // Must include!
-  
-  onPersistError(key, error) {
-    console.error(`Failed to persist ${key}:`, error);
-  }
 });
 ```
 

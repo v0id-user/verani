@@ -221,6 +221,5 @@ export class ConnectionHandler {
   }
 }
 
-// Re-export types for backward compatibility
 export type { ConnectionPromiseState, ConnectionTimeoutState, IsConnectingRef } from "../types";
 

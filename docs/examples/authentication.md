@@ -5,7 +5,7 @@
 This example shows how to properly verify user identity using JWT tokens.
 
 ```typescript
-import { defineRoom } from "verani";
+import { defineConnection } from "verani";
 // npm install @tsndr/cloudflare-worker-jwt
 import jwt from "@tsndr/cloudflare-worker-jwt";
 
@@ -14,7 +14,7 @@ interface AuthMeta extends ConnectionMeta {
   role: "user" | "moderator" | "admin";
 }
 
-export const secureRoom = defineRoom<AuthMeta>({
+export const secureConnection = defineConnection<AuthMeta>({
   async extractMeta(req) {
     // Get token from query parameter (or Authorization header)
     const url = new URL(req.url);
@@ -57,7 +57,7 @@ export const secureRoom = defineRoom<AuthMeta>({
 });
 
 // Register event handlers (socket.io-like)
-secureRoom.on("mod.kick", (ctx, data) => {
+secureConnection.on("mod.kick", (ctx, data) => {
   // Authorization check: Moderator-only actions
   if (ctx.meta.role !== "moderator" && ctx.meta.role !== "admin") {
     ctx.emit.emit("error", { message: "Insufficient permissions" });

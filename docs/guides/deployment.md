@@ -139,24 +139,13 @@ When using state persistence:
 - **Optimize keys**: Only persist what you need - each key adds storage overhead
 
 ```typescript
-const room = defineRoom({
+const connection = defineConnection({
   state: {
     // Only persist essential state
     messageCount: 0,
     settings: { maxUsers: 100 }
   },
   persistedKeys: ["messageCount", "settings"], // Minimal set
-  
-  persistOptions: {
-    shallow: true, // Faster than deep proxying
-    throwOnError: false // Don't crash on persistence failures
-  },
-  
-  onPersistError(key, error) {
-    // Log to monitoring service
-    console.error(`[Persistence] Failed to persist ${key}:`, error);
-    // Maybe notify admins or use fallback storage
-  }
 });
 ```
 

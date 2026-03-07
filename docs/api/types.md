@@ -9,19 +9,19 @@ All types are exported from the main package:
 ```typescript
 import type {
   // Server types
-  RoomDefinition,
-  RoomDefinitionWithHandlers,
-  RoomContext,
-  MessageContext,
+  ConnectionDefinition,
+  ConnectionContext,
   ConnectionMeta,
+  ConnectionEmit,
+  AsyncEmitBuilder,
+  ConnectionHandlerInstance,
+  ConnectionActorStub,
+  RoomActorStub,
+  RoomMember,
+  RoomCoordinatorDefinition,
   MessageFrame,
   BroadcastOptions,
   RpcBroadcastOptions,
-  VeraniActor,
-  ActorStub,
-  ActorHandlerClass,
-  EventHandler,
-  RoomEventEmitter,
 
   // Client types
   VeraniClientOptions,
@@ -73,7 +73,7 @@ interface MessageFrame {
 
 ### `BroadcastOptions`
 
-Options for filtering broadcast recipients. Use this when calling `broadcast()` directly on the Actor instance (inside lifecycle hooks).
+Options for filtering broadcast recipients.
 
 ```typescript
 interface BroadcastOptions {
@@ -85,77 +85,32 @@ interface BroadcastOptions {
 
 **Note:** For RPC calls, use `RpcBroadcastOptions` instead, which excludes the `except` option.
 
-### `EventHandler<TMeta, E>`
+### `ConnectionDefinition<TMeta, E, TState>`
 
-Event handler function type for socket.io-like event handling. Used with `room.on()` and `room.off()` methods.
-
-**Type Parameters:**
-- `TMeta extends ConnectionMeta` - Custom metadata type
-- `E` - Actor environment type (default: `unknown`)
-
-```typescript
-type EventHandler<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> = (
-  ctx: MessageContext<TMeta, E>,
-  data: any
-) => void | Promise<void>;
-```
-
-**Example:**
-
-```typescript
-const room = defineRoom<CustomMeta>({ /* ... */ });
-
-// Handler receives properly typed context
-room.on("chat.message", (ctx, data) => {
-  // ctx is typed as MessageContext<CustomMeta, E>
-  // ctx.meta has type CustomMeta with all custom properties
-  console.log(ctx.meta.username); // Type-safe access
-});
-```
-
-### `RoomEventEmitter<TMeta, E>`
-
-Event emitter interface for room-level event handling. Provides socket.io-like event registration and removal.
+Connection definition returned by `defineConnection()` with event handling methods.
 
 **Type Parameters:**
 - `TMeta extends ConnectionMeta` - Custom metadata type
 - `E` - Actor environment type (default: `unknown`)
+- `TState extends Record<string, unknown>` - State type
+
+Provides:
+- `on(event: string, handler): void` - Register event handler
+- `off(event: string): void` - Remove event handlers
+
+### `ConnectionContext<TMeta, E, TState>`
+
+Context passed to lifecycle hooks and event handlers.
 
 ```typescript
-interface RoomEventEmitter<TMeta extends ConnectionMeta = ConnectionMeta, E = unknown> {
-  on(event: string, handler: EventHandler<TMeta, E>): void;
-  off(event: string, handler?: EventHandler<TMeta, E>): void;
-  emit(event: string, ctx: MessageContext<TMeta, E>, data: any): Promise<void>;
+interface ConnectionContext<TMeta, E, TState> {
+  actor: ConnectionHandlerInstance<TMeta, E, TState>;
+  ws: WebSocket | null;
+  meta: TMeta;
+  emit: ConnectionEmit<TMeta>;
+  state: TState;
 }
 ```
-
-**Example:**
-
-```typescript
-import { createRoomEventEmitter } from "verani";
-
-const customEmitter = createRoomEventEmitter<CustomMeta>();
-
-const room = defineRoom({
-  eventEmitter: customEmitter,
-  // ... other config
-});
-```
-
-### `RoomDefinitionWithHandlers<TMeta, E>`
-
-Extended room definition returned by `defineRoom()` with socket.io-like convenience methods.
-
-**Type Parameters:**
-- `TMeta extends ConnectionMeta` - Custom metadata type
-- `E` - Actor environment type (default: `unknown`)
-
-Extends `RoomDefinition<TMeta, E>` and adds:
-- `on(event: string, handler: EventHandler<TMeta, E>): void`
-- `off(event: string, handler?: EventHandler<TMeta, E>): void`
-- `eventEmitter: RoomEventEmitter<TMeta, E>`
-
-See [Server API](./server.md#roomdefinitionwithhandlerstmeta-e) for complete documentation.
 
 ### `RpcBroadcastOptions`
 
@@ -168,22 +123,6 @@ interface RpcBroadcastOptions {
   /** Only send to specific client IDs */
   clientIds?: string[];
 }
-```
-
-**Comparison:**
-
-```typescript
-// Inside lifecycle hook - can use except
-ctx.actor.broadcast("default", data, {
-  except: ctx.ws,           // Available
-  userIds: ["alice", "bob"]
-});
-
-// Via RPC - use RpcBroadcastOptions
-await stub.broadcast("default", data, {
-  except: ctx.ws,           // Not available - WebSocket can't be serialized
-  userIds: ["alice", "bob"] // Available
-});
 ```
 
 ## Client Types
@@ -217,14 +156,14 @@ import type {
   ContractDefinition,
   EventMap,
   PayloadMarker,
-  
+
   // Type inference
   ServerEventNames,
   ClientEventNames,
   ServerPayload,
   ClientPayload,
   InferChannels,
-  
+
   // Validation
   Validator,
   ValidatedContract,
@@ -235,9 +174,9 @@ import type {
 
 ```typescript
 import type {
-  TypedRoom,
-  TypedRoomConfig,
-  TypedRoomContext,
+  TypedConnection,
+  TypedConnectionConfig,
+  TypedConnectionContext,
   TypedMessageContext,
   TypedEventHandler,
 } from "verani/typed";
@@ -257,4 +196,3 @@ import type {
 - [Client API](./client.md) - Client-side API reference
 - [Typed API](./typed.md) - Type-safe contracts (tRPC-like)
 - [Utilities](./utilities.md) - Utility functions
-

@@ -20,11 +20,11 @@ storeAttachment(ws, meta)
       ↓
 sessions.set(ws, { ws, meta })
       ↓
-onConnect(ctx)  → ctx.emit available, ctx.actor.roomState ready
+onConnect(ctx)  → ctx.emit available, ctx.actor.state ready
       ↓
 [connection active, messages flow]
       ↓
-Event handlers (room.on()) or onMessage hook
+Event handlers (connection.on())
       ↓
 State changes automatically persisted (if persistedKeys defined)
       ↓
@@ -42,13 +42,10 @@ Actor may hibernate (state persists)
 **onConnect** - Called when a connection is established:
 
 ```typescript
-const room = defineRoom({
+const connection = defineConnection({
   onConnect(ctx) {
     // ctx.emit is available here
-    ctx.emit.emit("welcome", { message: "Connected!" });
-    ctx.actor.emit.to("default").emit("user.joined", {
-      userId: ctx.meta.userId
-    });
+    ctx.emit("welcome", { message: "Connected!" });
   }
 });
 ```
@@ -56,9 +53,9 @@ const room = defineRoom({
 **Event Handlers** - Handle incoming messages (recommended):
 
 ```typescript
-room.on("chat.message", (ctx, data) => {
+connection.on("chat.message", (ctx, data) => {
   // ctx.emit is available here
-  ctx.actor.emit.to("default").emit("chat.message", {
+  ctx.emit.toRoom("chat").emit("chat.message", {
     from: ctx.meta.userId,
     text: data.text
   });
@@ -68,26 +65,20 @@ room.on("chat.message", (ctx, data) => {
 **onDisconnect** - Called when a connection closes:
 
 ```typescript
-const room = defineRoom({
+const connection = defineConnection({
   onDisconnect(ctx) {
     // ctx.emit is available here
-    ctx.actor.emit.to("default").emit("user.left", {
+    ctx.emit.toRoom("chat").emit("user.left", {
       userId: ctx.meta.userId
     });
   }
 });
 ```
 
-**Note:** The traditional `onMessage` hook is still supported as a fallback when no event handlers match.
-
-**Sending Messages:** Verani provides a socket.io-like emit API for sending messages:
-- `ctx.emit.emit("event", data)` - Send to current socket
-- `ctx.emit.to(userId).emit("event", data)` - Send to specific user (all their sessions)
-- `ctx.emit.to(channel).emit("event", data)` - Broadcast to channel (excluding sender)
-- `ctx.actor.emit.emit("event", data)` - Broadcast to default channel
-- `ctx.actor.emit.to(channel).emit("event", data)` - Broadcast to specific channel
-
-The legacy `ctx.actor.broadcast()` method is still available but the emit API is preferred for a more Socket.io-like experience.
+**Sending Messages:** Verani provides emit APIs for sending messages:
+- `ctx.emit("event", data)` - Send to current socket
+- `ctx.emit.toRoom(roomName).emit("event", data)` - Broadcast to room via RPC
+- `ctx.emit.toUser(userId).emit("event", data)` - Send to specific user via RPC
 
 ## Client Side
 
@@ -116,7 +107,7 @@ Retry connection
 If your room defines persisted state, it's initialized during `onInit`:
 
 ```typescript
-const room = defineRoom({
+const connection = defineConnection({
   state: {
     count: 0,
     lastActivity: null as Date | null
@@ -124,11 +115,11 @@ const room = defineRoom({
   persistedKeys: ["count", "lastActivity"],
 
   onConnect(ctx) {
-    // State is ready here - loaded from storage during onInit
-    console.log(`Current count: ${ctx.actor.roomState.count}`);
-    
+    // State is ready here - loaded from storage
+    console.log(`Current count: ${ctx.state.count}`);
+
     // Changes are automatically persisted
-    ctx.actor.roomState.count++;
+    ctx.state.count++;
   }
 });
 ```

@@ -19,9 +19,9 @@ The counter value survives Actor hibernation - disconnect, wait for hibernation,
 ### Room Definition
 
 ```typescript
-import { defineRoom, createActorHandler } from "verani";
+import { defineConnection, createConnectionHandler } from "verani";
 
-export const counterRoom = defineRoom({
+export const counterConnection = defineConnection({
   name: "counter",
   websocketPath: "/ws/counter",
 
@@ -42,43 +42,43 @@ export const counterRoom = defineRoom({
   onConnect(ctx) {
     // Send current count to new connections
     ctx.emit.emit("counter:sync", {
-      count: ctx.actor.roomState.count,
-      lastUpdatedBy: ctx.actor.roomState.lastUpdatedBy,
+      count: ctx.state.count,
+      lastUpdatedBy: ctx.state.lastUpdatedBy,
     });
   },
 });
 
 // Event: Increment the counter
-counterRoom.on("counter:increment", (ctx, data) => {
+counterConnection.on("counter:increment", (ctx, data) => {
   const amount = data?.amount ?? 1;
 
   // Modify state - automatically persisted!
-  ctx.actor.roomState.count += amount;
-  ctx.actor.roomState.lastUpdatedBy = ctx.meta.userId;
+  ctx.state.count += amount;
+  ctx.state.lastUpdatedBy = ctx.meta.userId;
 
   // Broadcast update to all clients
   ctx.actor.emit.to("default").emit("counter:update", {
-    count: ctx.actor.roomState.count,
+    count: ctx.state.count,
     updatedBy: ctx.meta.userId,
   });
 });
 
 // Event: Decrement the counter
-counterRoom.on("counter:decrement", (ctx, data) => {
+counterConnection.on("counter:decrement", (ctx, data) => {
   const amount = data?.amount ?? 1;
-  ctx.actor.roomState.count -= amount;
-  ctx.actor.roomState.lastUpdatedBy = ctx.meta.userId;
+  ctx.state.count -= amount;
+  ctx.state.lastUpdatedBy = ctx.meta.userId;
 
   ctx.actor.emit.to("default").emit("counter:update", {
-    count: ctx.actor.roomState.count,
+    count: ctx.state.count,
     updatedBy: ctx.meta.userId,
   });
 });
 
 // Event: Reset the counter
-counterRoom.on("counter:reset", (ctx) => {
-  ctx.actor.roomState.count = 0;
-  ctx.actor.roomState.lastUpdatedBy = ctx.meta.userId;
+counterConnection.on("counter:reset", (ctx) => {
+  ctx.state.count = 0;
+  ctx.state.lastUpdatedBy = ctx.meta.userId;
 
   ctx.actor.emit.to("default").emit("counter:reset", {
     resetBy: ctx.meta.userId,
@@ -86,14 +86,14 @@ counterRoom.on("counter:reset", (ctx) => {
 });
 
 // Event: Get current count
-counterRoom.on("counter:get", (ctx) => {
+counterConnection.on("counter:get", (ctx) => {
   ctx.emit.emit("counter:sync", {
-    count: ctx.actor.roomState.count,
-    lastUpdatedBy: ctx.actor.roomState.lastUpdatedBy,
+    count: ctx.state.count,
+    lastUpdatedBy: ctx.state.lastUpdatedBy,
   });
 });
 
-export const CounterActor = createActorHandler(counterRoom);
+export const CounterActor = createConnectionHandler(counterConnection);
 ```
 
 ### Client Usage
@@ -157,13 +157,13 @@ State is fully typed based on your definition:
 
 ```typescript
 // Typed as number
-ctx.actor.roomState.count += 1;
+ctx.state.count += 1;
 
 // Typed as string | null
-ctx.actor.roomState.lastUpdatedBy = ctx.meta.userId;
+ctx.state.lastUpdatedBy = ctx.meta.userId;
 
 // Type error - property doesn't exist
-ctx.actor.roomState.foo;
+ctx.state.foo;
 ```
 
 ### Automatic Persistence
@@ -171,7 +171,7 @@ ctx.actor.roomState.foo;
 Changes to persisted keys are automatically saved:
 
 ```typescript
-ctx.actor.roomState.count += 1;  // Automatically persisted!
+ctx.state.count += 1;  // Automatically persisted!
 ```
 
 No manual `getStorage().put()` calls needed.
