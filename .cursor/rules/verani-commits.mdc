@@ -17,3 +17,7 @@ alwaysApply: true
 ## Before committing
 
 Check the diff against main and apply **anti-slop** rules: remove extra comments, defensive try/catch, `as any` casts, or style inconsistent with the file. See `anti-slop.mdc`.
+
+## Always commit
+
+After making changes, commit them following the conventions above. Do not leave uncommitted work. Split into multiple commits by logical unit.

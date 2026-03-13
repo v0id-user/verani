@@ -60,3 +60,4 @@ Verani is a small, focused realtime SDK for Cloudflare Actors (Durable Objects) 
 - **Keep commits small and focused.**
 - **Split commits** — No slop commits. Do not squash everything into one big commit. Split by logical unit: one fix per commit, one feature per commit, docs separate from code.
 - **Before committing:** Apply anti-slop rules — remove extra comments, defensive try/catch, `as any` casts, or style inconsistent with the file.
+- **Always commit.** After making changes, commit them following the conventions above. Do not leave uncommitted work. Split into multiple commits by logical unit.
