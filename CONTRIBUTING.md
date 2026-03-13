@@ -21,6 +21,8 @@ git checkout -b feature/your-feature-name
 
 3. Make your changes.
 4. Commit with a clear message and push your branch.
+
+   **Commit conventions:** Use conventional commits (`type(scope): message`, e.g. `fix(actor): handle wake`). Subject line only, no description/body. Keep commits small and focused; split by logical unit — no one big commit containing everything. Before committing, apply anti-slop rules — remove extra comments, defensive try/catch, `as any` casts, or style inconsistent with the file. See `.cursor/rules/anti-slop.mdc` and `.claude/CLAUDE.md`.
 5. Open a **Pull Request** targeting the `master` branch.
 
 - Describe your change and reference any related issues.

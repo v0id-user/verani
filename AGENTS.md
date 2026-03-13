@@ -1,6 +1,13 @@
 # Agents
 
-## Cursor Cloud specific instructions
+## AI Rules
+
+Project semantics for Cursor and Claude are defined in:
+
+- **Cursor:** `.cursor/rules/` — `verani-context.mdc`, `anti-slop.mdc`, `verani-commits.mdc`, and file-specific rules
+- **Claude:** `.claude/CLAUDE.md`
+
+## Cursor Cloud
 
 ### Overview
 
@@ -20,8 +27,8 @@ All commands use `bun` as the package manager (lockfile: `bun.lock`).
 
 ### Gotchas
 
-- **`wrangler.jsonc` has stale DO bindings.** The config references `CounterActor`, `ChatExample`, `PresenceExample`, and `NotificationsExample` which are not exported from `src/index.ts`. `wrangler dev` will refuse to start until these are removed. The active DOs are `UserConnection`, `PresenceRoom`, and `ChatRoom`.
-- **Test snapshots are outdated.** `test/index.spec.ts` expects `"Hello World!"` but the worker now returns an HTML info page. The test infrastructure (vitest + cloudflare workers pool) works correctly; the inline snapshots just need updating with `bun run test -- --run --update`.
-- **RoomDO binding lookup fails at runtime.** The example `onConnect` hook tries to join a presence room, but the binding resolution inside `joinRoom()` throws "RoomDO binding not found". This is a pre-existing code issue, not an environment problem. WebSocket connections and message handling work fine otherwise.
-- **Docs site** (`site/`) is a separate workspace. Run `cd site && bun run dev` to start it independently. It uses its own `wrangler.jsonc`.
-- **No external services required.** Everything runs locally via wrangler/miniflare with built-in Durable Object simulation (SQLite-backed). No databases, Docker, or API keys needed.
+- **`wrangler.jsonc` has stale DO bindings.** Remove `CounterActor`, `ChatExample`, `PresenceExample`, `NotificationsExample`. Active DOs: `UserConnection`, `PresenceRoom`, `ChatRoom`.
+- **Test snapshots** — Update with `bun run test -- --run --update` if outdated.
+- **RoomDO binding** — Example `onConnect` may throw "RoomDO binding not found"; WebSocket handling works otherwise.
+- **Docs site** (`site/`) — Separate workspace; run `cd site && bun run dev` independently.
+- **No external services** — Local wrangler/miniflare with SQLite-backed DO simulation.
