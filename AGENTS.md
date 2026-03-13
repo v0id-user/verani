@@ -38,6 +38,8 @@ All rule files share the same project semantics. If you update one, update the o
 | Docs dev | `cd site && bun run dev` |
 | Deploy docs | Auto-deploys via Cloudflare Workers Builds on push to `canary` |
 | Deploy docs (manual) | `cd site && bun run deploy` |
+| Bump version | `bun x @nyron/cli bump --type patch\|minor\|major` |
+| Push release tag | `bun x @nyron/cli push-tag` |
 
 ## Architecture
 
@@ -77,6 +79,22 @@ Review the diff and apply anti-slop rules:
 ### Always Commit
 
 After making changes, commit them following the conventions above. Do not leave uncommitted work. Split into multiple commits by logical unit.
+
+## Versioning (Nyron)
+
+This project uses [Nyron](https://nyron.dev) for versioning, changelogs, and GitHub releases. **Never bump versions manually** — always use Nyron.
+
+**Workflow:**
+1. `bun x @nyron/cli bump --type patch|minor|major` — bumps `package.json` version, updates changelog, updates `.nyron/` state
+2. Commit the version bump: `chore: release v<version>`
+3. `bun x @nyron/cli push-tag` — creates the `nyron-release@*` tag that triggers the GitHub Actions release workflow
+4. Push the commit and tag
+
+**Rules:**
+- **Never** edit `package.json` version, `.nyron/meta.json`, or `.nyron/versions.json` by hand.
+- **Never** create version tags (`v*`) manually — Nyron manages them.
+- Use `patch` for fixes, `minor` for features, `major` for breaking changes.
+- The release workflow (`.github/workflows/release.yml`) runs automatically on `nyron-release@*` tags.
 
 ## Code Style
 

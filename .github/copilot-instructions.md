@@ -26,6 +26,8 @@ Verani is a realtime SDK for Cloudflare Actors (Durable Objects) with Socket.io-
 | Run tests | `bun run test` |
 | Unit tests only | `bun run test:unit` |
 | Generate types | `bun run cf-typegen` |
+| Bump version | `bun x @nyron/cli bump --type patch\|minor\|major` |
+| Push release tag | `bun x @nyron/cli push-tag` |
 
 ## Code Style
 
@@ -42,6 +44,17 @@ Verani is a realtime SDK for Cloudflare Actors (Durable Objects) with Socket.io-
 - **Split commits by logical unit.** One fix per commit, one feature per commit, docs separate from code. Never squash unrelated changes into one commit.
 - Before committing, review the diff and remove AI slop (extra comments, defensive checks, `as any` casts, style inconsistencies).
 - **Always commit.** After making changes, commit them following the conventions above. Do not leave uncommitted work. Split into multiple commits by logical unit.
+
+## Versioning (Nyron)
+
+This project uses [Nyron](https://nyron.dev) for versioning, changelogs, and GitHub releases. **Never bump versions manually.**
+
+1. `bun x @nyron/cli bump --type patch|minor|major` — bumps version, updates changelog and `.nyron/` state
+2. Commit: `chore: release v<version>`
+3. `bun x @nyron/cli push-tag` — creates the release trigger tag
+4. Push commit and tag
+
+Never edit `package.json` version, `.nyron/meta.json`, or `.nyron/versions.json` by hand. Never create `v*` tags manually.
 
 ## Hard Rules
 
