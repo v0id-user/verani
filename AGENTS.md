@@ -36,7 +36,8 @@ All rule files share the same project semantics. If you update one, update the o
 | Unit tests only | `bun run test:unit` |
 | Generate types | `bun run cf-typegen` |
 | Docs dev | `cd site && bun run dev` |
-| Deploy docs | `cd site && bun run deploy` (also auto-deploys on push to `canary`) |
+| Deploy docs | Auto-deploys via Cloudflare Workers Builds on push to `canary` |
+| Deploy docs (manual) | `cd site && bun run deploy` |
 
 ## Architecture
 
