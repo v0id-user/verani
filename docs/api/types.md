@@ -10,23 +10,25 @@ All types are exported from the main package:
 import type {
   // Server types
   ConnectionDefinition,
+  ConnectionDefinitionWithHandlers,
   ConnectionContext,
+  ConnectionHandlerClass,
   ConnectionMeta,
   ConnectionEmit,
   AsyncEmitBuilder,
-  ConnectionHandlerInstance,
   ConnectionActorStub,
   RoomActorStub,
+  RoomHandlerClass,
   RoomMember,
   RoomCoordinatorDefinition,
   MessageFrame,
   BroadcastOptions,
   RpcBroadcastOptions,
+  VeraniEnv,
 
-  // Client types
-  VeraniClientOptions,
-  ConnectionState,
-  ReconnectionConfig,
+  // Persistence types
+  SafePersistOptions,
+  PersistableActor,
 
   // Shared types
   ClientMessage,
@@ -64,10 +66,10 @@ interface CustomMeta extends ConnectionMeta {
 Structure of messages sent over WebSocket.
 
 ```typescript
-interface MessageFrame {
+interface MessageFrame<TData = unknown> {
   type: string;
   channel?: string;
-  data?: any;
+  data?: TData;
 }
 ```
 

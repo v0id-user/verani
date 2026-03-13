@@ -31,6 +31,7 @@ Complete documentation for Verani, a realtime framework for Cloudflare Workers.
 - [Channels](./examples/channels.md) - Custom paths and multiple channels
 - [Presence](./examples/presence.md) - User presence tracking
 - [Authentication](./examples/authentication.md) - JWT authentication
+- [Persistence](./examples/persistence.md) - State persistence across hibernation
 - [Rate Limiting](./examples/rate-limiting.md) - Prevent spam
 - [RPC](./examples/rpc.md) - Remote Procedure Calls
 
@@ -44,6 +45,7 @@ See [Examples Index](./examples/README.md) for all examples.
 - [Emits and Channels](./concepts/emits-channels.md) - Emit patterns and targeting
 - [Hibernation](./concepts/hibernation.md) - Hibernation behavior (automatic state restoration)
 - [State Management](./concepts/state-management.md) - State types
+- [Persistence](./concepts/persistence.md) - Declarative state persistence
 - [RPC](./concepts/rpc.md) - Remote Procedure Calls (DO-to-DO communication)
 - [Isolation](./concepts/isolation.md) - Isolation strategies
 - [Lifecycle](./concepts/lifecycle.md) - Connection lifecycle
