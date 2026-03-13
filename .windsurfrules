@@ -1,0 +1,57 @@
+# Verani — Windsurf Rules
+
+Verani is a realtime SDK for Cloudflare Actors (Durable Objects) with Socket.io-like semantics. This is a **library**, not an app.
+
+## Tech Stack
+
+- **Runtime:** Cloudflare Workers, Durable Objects (Actors)
+- **Language:** TypeScript
+- **Package manager:** bun (lockfile: `bun.lock`) — use `bun`, never npm/yarn
+- **Build:** tsdown → `dist/`
+- **Tests:** vitest with `@cloudflare/vitest-pool-workers`
+
+## Architecture
+
+- **ConnectionDO** — One per user. Owns a single WebSocket, session metadata, room membership (persisted).
+- **RoomDO** — One per room. Coordinates membership and message fanout via RPC. No WebSockets.
+- **Hibernation** — Actors hibernate when idle. Use WebSocket attachments and persisted state; re-join RoomDOs on wake.
+
+## Commands
+
+| Task | Command |
+|------|---------|
+| Install deps | `bun install` |
+| Dev server | `bun run dev` |
+| Build library | `bun run build` |
+| Run tests | `bun run test` |
+| Unit tests only | `bun run test:unit` |
+| Generate types | `bun run cf-typegen` |
+
+## Code Style — Anti-Slop
+
+- Follow existing patterns in the file you're editing.
+- No extra comments a human wouldn't write.
+- No defensive try/catch unless the callsite genuinely needs it.
+- No `as any` casts to work around type issues — fix the types.
+- No over-engineering: only add what's directly needed.
+
+## Commit Conventions
+
+- **Format:** `type(scope): message` — subject line only, no body.
+- **Types:** `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+- **Split commits by logical unit.** One fix per commit, one feature per commit, docs separate from code. A PR with many small commits is better than one commit with unrelated changes. No slop commits.
+- Before committing, review the diff and remove AI slop.
+- **Always commit.** After making changes, commit them following the conventions above. Do not leave uncommitted work. Split into multiple commits by logical unit.
+
+## Hard Rules
+
+- DO bindings in `wrangler.jsonc` must match actual exports. Active DOs: `UserConnection`, `PresenceRoom`, `ChatRoom`.
+- Always use `bun` — never npm or yarn.
+- Docs site (`site/`) is a separate workspace — run `cd site && bun run dev` independently.
+
+## Gotchas
+
+- `wrangler.jsonc` — Remove stale bindings or wrangler dev fails.
+- Test snapshots — Update with `bun run test -- --run --update` if outdated.
+- RoomDO binding — Example `onConnect` may throw "RoomDO binding not found"; WebSocket handling works otherwise.
+- No external services — Everything runs locally via wrangler/miniflare (SQLite-backed DO simulation).
