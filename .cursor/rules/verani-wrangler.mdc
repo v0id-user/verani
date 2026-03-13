@@ -1,0 +1,33 @@
+---
+description: Wrangler DO bindings must match exports; active DOs
+globs: wrangler.jsonc, **/wrangler*.jsonc
+alwaysApply: false
+---
+
+# Verani Wrangler Config
+
+## DO Bindings
+
+`class_name` in `durable_objects.bindings` **must** match the exported class name from the worker entry point.
+
+**Active DOs:** `UserConnection`, `PresenceRoom`, `ChatRoom`
+
+Remove any stale bindings (e.g. `CounterActor`, `ChatExample`, `PresenceExample`, `NotificationsExample`) or `wrangler dev` will fail.
+
+## Example
+
+```jsonc
+{
+  "durable_objects": {
+    "bindings": [
+      { "class_name": "UserConnection", "name": "CONNECTION_DO" },
+      { "class_name": "PresenceRoom", "name": "PRESENCE_ROOM" },
+      { "class_name": "ChatRoom", "name": "CHAT_ROOM" }
+    ]
+  }
+}
+```
+
+## Migrations
+
+`new_sqlite_classes` must list the same DO class names.

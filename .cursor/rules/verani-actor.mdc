@@ -1,0 +1,28 @@
+---
+description: ConnectionDO and RoomDO patterns, attachment serialization, persist helpers
+globs: src/actor/**/*.ts
+alwaysApply: false
+---
+
+# Verani Actor Layer
+
+## ConnectionDO vs RoomDO
+
+- **ConnectionDO** — One per user. Owns WebSocket, metadata, room membership. RPC: `deliverMessage`, `joinRoom`, `leaveRoom`.
+- **RoomDO** — One per room. Owns member set, no WebSockets. RPC: `join`, `leave`, `broadcast`.
+
+## Hibernation
+
+In-memory state is wiped on eviction. Use:
+
+1. **WebSocket attachments** — `storeAttachment(ws, meta)` / `ws.deserializeAttachment()` for session metadata
+2. **Persist helpers** — `initializePersistedState`, `PERSISTED_STATE`, `STATE_READY` from `persist.ts`
+3. **Re-join on wake** — Room membership must be re-established via `onWake`; RoomDOs don't know the user until re-join
+
+## Protocol
+
+JSON frames: `{ type, channel?, data? }`. Use `encodeFrame` / `decodeFrame` from `protocol.ts`.
+
+## Types
+
+Import from `./types`: `ConnectionMeta`, `ConnectionActorStub`, `RoomDOBinding`, `ConnectionDOBinding`, `ConnectionEmit`, etc.

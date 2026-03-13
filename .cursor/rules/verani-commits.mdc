@@ -1,0 +1,19 @@
+---
+description: Commit conventions; mentions anti-slop
+alwaysApply: true
+---
+
+# Commit Conventions
+
+- **Format:** Use conventional commits: `type(scope): message` (e.g. `fix(actor): handle hibernation wake`, `feat(client): add reconnection`). Subject line only — no description/body.
+- **Scope:** Optional. Use when helpful: `actor`, `client`, `typed`, `examples`, `docs`, etc.
+- **Types:** `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+- **Keep commits small and focused** — one logical change per commit.
+
+## Split commits
+
+**No slop commits.** Do not squash everything into one big commit. Split by logical unit: one fix per commit, one feature per commit, docs separate from code, etc. A PR with many small commits is better than one commit containing unrelated changes.
+
+## Before committing
+
+Check the diff against main and apply **anti-slop** rules: remove extra comments, defensive try/catch, `as any` casts, or style inconsistent with the file. See `anti-slop.mdc`.

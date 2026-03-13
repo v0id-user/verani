@@ -1,0 +1,27 @@
+---
+description: VeraniClient API, protocol frames, connection lifecycle
+globs: src/client/**/*.ts, examples/**/*.ts
+alwaysApply: false
+---
+
+# Verani Client Layer
+
+## VeraniClient
+
+```ts
+import { VeraniClient } from "verani/client";
+
+const client = new VeraniClient("wss://example.com/ws?userId=123");
+client.on("event.name", (data) => { ... });
+client.emit("event.name", payload);
+```
+
+- Uses `ConnectionManager`, `ConnectionHandler`, `MessageQueue`, `KeepaliveManager`, `EventEmitter` internally
+- Protocol: `encodeClientMessage` / decode in `protocol.ts`
+- Options: `VeraniClientOptions` (reconnection, keepalive, etc.)
+
+## Examples
+
+- `examples/server.ts` — Connection definition, room handlers, event handlers
+- `defineConnection` + `createConnectionHandler` for backend; `createRoomHandler` for rooms
+- Extract userId from request (`?userId=`, `?token=user:xxx`) before routing to ConnectionDO

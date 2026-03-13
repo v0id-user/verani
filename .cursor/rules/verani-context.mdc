@@ -1,0 +1,41 @@
+---
+description: Verani project context, architecture, commands, and gotchas
+alwaysApply: true
+---
+
+# Verani Project Context
+
+**Verani** is a small, focused realtime SDK for Cloudflare Actors (Durable Objects) with Socket.io-like semantics. This is a **library**, not an app.
+
+## Architecture
+
+- **ConnectionDO** per user — one DO owns one WebSocket
+- **RoomDO** per room — coordinates membership and message fanout via RPC
+- Handles **hibernation** correctly (attachments, persisted state, re-join on wake)
+- Horizontally scalable; no single-threaded bottleneck
+
+**Backend API:** `defineConnection`, `createConnectionHandler`, `createRoomHandler`
+**Client API:** `VeraniClient` with `on(event, handler)` / `emit(event, payload)`
+
+## Commands (bun only)
+
+| Task | Command |
+|------|---------|
+| Install deps | `bun install` |
+| Dev server | `bun run dev` (localhost:8787) |
+| Build library | `bun run build` |
+| Run tests | `bun run test` |
+| Generate types | `bun run cf-typegen` |
+
+## Gotchas
+
+- **wrangler.jsonc** — DO bindings must match exports. Active DOs: `UserConnection`, `PresenceRoom`, `ChatRoom`. Remove any stale bindings (CounterActor, ChatExample, etc.) or wrangler dev will fail.
+- **Test snapshots** — May be outdated; update with `bun run test -- --run --update`.
+- **RoomDO binding** — Example `onConnect` may throw "RoomDO binding not found" at runtime; WebSocket handling works otherwise.
+- **Docs site** (`site/`) — Separate workspace; run `cd site && bun run dev` independently.
+
+## Folder Structure
+
+- `src/` — Core library (actor/, client/, shared/, typed/)
+- `examples/` — Example apps and server definitions
+- `site/` — Documentation site (separate workspace)
