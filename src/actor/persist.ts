@@ -218,6 +218,7 @@ function createDeepProxy<T extends object>(
   onSet: (rootKey: string, value: unknown) => void,
   onDelete: (rootKey: string) => void,
   trackedKeys: string[],
+  rootState?: Record<string, unknown>,
   rootKey?: string
 ): T {
   return new Proxy(target, {
@@ -227,11 +228,13 @@ function createDeepProxy<T extends object>(
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         const keyToTrack = rootKey ?? String(key);
         if (trackedKeys.includes(keyToTrack) || rootKey !== undefined) {
+          const state = rootState ?? (target as Record<string, unknown>);
           return createDeepProxy(
             value as object,
             onSet,
             onDelete,
             trackedKeys,
+            state,
             keyToTrack
           );
         }
@@ -246,8 +249,8 @@ function createDeepProxy<T extends object>(
       if (result) {
         const keyToTrack = rootKey ?? String(key);
         if (trackedKeys.includes(keyToTrack)) {
-          if (rootKey) {
-            onSet(rootKey, undefined);
+          if (rootKey && rootState) {
+            onSet(rootKey, rootState[rootKey]);
           } else {
             onSet(String(key), value);
           }
@@ -263,8 +266,8 @@ function createDeepProxy<T extends object>(
       if (result) {
         const keyToTrack = rootKey ?? String(key);
         if (trackedKeys.includes(keyToTrack)) {
-          if (rootKey) {
-            onSet(rootKey, undefined);
+          if (rootKey && rootState) {
+            onSet(rootKey, rootState[rootKey]);
           } else {
             onDelete(String(key));
           }
