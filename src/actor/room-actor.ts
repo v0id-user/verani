@@ -322,6 +322,16 @@ export function createRoomHandler<E = unknown>(
 			this.roomState[key] = value;
 			await this.ctx.storage.put(`_room_state:${key}`, value);
 		}
+
+		/**
+		 * Clean shutdown: call hook, then clear storage
+		 */
+		async destroy() {
+			if (definition.onDestroy) {
+				await definition.onDestroy(this.roomState);
+			}
+			await super.destroy();
+		}
 	}
 
 	// Set the name property for proper Actor binding resolution

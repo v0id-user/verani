@@ -130,6 +130,12 @@ export interface RoomCoordinatorDefinition<E = unknown> {
    * Called when a user leaves this room
    */
   onLeave?(roomState: Record<string, unknown>, userId: string): void | Promise<void>;
+
+  /**
+   * Called before the actor is destroyed and all storage is cleared.
+   * Use for cleanup logic (e.g., notifying other services).
+   */
+  onDestroy?(roomState: Record<string, unknown>): void | Promise<void>;
 }
 
 // ============================================================================

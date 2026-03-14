@@ -122,6 +122,12 @@ export interface ConnectionDefinition<
 	 * Called when persistence fails
 	 */
 	onPersistError?(key: string, error: Error): void;
+
+	/**
+	 * Called before the actor is destroyed and all storage is cleared.
+	 * Use for cleanup (e.g., leaving rooms, notifying services).
+	 */
+	onDestroy?(ctx: ConnectionContext<TMeta, E, TState>): void | Promise<void>;
 }
 
 /**
@@ -747,6 +753,29 @@ export function createConnectionHandler<
 		 */
 		off(event: string): void {
 			this.handlers.delete(event);
+		}
+
+		/**
+		 * Clean shutdown: leave all rooms, close WebSocket, call hook, then clear storage
+		 */
+		async destroy() {
+			for (const roomName of this[ROOMS].keys()) {
+				try {
+					await this.leaveRoomInternal(roomName);
+				} catch {
+					// RPC failure during destroy — non-fatal
+				}
+			}
+
+			if (this[WS] && this[WS].readyState === WebSocket.OPEN) {
+				this[WS].close(1000, "Actor destroyed");
+			}
+
+			if (definition.onDestroy && this[META]) {
+				await definition.onDestroy(this.createContext());
+			}
+
+			await super.destroy();
 		}
 	}
 
