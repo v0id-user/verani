@@ -153,8 +153,10 @@ export function createRoomHandler<E = unknown>(
 		 * Called when the DO initializes or wakes from hibernation
 		 */
 		protected async onInit() {
-			await this.restoreMembersFromStorage();
-			await this.restoreRoomStateFromStorage();
+			this.ensureTables();
+			await this.migrateFromKV();
+			this.loadMembers();
+			this.loadRoomState();
 
 			if (definition.onInit) {
 				await definition.onInit(this.roomState);
@@ -162,30 +164,73 @@ export function createRoomHandler<E = unknown>(
 		}
 
 		/**
-		 * Restore member list from Durable Object storage
+		 * Create SQL tables if they don't exist
 		 */
-		private async restoreMembersFromStorage(): Promise<void> {
-			const storage = this.ctx.storage;
-			const memberList = await storage.list<RoomMember>({ prefix: "_room_member:" });
+		private ensureTables(): void {
+			this.sql`CREATE TABLE IF NOT EXISTS room_members (
+				user_id TEXT PRIMARY KEY,
+				joined_at INTEGER NOT NULL,
+				metadata TEXT
+			)`;
+			this.sql`CREATE TABLE IF NOT EXISTS room_state (
+				key TEXT PRIMARY KEY,
+				value TEXT
+			)`;
+		}
 
-			this[MEMBERS].clear();
-			for (const [key, member] of memberList.entries()) {
-				const userId = key.replace("_room_member:", "");
-				this[MEMBERS].set(userId, member);
+		/**
+		 * One-time migration from KV to SQL for existing deployments
+		 */
+		private async migrateFromKV(): Promise<void> {
+			const storage = this.ctx.storage;
+
+			const memberList = await storage.list<RoomMember>({ prefix: "_room_member:" });
+			if (memberList.size > 0) {
+				for (const [key, member] of memberList.entries()) {
+					const userId = key.replace("_room_member:", "");
+					const metadata = member.metadata ? JSON.stringify(member.metadata) : null;
+					this.sql`INSERT OR REPLACE INTO room_members (user_id, joined_at, metadata)
+						VALUES (${userId}, ${member.joinedAt}, ${metadata})`;
+				}
+				await storage.delete(Array.from(memberList.keys()));
+			}
+
+			const stateMap = await storage.list<unknown>({ prefix: "_room_state:" });
+			if (stateMap.size > 0) {
+				for (const [key, value] of stateMap.entries()) {
+					const stateKey = key.replace("_room_state:", "");
+					this.sql`INSERT OR REPLACE INTO room_state (key, value)
+						VALUES (${stateKey}, ${JSON.stringify(value)})`;
+				}
+				await storage.delete(Array.from(stateMap.keys()));
 			}
 		}
 
 		/**
-		 * Restore room state from storage
+		 * Load members from SQL into memory
 		 */
-		private async restoreRoomStateFromStorage(): Promise<void> {
-			const storage = this.ctx.storage;
-			const stateMap = await storage.list<unknown>({ prefix: "_room_state:" });
+		private loadMembers(): void {
+			this[MEMBERS].clear();
+			const rows = this.sql`SELECT user_id, joined_at, metadata FROM room_members` as
+				{ user_id: string; joined_at: number; metadata: string | null }[];
+			for (const row of rows) {
+				this[MEMBERS].set(row.user_id, {
+					userId: row.user_id,
+					joinedAt: row.joined_at,
+					metadata: row.metadata ? JSON.parse(row.metadata) : undefined
+				});
+			}
+		}
 
+		/**
+		 * Load room state from SQL into memory
+		 */
+		private loadRoomState(): void {
 			this.roomState = {};
-			for (const [key, value] of stateMap.entries()) {
-				const stateKey = key.replace("_room_state:", "");
-				this.roomState[stateKey] = value;
+			const rows = this.sql`SELECT key, value FROM room_state` as
+				{ key: string; value: string }[];
+			for (const row of rows) {
+				this.roomState[row.key] = JSON.parse(row.value);
 			}
 		}
 
@@ -193,14 +238,13 @@ export function createRoomHandler<E = unknown>(
 		 * Add a user to this room
 		 */
 		async join(userId: string, metadata: Record<string, unknown> = {}): Promise<void> {
-			const member: RoomMember = {
-				userId,
-				joinedAt: Date.now(),
-				metadata
-			};
+			const joinedAt = Date.now();
+			const member: RoomMember = { userId, joinedAt, metadata };
+			const metadataJson = Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null;
 
 			this[MEMBERS].set(userId, member);
-			await this.ctx.storage.put(`_room_member:${userId}`, member);
+			this.sql`INSERT OR REPLACE INTO room_members (user_id, joined_at, metadata)
+				VALUES (${userId}, ${joinedAt}, ${metadataJson})`;
 
 			if (definition.onJoin) {
 				await definition.onJoin(this.roomState, userId, metadata);
@@ -214,7 +258,7 @@ export function createRoomHandler<E = unknown>(
 			if (!this[MEMBERS].has(userId)) return;
 
 			this[MEMBERS].delete(userId);
-			await this.ctx.storage.delete(`_room_member:${userId}`);
+			this.sql`DELETE FROM room_members WHERE user_id = ${userId}`;
 
 			if (definition.onLeave) {
 				await definition.onLeave(this.roomState, userId);
@@ -305,7 +349,8 @@ export function createRoomHandler<E = unknown>(
 
 			member.metadata = { ...member.metadata, ...metadata };
 			this[MEMBERS].set(userId, member);
-			await this.ctx.storage.put(`_room_member:${userId}`, member);
+			const metadataJson = JSON.stringify(member.metadata);
+			this.sql`UPDATE room_members SET metadata = ${metadataJson} WHERE user_id = ${userId}`;
 		}
 
 		/**
@@ -320,7 +365,8 @@ export function createRoomHandler<E = unknown>(
 		 */
 		async setRoomState(key: string, value: unknown): Promise<void> {
 			this.roomState[key] = value;
-			await this.ctx.storage.put(`_room_state:${key}`, value);
+			const valueJson = JSON.stringify(value);
+			this.sql`INSERT OR REPLACE INTO room_state (key, value) VALUES (${key}, ${valueJson})`;
 		}
 
 		/**
