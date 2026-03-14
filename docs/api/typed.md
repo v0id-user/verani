@@ -232,14 +232,16 @@ Creates a type-safe connection based on a contract.
 **Parameters:**
 
 - `contract` - The contract defining events
-- `config` - Room configuration
+- `config` - Connection configuration
 
 **Config Options:**
 
 ```typescript
 interface TypedConnectionConfig<C, TMeta, E> {
-  name?: string;                    // Room name for debugging
+  name?: string;                    // Connection name for debugging
   websocketPath?: string;           // WebSocket path (default: "/ws")
+  rooms?: Record<string, string>;   // Room name or namespace → RoomDO binding
+  connectionBinding?: string;       // ConnectionDO binding name
   extractMeta?(req: Request): TMeta | Promise<TMeta>;
   onConnect?(ctx: TypedConnectionContext<C, TMeta, E>): void | Promise<void>;
   onDisconnect?(ctx: TypedConnectionContext<C, TMeta, E>): void | Promise<void>;
@@ -249,6 +251,18 @@ interface TypedConnectionConfig<C, TMeta, E> {
 ```
 
 **Returns:** `TypedConnection<C, TMeta, E>`
+
+Typed connections support the same room binding behavior as `defineConnection()`, including namespace-based dynamic room names:
+
+```typescript
+const connection = createTypedConnection(chatContract, {
+  rooms: { conversation: "ChatRoom" },
+  connectionBinding: "UserConnection",
+  async onConnect(ctx) {
+    await ctx.actor.joinRoom("conversation:123");
+  },
+});
+```
 
 ### `connection.on(event, handler)`
 
@@ -312,6 +326,9 @@ ctx.emit("server.event", { data: "value" });
 
 // Emit to specific user or channel
 ctx.emit.to("userId").emit("notification", { ... });
+
+// Emit to a room and include the sender
+ctx.emit.toRoom("conversation:123", { includeSelf: true }).emit("chat.message", { ... });
 
 // Actor-level broadcast to channel
 ctx.actor.emit.to("default").emit("announcement", { ... });

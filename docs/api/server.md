@@ -91,6 +91,17 @@ Map of room names to their environment binding keys. Must match binding names in
 rooms: { "presence": "PresenceRoom", "chat": "ChatRoom" }
 ```
 
+For dynamic room names, map the namespace prefix and use the full room name at runtime:
+
+```typescript
+rooms: { conversation: "ChatRoom" }
+
+await ctx.actor.joinRoom("conversation:123");
+await ctx.emit.toRoom("conversation:123").emit("chat.message", data);
+```
+
+Exact keys still win over namespace prefixes, so you can override specific rooms when needed.
+
 #### `connectionBinding?: string`
 Environment binding key for the ConnectionDO class. Required for user-to-user messaging (`toUser`).
 
@@ -164,9 +175,14 @@ ctx.emit.emit("event", { data: "value" });
 // Emit to a room (via RoomDO RPC)
 await ctx.emit.toRoom("chat").emit("message", { text: "Hello" });
 
+// Include the current user in the room broadcast
+await ctx.emit.toRoom("chat", { includeSelf: true }).emit("message", { text: "Hello" });
+
 // Emit to a specific user (via ConnectionDO RPC)
 await ctx.emit.toUser("alice").emit("notification", { message: "Hi" });
 ```
+
+`toRoom()` excludes the current user by default. Pass `{ includeSelf: true }` when the sender should receive the same room event.
 
 **Note:** `toRoom()` and `toUser()` return async emit builders that use RPC.
 
