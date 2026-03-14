@@ -1,12 +1,10 @@
 {
   "packages": [
     {
-      "name": "verani",
-      "path": ".",
       "prefix": "verani",
       "version": "0.11.0"
     }
   ],
   "createdAt": "2025-12-05T19:03:32.017Z",
-  "latestTag": "nyron-release@0.11.0"
+  "latestTag": "nyron-release@2026-03-14@05-25-33.551"
 }
