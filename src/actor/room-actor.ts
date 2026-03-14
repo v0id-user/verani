@@ -244,48 +244,48 @@ export function createRoomHandler<E = unknown>(
 		 * @returns Number of members the message was sent to
 		 */
 		async broadcast<TData = unknown>(event: string, data?: TData, opts?: BroadcastOptions): Promise<number> {
-			console.debug(`[Verani:RoomDO] Broadcasting "${event}" to ${this[MEMBERS].size} members`);
-
 			const ConnectionDO = this.getConnectionDO();
 			if (!ConnectionDO) {
 				console.error("[Verani:RoomDO] ConnectionDO binding not found in environment");
 				return 0;
 			}
 
+			const eligible = Array.from(this[MEMBERS].entries()).filter(([userId]) => {
+				if (opts?.userIds && !opts.userIds.includes(userId)) return false;
+				if (opts?.exceptUserId === userId) return false;
+				return true;
+			});
+
+			const results = await Promise.all(
+				eligible.map(async ([userId]): Promise<{ userId: string; ok: boolean; error?: Error }> => {
+					try {
+						const connectionStub = ConnectionDO.get(userId);
+						await connectionStub.deliverMessage(event, data);
+						return { userId, ok: true };
+					} catch (error) {
+						return { userId, ok: false, error: error as Error };
+					}
+				})
+			);
+
 			let sentCount = 0;
-			const errors: Error[] = [];
+			const staleMembers: string[] = [];
 
-			// Iterate through members and send via RPC
-			for (const [userId, _member] of this[MEMBERS].entries()) {
-				// Skip if userIds filter is specified and doesn't match
-				if (opts?.userIds && !opts.userIds.includes(userId)) {
-					continue;
-				}
-
-				// Skip excluded user
-				if (opts?.exceptUserId === userId) {
-					continue;
-				}
-
-				try {
-					// Get the user's ConnectionDO and call deliverMessage via RPC
-					const connectionStub = ConnectionDO.get(userId);
-					await connectionStub.deliverMessage(event, data);
+			for (const result of results) {
+				if (result.ok) {
 					sentCount++;
-				} catch (error) {
-					console.error(`[Verani:RoomDO] Failed to deliver to ${userId}:`, error);
-					errors.push(error as Error);
-
-					// If the connection is gone, remove them from the room
-					if ((error as Error).message?.includes("not found") ||
-						(error as Error).message?.includes("no connection")) {
-						console.debug(`[Verani:RoomDO] Removing stale member ${userId}`);
-						await this.leave(userId);
+				} else {
+					if (result.error?.message?.includes("not found") ||
+						result.error?.message?.includes("no connection")) {
+						staleMembers.push(result.userId);
 					}
 				}
 			}
 
-			console.debug(`[Verani:RoomDO] Broadcast complete, sent to ${sentCount}/${this[MEMBERS].size} members`);
+			for (const userId of staleMembers) {
+				await this.leave(userId);
+			}
+
 			return sentCount;
 		}
 
