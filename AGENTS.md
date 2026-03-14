@@ -84,17 +84,28 @@ After making changes, commit them following the conventions above. Do not leave 
 
 This project uses [Nyron](https://nyron.dev) for versioning, changelogs, and GitHub releases. **Never bump versions manually** — always use Nyron.
 
-**Workflow:**
-1. `bun x @nyron/cli bump --type patch|minor|major` — bumps `package.json` version, updates changelog, updates `.nyron/` state
+**Full release workflow:**
+1. `bun x @nyron/cli bump --type patch|minor|major` — bumps `package.json` version, updates `.nyron/` state files
 2. Commit the version bump: `chore: release v<version>`
-3. `bun x @nyron/cli push-tag` — creates the `nyron-release@*` tag that triggers the GitHub Actions release workflow
-4. Push the commit and tag
+3. `bun x @nyron/cli push-tag` — creates a `nyron-release@YYYY-MM-DD@HH-MM-SS.mmm` tag and pushes it to origin. Also updates `.nyron/meta.json` with the new `latestTag`.
+4. Commit the state update: `chore(nyron): update state files after push-tag`
+5. `bun x @nyron/cli release --use-existing-tag --dry-run` — preview changelog (commits between previous and current release tags)
+6. `bun x @nyron/cli release --use-existing-tag` — publish GitHub Release (requires `GITHUB_TOKEN`)
+7. `git push` — push commits to remote
 
 **Rules:**
-- **Never** edit `package.json` version, `.nyron/meta.json`, or `.nyron/versions.json` by hand.
-- **Never** create version tags (`v*`) manually — Nyron manages them.
+- Never edit `package.json` version, `.nyron/meta.json`, or `.nyron/versions.json` by hand.
+- Never create version tags manually — Nyron manages them.
 - Use `patch` for fixes, `minor` for features, `major` for breaking changes.
 - The release workflow (`.github/workflows/release.yml`) runs automatically on `nyron-release@*` tags.
+
+**Critical details (common mistakes):**
+- **Do NOT modify `.nyron/` files before running `bump`.** Nyron reads the current version from `.nyron/meta.json` to compute the next version. If `meta.json` is modified (even by a linter/formatter) before `bump` runs, the version will be wrong.
+- **`push-tag` modifies `.nyron/meta.json`** (updates `latestTag`). This change must be committed separately after running `push-tag`.
+- **Release tags use timestamp format:** `nyron-release@YYYY-MM-DD@HH-MM-SS.mmm`. Never create tags with version numbers like `nyron-release@0.11.0` — Nyron won't recognize them.
+- **Changelog needs two boundary tags.** `release --use-existing-tag` diffs commits between the previous and current `nyron-release@*` tags. If no previous tag exists (first release), create a retroactive base tag on the pre-release commit: `git tag "nyron-release@<ISO-timestamp>" <commit-hash>`, then push it.
+- **`.nyron/meta.json` format:** `packages` is an array of objects with `prefix` and `version` fields (not `name` or `path` — those live in `nyron.config.ts`).
+- **`.nyron/versions.json` format:** `packages` is an object keyed by project name, where each value is an array of version objects with `version`, `prefix`, and optionally `date` fields.
 
 ## Code Style
 

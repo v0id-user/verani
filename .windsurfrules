@@ -49,12 +49,19 @@ Verani is a realtime SDK for Cloudflare Actors (Durable Objects) with Socket.io-
 
 This project uses [Nyron](https://nyron.dev) for versioning, changelogs, and GitHub releases. **Never bump versions manually.**
 
-1. `bun x @nyron/cli bump --type patch|minor|major` — bumps version, updates changelog and `.nyron/` state
+1. `bun x @nyron/cli bump --type patch|minor|major` — bumps version and `.nyron/` state
 2. Commit: `chore: release v<version>`
-3. `bun x @nyron/cli push-tag` — creates the release trigger tag
-4. Push commit and tag
+3. `bun x @nyron/cli push-tag` — creates `nyron-release@YYYY-MM-DD@HH-MM-SS.mmm` tag, pushes to origin, updates `.nyron/meta.json`
+4. Commit: `chore(nyron): update state files after push-tag`
+5. `bun x @nyron/cli release --use-existing-tag` — publishes GitHub Release with changelog (needs `GITHUB_TOKEN`)
+6. `git push`
 
-Never edit `package.json` version, `.nyron/meta.json`, or `.nyron/versions.json` by hand. Never create `v*` tags manually.
+**Critical:**
+- Never edit `package.json` version, `.nyron/meta.json`, or `.nyron/versions.json` by hand. Never create version tags manually.
+- Do NOT modify `.nyron/` files before running `bump` — Nyron reads current version from them. Premature modification causes wrong version.
+- `push-tag` modifies `meta.json` (`latestTag`) — commit this change separately.
+- Release tags use timestamp format (`nyron-release@YYYY-MM-DD@HH-MM-SS.mmm`), not version numbers.
+- Changelog generation (`release`) diffs commits between two `nyron-release@*` tags. First release needs a retroactive base tag on the pre-release commit.
 
 ## Hard Rules
 
