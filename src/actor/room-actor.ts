@@ -135,20 +135,12 @@ export function createRoomHandler<E = unknown>(
 		 * Called when the DO initializes or wakes from hibernation
 		 */
 		protected async onInit() {
-			console.debug("[Verani:RoomDO] onInit called");
-
-			// Restore members from storage
 			await this.restoreMembersFromStorage();
-
-			// Restore room state from storage
 			await this.restoreRoomStateFromStorage();
 
-			// Call user-defined onInit hook
 			if (definition.onInit) {
 				await definition.onInit(this.roomState);
 			}
-
-			console.debug(`[Verani:RoomDO] Initialized with ${this[MEMBERS].size} members`);
 		}
 
 		/**
@@ -163,8 +155,6 @@ export function createRoomHandler<E = unknown>(
 				const userId = key.replace("_room_member:", "");
 				this[MEMBERS].set(userId, member);
 			}
-
-			console.debug(`[Verani:RoomDO] Restored ${this[MEMBERS].size} members from storage`);
 		}
 
 		/**
@@ -179,60 +169,38 @@ export function createRoomHandler<E = unknown>(
 				const stateKey = key.replace("_room_state:", "");
 				this.roomState[stateKey] = value;
 			}
-
-			console.debug(`[Verani:RoomDO] Restored room state with ${Object.keys(this.roomState).length} keys`);
 		}
 
 		/**
 		 * Add a user to this room
 		 */
 		async join(userId: string, metadata: Record<string, unknown> = {}): Promise<void> {
-			console.debug(`[Verani:RoomDO] User ${userId} joining room`);
-
 			const member: RoomMember = {
 				userId,
 				joinedAt: Date.now(),
 				metadata
 			};
 
-			// Store in memory
 			this[MEMBERS].set(userId, member);
-
-			// Persist to storage
 			await this.ctx.storage.put(`_room_member:${userId}`, member);
 
-			// Call user-defined onJoin hook
 			if (definition.onJoin) {
 				await definition.onJoin(this.roomState, userId, metadata);
 			}
-
-			console.debug(`[Verani:RoomDO] User ${userId} joined, total members: ${this[MEMBERS].size}`);
 		}
 
 		/**
 		 * Remove a user from this room
 		 */
 		async leave(userId: string): Promise<void> {
-			console.debug(`[Verani:RoomDO] User ${userId} leaving room`);
+			if (!this[MEMBERS].has(userId)) return;
 
-			const member = this[MEMBERS].get(userId);
-			if (!member) {
-				console.debug(`[Verani:RoomDO] User ${userId} was not in room`);
-				return;
-			}
-
-			// Remove from memory
 			this[MEMBERS].delete(userId);
-
-			// Remove from storage
 			await this.ctx.storage.delete(`_room_member:${userId}`);
 
-			// Call user-defined onLeave hook
 			if (definition.onLeave) {
 				await definition.onLeave(this.roomState, userId);
 			}
-
-			console.debug(`[Verani:RoomDO] User ${userId} left, remaining members: ${this[MEMBERS].size}`);
 		}
 
 		/**
@@ -245,10 +213,7 @@ export function createRoomHandler<E = unknown>(
 		 */
 		async broadcast<TData = unknown>(event: string, data?: TData, opts?: BroadcastOptions): Promise<number> {
 			const ConnectionDO = this.getConnectionDO();
-			if (!ConnectionDO) {
-				console.error("[Verani:RoomDO] ConnectionDO binding not found in environment");
-				return 0;
-			}
+			if (!ConnectionDO) return 0;
 
 			const eligible = Array.from(this[MEMBERS].entries()).filter(([userId]) => {
 				if (opts?.userIds && !opts.userIds.includes(userId)) return false;
@@ -315,18 +280,11 @@ export function createRoomHandler<E = unknown>(
 		 */
 		async updateMemberMetadata(userId: string, metadata: Record<string, unknown>): Promise<void> {
 			const member = this[MEMBERS].get(userId);
-			if (!member) {
-				console.warn(`[Verani:RoomDO] Cannot update metadata for non-member: ${userId}`);
-				return;
-			}
+			if (!member) return;
 
 			member.metadata = { ...member.metadata, ...metadata };
 			this[MEMBERS].set(userId, member);
-
-			// Persist update
 			await this.ctx.storage.put(`_room_member:${userId}`, member);
-
-			console.debug(`[Verani:RoomDO] Updated metadata for ${userId}`);
 		}
 
 		/**
@@ -342,7 +300,6 @@ export function createRoomHandler<E = unknown>(
 		async setRoomState(key: string, value: unknown): Promise<void> {
 			this.roomState[key] = value;
 			await this.ctx.storage.put(`_room_state:${key}`, value);
-			console.debug(`[Verani:RoomDO] Set room state "${key}"`);
 		}
 	}
 

@@ -52,6 +52,9 @@ export type {
 // Attachment utilities
 export { storeAttachment } from "./actor/attachment";
 
+// Debug utility
+export { enableDebug } from "./actor/debug";
+
 // ============================================================================
 // State Persistence - Safe wrapper for @Persist decorator
 // ============================================================================

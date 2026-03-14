@@ -303,7 +303,6 @@ export function createConnectionHandler<
 				async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
 					const RoomDO = self.getRoomDO();
 					if (!RoomDO) {
-						console.error("[Verani:ConnectionDO] RoomDO binding not found");
 						return 0;
 					}
 
@@ -313,8 +312,7 @@ export function createConnectionHandler<
 							exceptUserId: self[META]?.userId // Don't echo back to sender
 						};
 						return await roomStub.broadcast(event, data, opts);
-					} catch (error) {
-						console.error(`[Verani:ConnectionDO] Failed to broadcast to room ${roomName}:`, error);
+					} catch {
 						return 0;
 					}
 				}
@@ -330,7 +328,6 @@ export function createConnectionHandler<
 				async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
 					const ConnectionDO = self.getConnectionDO();
 					if (!ConnectionDO) {
-						console.error("[Verani:ConnectionDO] ConnectionDO binding not found");
 						return 0;
 					}
 
@@ -338,8 +335,7 @@ export function createConnectionHandler<
 						const userStub = ConnectionDO.get(userId) as ConnectionActorStub;
 						const success = await userStub.deliverMessage(event, data);
 						return success ? 1 : 0;
-					} catch (error) {
-						console.error(`[Verani:ConnectionDO] Failed to send to user ${userId}:`, error);
+					} catch {
 						return 0;
 					}
 				}
@@ -352,7 +348,6 @@ export function createConnectionHandler<
 		private sendToWebSocket<TData = unknown>(event: string, data?: TData): boolean {
 			const ws = this[WS];
 			if (!ws || ws.readyState !== WebSocket.OPEN) {
-				console.debug("[Verani:ConnectionDO] Cannot send - WebSocket not open");
 				return false;
 			}
 
@@ -361,8 +356,7 @@ export function createConnectionHandler<
 				const frame = { type: "event", channel: "default", data: eventData };
 				ws.send(encodeFrame(frame));
 				return true;
-			} catch (error) {
-				console.error("[Verani:ConnectionDO] Failed to send to WebSocket:", error);
+			} catch {
 				return false;
 			}
 		}
@@ -388,8 +382,6 @@ export function createConnectionHandler<
 		 * Called when DO initializes or wakes from hibernation
 		 */
 		protected async onInit() {
-			console.debug("[Verani:ConnectionDO] onInit called");
-
 			// Initialize persisted state if defined
 			if (definition.state) {
 				if (definition.onPersistError) {
@@ -413,7 +405,6 @@ export function createConnectionHandler<
 			const storedRooms = await this.ctx.storage.get<StoredRoom[]>("_connection_rooms");
 			if (storedRooms && Array.isArray(storedRooms)) {
 				this[ROOMS] = new Map(storedRooms.map(r => [r.roomName, r.metadata]));
-				console.debug(`[Verani:ConnectionDO] Restored ${this[ROOMS].size} rooms from storage`);
 			}
 
 			// Copy handlers from definition
@@ -432,10 +423,8 @@ export function createConnectionHandler<
 					const meta = ws.deserializeAttachment() as TMeta | undefined;
 					if (meta) {
 						this[META] = meta;
-						console.debug(`[Verani:ConnectionDO] Restored connection for user ${meta.userId}`);
 
 						// Auto-rejoin all rooms after hibernation
-						// This ensures RoomDOs know this user is still connected
 						await this.rejoinRoomsAfterHibernation();
 
 						// Call user-defined hook (optional, for custom logic)
@@ -446,7 +435,6 @@ export function createConnectionHandler<
 				}
 			}
 
-			console.debug(`[Verani:ConnectionDO] Initialized, connected: ${this[WS] !== null}`);
 		}
 
 		/**
@@ -460,11 +448,8 @@ export function createConnectionHandler<
 		 * Handle WebSocket connection
 		 */
 		protected async onWebSocketConnect(ws: WebSocket, req: Request) {
-			console.debug("[Verani:ConnectionDO] onWebSocketConnect called");
-
 			// Close existing connection if any (single connection per DO)
 			if (this[WS] && this[WS].readyState === WebSocket.OPEN) {
-				console.debug("[Verani:ConnectionDO] Closing existing connection");
 				this[WS].close(1000, "New connection established");
 			}
 
@@ -492,7 +477,6 @@ export function createConnectionHandler<
 				try {
 					await definition.onConnect(this.createContext());
 				} catch (error) {
-					console.error("[Verani:ConnectionDO] onConnect error:", error);
 					if (definition.onError) {
 						await definition.onError(error as Error, this.createContext());
 					}
@@ -501,19 +485,13 @@ export function createConnectionHandler<
 				}
 			}
 
-			console.debug(`[Verani:ConnectionDO] Connected: ${meta.userId}`);
 		}
 
 		/**
 		 * Handle WebSocket message
 		 */
 		protected async onWebSocketMessage(ws: WebSocket, raw: WebSocketRawData) {
-			console.debug("[Verani:ConnectionDO] onWebSocketMessage called");
-
-			if (!this[META]) {
-				console.warn("[Verani:ConnectionDO] Received message but no metadata");
-				return;
-			}
+			if (!this[META]) return;
 
 			try {
 				// Parse message
@@ -535,7 +513,6 @@ export function createConnectionHandler<
 					await definition.onMessage(this.createContext(), frame);
 				}
 			} catch (error) {
-				console.error("[Verani:ConnectionDO] Message handling error:", error);
 				if (definition.onError) {
 					await definition.onError(error as Error, this.createContext());
 				}
@@ -546,13 +523,11 @@ export function createConnectionHandler<
 		 * Handle WebSocket disconnect
 		 */
 		protected async onWebSocketDisconnect(ws: WebSocket) {
-			console.debug("[Verani:ConnectionDO] onWebSocketDisconnect called");
-
 			if (this[META] && definition.onDisconnect) {
 				try {
 					await definition.onDisconnect(this.createContext());
-				} catch (error) {
-					console.error("[Verani:ConnectionDO] onDisconnect error:", error);
+				} catch {
+					// User hook error — non-fatal
 				}
 			}
 
@@ -560,16 +535,12 @@ export function createConnectionHandler<
 			for (const roomName of this[ROOMS].keys()) {
 				try {
 					await this.leaveRoomInternal(roomName);
-				} catch (error) {
-					console.error(`[Verani:ConnectionDO] Failed to leave room ${roomName}:`, error);
+				} catch {
+					// RPC failure during disconnect — non-fatal
 				}
 			}
 
-			// Clear connection state
 			this[WS] = null;
-			// Keep META for potential reconnection
-
-			console.debug("[Verani:ConnectionDO] Disconnected");
 		}
 
 		/**
@@ -598,7 +569,6 @@ export function createConnectionHandler<
 		 * Called via RPC from RoomDO during broadcast
 		 */
 		async deliverMessage<TData = unknown>(event: string, data?: TData): Promise<boolean> {
-			console.debug(`[Verani:ConnectionDO] deliverMessage: ${event}`);
 			return this.sendToWebSocket(event, data);
 		}
 
@@ -606,7 +576,6 @@ export function createConnectionHandler<
 		 * Deliver a system event (presence updates, room events, etc.)
 		 */
 		async deliverSystemEvent<TPayload = unknown>(type: string, payload?: TPayload): Promise<void> {
-			console.debug(`[Verani:ConnectionDO] deliverSystemEvent: ${type}`);
 			this.sendToWebSocket(`system:${type}`, payload);
 		}
 
@@ -638,16 +607,11 @@ export function createConnectionHandler<
 				throw new Error("RoomDO binding not found");
 			}
 
-			console.debug(`[Verani:ConnectionDO] Joining room: ${roomName}`);
-
 			const roomStub = RoomDO.get(roomName) as RoomActorStub;
 			await roomStub.join(this[META].userId, metadata);
 
-			// Store room with metadata for hibernation persistence
 			this[ROOMS].set(roomName, metadata);
 			await this.persistRooms();
-
-			console.debug(`[Verani:ConnectionDO] Joined room: ${roomName}`);
 		}
 
 		/**
@@ -670,18 +634,10 @@ export function createConnectionHandler<
 			}
 
 			const RoomDO = this.getRoomDO();
-			if (!RoomDO) {
-				console.warn("[Verani:ConnectionDO] Cannot rejoin rooms: RoomDO binding not found");
-				return;
-			}
+			if (!RoomDO) return;
 
 			const userId = this[META]?.userId;
-			if (!userId) {
-				console.warn("[Verani:ConnectionDO] Cannot rejoin rooms: no user metadata");
-				return;
-			}
-
-			console.debug(`[Verani:ConnectionDO] Re-registering with ${this[ROOMS].size} rooms after hibernation`);
+			if (!userId) return;
 
 			const failedRooms: string[] = [];
 
@@ -689,23 +645,17 @@ export function createConnectionHandler<
 				try {
 					const roomStub = RoomDO.get(roomName) as RoomActorStub;
 					await roomStub.join(userId, metadata);
-					console.debug(`[Verani:ConnectionDO] Re-joined room: ${roomName}`);
-				} catch (error) {
-					console.error(`[Verani:ConnectionDO] Failed to re-join room ${roomName}:`, error);
+				} catch {
 					failedRooms.push(roomName);
 				}
 			}
 
-			// Remove rooms that failed to re-join (they may no longer exist)
 			if (failedRooms.length > 0) {
 				for (const roomName of failedRooms) {
 					this[ROOMS].delete(roomName);
 				}
 				await this.persistRooms();
-				console.debug(`[Verani:ConnectionDO] Removed ${failedRooms.length} failed rooms`);
 			}
-
-			console.debug(`[Verani:ConnectionDO] Room re-registration complete`);
 		}
 
 		/**
@@ -729,14 +679,10 @@ export function createConnectionHandler<
 				throw new Error("Cannot leave room: not connected");
 			}
 
-			console.debug(`[Verani:ConnectionDO] Leaving room: ${roomName}`);
-
 			await this.leaveRoomInternal(roomName);
 
 			this[ROOMS].delete(roomName);
 			await this.persistRooms();
-
-			console.debug(`[Verani:ConnectionDO] Left room: ${roomName}`);
 		}
 
 		/**

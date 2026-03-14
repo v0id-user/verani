@@ -15,15 +15,7 @@ export type { MessageFrame, WebSocketRawData };
  * @returns Decoded MessageFrame or a fallback invalid frame
  */
 export function decodeFrame(raw: WebSocketRawData): MessageFrame {
-  console.debug("[Verani:Protocol:Actor] Decoding frame, raw length:", typeof raw === "string" ? raw.length : "unknown");
-  const decoded = sharedDecodeFrame(raw);
-  if (decoded) {
-    console.debug("[Verani:Protocol:Actor] Decoded successfully:", { type: decoded.type, channel: decoded.channel });
-  } else {
-    console.debug("[Verani:Protocol:Actor] Decode failed, returning invalid frame");
-  }
-  // Return invalid frame as fallback
-  return decoded ?? { type: "invalid" };
+  return sharedDecodeFrame(raw) ?? { type: "invalid" };
 }
 
 /**
@@ -32,10 +24,7 @@ export function decodeFrame(raw: WebSocketRawData): MessageFrame {
  * @returns JSON string representation
  */
 export function encodeFrame(frame: MessageFrame): string {
-  console.debug("[Verani:Protocol:Actor] Encoding frame:", { type: frame.type, channel: frame.channel });
-  const encoded = sharedEncodeFrame(frame);
-  console.debug("[Verani:Protocol:Actor] Encoded length:", encoded.length);
-  return encoded;
+  return sharedEncodeFrame(frame);
 }
 
 // Re-export shared utilities

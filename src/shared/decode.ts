@@ -27,19 +27,15 @@ function isValidFrame(obj: unknown): obj is MessageFrame {
  */
 export function decodeFrame(raw: WebSocketRawData): MessageFrame | null {
   try {
-    console.debug("[Verani:Decode] Decoding raw data");
     const str = typeof raw === "string" ? raw : raw.toString();
     const parsed: unknown = JSON.parse(str);
 
     if (!isValidFrame(parsed)) {
-      console.warn("Invalid frame structure:", parsed);
       return null;
     }
 
-    console.debug("[Verani:Decode] Successfully decoded frame:", { type: parsed.type, hasChannel: !!parsed.channel });
     return parsed;
-  } catch (error) {
-    console.warn("Failed to decode frame:", error);
+  } catch {
     return null;
   }
 }

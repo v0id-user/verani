@@ -9,11 +9,8 @@ import type { MessageFrame } from "./types";
  * @throws Error if JSON serialization fails
  */
 export function encodeFrame(frame: MessageFrame): string {
-  console.debug("[Verani:Encode] Encoding frame:", { type: frame.type, hasChannel: !!frame.channel, hasData: !!frame.data });
   try {
-    const encoded = JSON.stringify(frame);
-    console.debug("[Verani:Encode] Encoded successfully, length:", encoded.length);
-    return encoded;
+    return JSON.stringify(frame);
   } catch (error) {
     throw new Error(
       `Failed to encode frame: ${error instanceof Error ? error.message : "unknown error"}`
