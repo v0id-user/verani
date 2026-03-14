@@ -292,12 +292,15 @@ export function getPersistedState<T extends Record<string, unknown>>(
   return actor[PERSISTED_STATE] as T;
 }
 
-export function setPeristErrorHandler(
+export function setPersistErrorHandler(
   actor: PersistableActor,
   handler: (key: string, error: Error) => void
 ): void {
   actor[PERSIST_ERROR_HANDLER] = handler;
 }
+
+/** @deprecated Use `setPersistErrorHandler` instead. */
+export const setPeristErrorHandler = setPersistErrorHandler;
 
 export async function persistKey(
   actor: PersistableActor,

@@ -64,6 +64,7 @@ export {
   initializePersistedState,
   isStateReady,
   getPersistedState,
+  setPersistErrorHandler,
   setPeristErrorHandler,
   persistKey,
   deletePersistedKey,
