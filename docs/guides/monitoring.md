@@ -27,6 +27,22 @@ Key metrics:
 - **CPU Time**: Processing time per request
 - **Duration**: Time Actor stays active
 
+## Debug Logging
+
+Verani ships with an opt-in debug utility. Enable it to see internal logs prefixed with `[Verani:*]`:
+
+```typescript
+import { enableDebug } from "verani";
+
+// Enable during development
+enableDebug(true);
+
+// Disable in production (default)
+enableDebug(false);
+```
+
+Debug output includes connection lifecycle events, room join/leave operations, message routing, and RPC calls between DOs.
+
 ## Debugging Tips
 
 ### Check Server Logs
@@ -55,19 +71,12 @@ Use browser DevTools to inspect WebSocket connections:
 
 ### Common Log Patterns
 
-**Connection established:**
-```
-[Verani] User alice connected (client: abc-123)
-```
+When `enableDebug(true)` is set:
 
-**Message received:**
 ```
-[Verani] Received message: {"type":"chat.message","data":{"text":"Hello"}}
-```
-
-**Error occurred:**
-```
-[Verani] Error for user alice: Error message here
+[Verani:connection] User alice connected (client: abc-123)
+[Verani:room] User alice joined room "chat"
+[Verani:room] Broadcasting to 3 members
 ```
 
 ## Related Documentation
