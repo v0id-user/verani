@@ -111,6 +111,12 @@ export interface RoomCoordinatorDefinition<E = unknown> {
   connectionBinding?: string;
 
   /**
+   * Maximum consecutive delivery failures before a member is considered stale
+   * and automatically removed from the room. Default: 3
+   */
+  maxDeliveryFailures?: number;
+
+  /**
    * Called when the RoomDO initializes or wakes from hibernation
    */
   onInit?(roomState: Record<string, unknown>): void | Promise<void>;

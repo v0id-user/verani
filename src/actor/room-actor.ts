@@ -6,6 +6,7 @@ import type { RoomCoordinatorDefinition, RoomMember, BroadcastOptions, Connectio
  */
 const MEMBERS = Symbol("MEMBERS");
 const ROOM_NAME = Symbol("ROOM_NAME");
+const DELIVERY_FAILURES = Symbol("DELIVERY_FAILURES");
 
 /**
  * RoomDO - Coordination Durable Object for managing room membership and message fanout.
@@ -114,6 +115,11 @@ export function createRoomHandler<E = unknown>(
 		 * Room name (set from the ID used to get this DO)
 		 */
 		[ROOM_NAME]: string = "";
+
+		/**
+		 * Consecutive delivery failure count per member
+		 */
+		[DELIVERY_FAILURES] = new Map<string, number>();
 
 		/**
 		 * Room-level shared state
@@ -244,21 +250,25 @@ export function createRoomHandler<E = unknown>(
 				})
 			);
 
+			const maxFailures = definition.maxDeliveryFailures ?? 3;
 			let sentCount = 0;
 			const staleMembers: string[] = [];
 
 			for (const result of results) {
 				if (result.ok) {
 					sentCount++;
+					this[DELIVERY_FAILURES].delete(result.userId);
 				} else {
-					if (result.error?.message?.includes("not found") ||
-						result.error?.message?.includes("no connection")) {
+					const failures = (this[DELIVERY_FAILURES].get(result.userId) ?? 0) + 1;
+					this[DELIVERY_FAILURES].set(result.userId, failures);
+					if (failures >= maxFailures) {
 						staleMembers.push(result.userId);
 					}
 				}
 			}
 
 			for (const userId of staleMembers) {
+				this[DELIVERY_FAILURES].delete(userId);
 				await this.leave(userId);
 			}
 
