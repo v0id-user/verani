@@ -486,10 +486,25 @@ export function createConnectionHandler<
 		}
 
 		/**
-		 * Check if WebSocket should be upgraded
+		 * Allow WebSocket upgrades (overrides Actor base class default of false)
 		 */
-		protected async shouldUpgradeWebSocket(request: Request): Promise<boolean> {
+		protected shouldUpgradeSocket(request: Request): boolean {
 			return true;
+		}
+
+		/**
+		 * Handle WebSocket upgrade — creates WebSocketPair directly,
+		 * bypassing the Sockets class which stores conflicting attachment metadata.
+		 */
+		protected onWebSocketUpgrade(request: Request): Response {
+			const pair = new WebSocketPair();
+			const [client, server] = Object.values(pair);
+			this.ctx.acceptWebSocket(server);
+			const response = new Response(null, { status: 101, webSocket: client });
+			Promise.resolve().then(() => {
+				this.onWebSocketConnect(server, request);
+			});
+			return response;
 		}
 
 		/**
@@ -589,23 +604,6 @@ export function createConnectionHandler<
 			}
 
 			this[WS] = null;
-		}
-
-		/**
-		 * Custom fetch handler for WebSocket upgrade
-		 */
-		async fetch(request: Request): Promise<Response> {
-			const url = new URL(request.url);
-			const upgradeHeader = request.headers.get("Upgrade");
-
-			if (url.pathname === websocketPath && upgradeHeader === "websocket") {
-				const shouldUpgrade = await this.shouldUpgradeWebSocket(request);
-				if (shouldUpgrade) {
-					return (this as any).onWebSocketUpgrade(request);
-				}
-			}
-
-			return (this as any).onRequest(request);
 		}
 
 		// =====================================================================
