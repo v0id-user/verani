@@ -51,6 +51,24 @@ export interface ConnectionDefinition<
 	websocketPath?: string;
 
 	/**
+	 * Map of room names to their environment binding keys.
+	 * Must match binding names in wrangler.toml/wrangler.jsonc.
+	 * Required for room features (joinRoom, toRoom, etc.).
+	 *
+	 * @example { "presence": "PresenceRoom", "chat": "ChatRoom" }
+	 */
+	rooms?: Record<string, string>;
+
+	/**
+	 * Environment binding key for the ConnectionDO class.
+	 * Must match the binding name in wrangler.toml/wrangler.jsonc.
+	 * Required for user-to-user messaging (toUser).
+	 *
+	 * @example "UserConnection"
+	 */
+	connectionBinding?: string;
+
+	/**
 	 * Extract metadata from the connection request
 	 */
 	extractMeta?(req: Request): TMeta | Promise<TMeta>;
@@ -249,19 +267,57 @@ export function createConnectionHandler<
 		}
 
 		/**
-		 * Get RoomDO binding from environment
+		 * Get RoomDO binding from environment by room name
 		 */
-		private getRoomDO(): RoomDOBinding | undefined {
+		private getRoomBinding(roomName: string): RoomDOBinding {
+			if (!definition.rooms) {
+				throw new Error(
+					`Cannot access room "${roomName}": no "rooms" config provided in ConnectionDefinition. ` +
+					`Add rooms: { "${roomName}": "YourRoomBinding" } to your definition.`
+				);
+			}
+
+			const bindingKey = definition.rooms[roomName];
+			if (!bindingKey) {
+				throw new Error(
+					`Cannot access room "${roomName}": not found in "rooms" config. ` +
+					`Available rooms: ${Object.keys(definition.rooms).join(", ")}`
+				);
+			}
+
 			const env = this.env as Record<string, unknown>;
-			return (env.ROOM_DO || env.RoomDO || env.VERANI_ROOM) as RoomDOBinding | undefined;
+			const binding = env[bindingKey] as RoomDOBinding | undefined;
+			if (!binding) {
+				throw new Error(
+					`Room "${roomName}" binding "${bindingKey}" not found in environment. ` +
+					`Check your wrangler.toml durable_objects bindings.`
+				);
+			}
+
+			return binding;
 		}
 
 		/**
 		 * Get ConnectionDO binding from environment (for user-to-user messaging)
 		 */
-		private getConnectionDO(): ConnectionDOBinding | undefined {
+		private getConnectionBinding(): ConnectionDOBinding {
+			if (!definition.connectionBinding) {
+				throw new Error(
+					`Cannot resolve ConnectionDO: no "connectionBinding" provided in ConnectionDefinition. ` +
+					`Add connectionBinding: "YourConnectionBinding" to your definition.`
+				);
+			}
+
 			const env = this.env as Record<string, unknown>;
-			return (env.CONNECTION_DO || env.ConnectionDO || env.VERANI_CONNECTION) as ConnectionDOBinding | undefined;
+			const binding = env[definition.connectionBinding] as ConnectionDOBinding | undefined;
+			if (!binding) {
+				throw new Error(
+					`ConnectionDO binding "${definition.connectionBinding}" not found in environment. ` +
+					`Check your wrangler.toml durable_objects bindings.`
+				);
+			}
+
+			return binding;
 		}
 
 		/**
@@ -301,15 +357,11 @@ export function createConnectionHandler<
 			const self = this;
 			return {
 				async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
-					const RoomDO = self.getRoomDO();
-					if (!RoomDO) {
-						return 0;
-					}
-
 					try {
+						const RoomDO = self.getRoomBinding(roomName);
 						const roomStub = RoomDO.get(roomName) as RoomActorStub;
 						const opts: BroadcastOptions = {
-							exceptUserId: self[META]?.userId // Don't echo back to sender
+							exceptUserId: self[META]?.userId
 						};
 						return await roomStub.broadcast(event, data, opts);
 					} catch {
@@ -326,12 +378,8 @@ export function createConnectionHandler<
 			const self = this;
 			return {
 				async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
-					const ConnectionDO = self.getConnectionDO();
-					if (!ConnectionDO) {
-						return 0;
-					}
-
 					try {
+						const ConnectionDO = self.getConnectionBinding();
 						const userStub = ConnectionDO.get(userId) as ConnectionActorStub;
 						const success = await userStub.deliverMessage(event, data);
 						return success ? 1 : 0;
@@ -602,11 +650,7 @@ export function createConnectionHandler<
 				throw new Error("Cannot join room: not connected");
 			}
 
-			const RoomDO = this.getRoomDO();
-			if (!RoomDO) {
-				throw new Error("RoomDO binding not found");
-			}
-
+			const RoomDO = this.getRoomBinding(roomName);
 			const roomStub = RoomDO.get(roomName) as RoomActorStub;
 			await roomStub.join(this[META].userId, metadata);
 
@@ -629,12 +673,7 @@ export function createConnectionHandler<
 		 * This ensures RoomDOs know this connection is still active
 		 */
 		private async rejoinRoomsAfterHibernation(): Promise<void> {
-			if (this[ROOMS].size === 0) {
-				return;
-			}
-
-			const RoomDO = this.getRoomDO();
-			if (!RoomDO) return;
+			if (this[ROOMS].size === 0) return;
 
 			const userId = this[META]?.userId;
 			if (!userId) return;
@@ -643,6 +682,7 @@ export function createConnectionHandler<
 
 			for (const [roomName, metadata] of this[ROOMS].entries()) {
 				try {
+					const RoomDO = this.getRoomBinding(roomName);
 					const roomStub = RoomDO.get(roomName) as RoomActorStub;
 					await roomStub.join(userId, metadata);
 				} catch {
@@ -664,9 +704,7 @@ export function createConnectionHandler<
 		private async leaveRoomInternal(roomName: string): Promise<void> {
 			if (!this[META]) return;
 
-			const RoomDO = this.getRoomDO();
-			if (!RoomDO) return;
-
+			const RoomDO = this.getRoomBinding(roomName);
 			const roomStub = RoomDO.get(roomName) as RoomActorStub;
 			await roomStub.leave(this[META].userId);
 		}

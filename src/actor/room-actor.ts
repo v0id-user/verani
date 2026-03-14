@@ -121,14 +121,26 @@ export function createRoomHandler<E = unknown>(
 		private roomState: Record<string, unknown> = {};
 
 		/**
-		 * Reference to ConnectionDO class for RPC calls
-		 * This will be injected via environment bindings
+		 * Get ConnectionDO binding from environment for RPC calls
 		 */
-		private getConnectionDO(): ConnectionDOBinding | undefined {
-			// Access the ConnectionDO binding from environment
-			// The binding name should match wrangler.toml configuration
+		private getConnectionBinding(): ConnectionDOBinding {
+			if (!definition.connectionBinding) {
+				throw new Error(
+					`Cannot resolve ConnectionDO: no "connectionBinding" provided in RoomCoordinatorDefinition. ` +
+					`Add connectionBinding: "YourConnectionBinding" to your definition.`
+				);
+			}
+
 			const env = this.env as Record<string, unknown>;
-			return (env.CONNECTION_DO || env.ConnectionDO || env.VERANI_CONNECTION) as ConnectionDOBinding | undefined;
+			const binding = env[definition.connectionBinding] as ConnectionDOBinding | undefined;
+			if (!binding) {
+				throw new Error(
+					`ConnectionDO binding "${definition.connectionBinding}" not found in environment. ` +
+					`Check your wrangler.toml durable_objects bindings.`
+				);
+			}
+
+			return binding;
 		}
 
 		/**
@@ -212,8 +224,7 @@ export function createRoomHandler<E = unknown>(
 		 * @returns Number of members the message was sent to
 		 */
 		async broadcast<TData = unknown>(event: string, data?: TData, opts?: BroadcastOptions): Promise<number> {
-			const ConnectionDO = this.getConnectionDO();
-			if (!ConnectionDO) return 0;
+			const ConnectionDO = this.getConnectionBinding();
 
 			const eligible = Array.from(this[MEMBERS].entries()).filter(([userId]) => {
 				if (opts?.userIds && !opts.userIds.includes(userId)) return false;

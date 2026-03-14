@@ -102,6 +102,15 @@ export interface RoomCoordinatorDefinition<E = unknown> {
   name?: string;
 
   /**
+   * Environment binding key for the ConnectionDO class.
+   * Must match the binding name in wrangler.toml/wrangler.jsonc.
+   * Required for broadcast message delivery to work.
+   *
+   * @example "UserConnection"
+   */
+  connectionBinding?: string;
+
+  /**
    * Called when the RoomDO initializes or wakes from hibernation
    */
   onInit?(roomState: Record<string, unknown>): void | Promise<void>;
@@ -178,14 +187,20 @@ export interface ConnectionActorStub {
 }
 
 /**
- * Environment type with Durable Object bindings for Verani
- * Users should extend this with their own bindings
+ * Environment type with Durable Object bindings for Verani.
+ * Users should extend this with their actual binding names from wrangler.toml.
+ *
+ * @example
+ * ```typescript
+ * interface Env extends VeraniEnv {
+ *   UserConnection: DurableObjectNamespace;
+ *   PresenceRoom: DurableObjectNamespace;
+ *   ChatRoom: DurableObjectNamespace;
+ * }
+ * ```
  */
 export interface VeraniEnv {
-  /** ConnectionDO binding - required for per-user connection routing */
-  CONNECTION_DO?: DurableObjectNamespace;
-  /** RoomDO binding - required for room coordination */
-  ROOM_DO?: DurableObjectNamespace;
+  [key: string]: unknown;
 }
 
 /**
