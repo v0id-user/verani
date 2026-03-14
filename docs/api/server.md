@@ -32,6 +32,13 @@ import { defineConnection, createConnectionHandler } from "verani";
 const userConnection = defineConnection({
   name: "UserConnection",
   websocketPath: "/ws",
+  // Map room names to wrangler.toml binding names
+  rooms: {
+    presence: "PresenceRoom",
+    chat: "ChatRoom"
+  },
+  // Binding name for user-to-user messaging
+  connectionBinding: "UserConnection",
 
   extractMeta(req) {
     const url = new URL(req.url);
@@ -46,13 +53,10 @@ const userConnection = defineConnection({
   },
 
   async onConnect(ctx) {
-    console.log(`User ${ctx.meta.userId} connected`);
-    // Join a room (persisted across hibernation)
     await ctx.actor.joinRoom("presence", { username: ctx.meta.username });
   },
 
   async onDisconnect(ctx) {
-    console.log(`User ${ctx.meta.userId} disconnected`);
     // Room leave is handled automatically
   }
 });
@@ -75,10 +79,20 @@ Configuration object for a connection handler.
 **Properties:**
 
 #### `name?: string`
-Optional name for debugging.
+Optional name for debugging and Actor binding resolution.
 
 #### `websocketPath?: string`
 WebSocket upgrade path (default: `"/ws"`).
+
+#### `rooms?: Record<string, string>`
+Map of room names to their environment binding keys. Must match binding names in `wrangler.toml`. Required for room features (`joinRoom`, `toRoom`, etc.).
+
+```typescript
+rooms: { "presence": "PresenceRoom", "chat": "ChatRoom" }
+```
+
+#### `connectionBinding?: string`
+Environment binding key for the ConnectionDO class. Required for user-to-user messaging (`toUser`).
 
 #### `extractMeta?(req: Request): TMeta | Promise<TMeta>`
 Extract metadata from the WebSocket upgrade request.
@@ -89,14 +103,17 @@ Called when WebSocket connection is established.
 #### `onDisconnect?(ctx: ConnectionContext): void | Promise<void>`
 Called when WebSocket connection is closed.
 
-#### `onMessage?(ctx: ConnectionContext, frame: any): void | Promise<void>`
+#### `onMessage?(ctx: ConnectionContext, frame: unknown): void | Promise<void>`
 Called when a message is received (fallback if no handler matches).
 
 #### `onError?(error: Error, ctx: ConnectionContext): void | Promise<void>`
 Called when an error occurs.
 
-#### `onHibernationRestore?(actor: any): void | Promise<void>`
-Called after waking from hibernation. **Note:** Room re-joining is handled automatically by the SDK.
+#### `onHibernationRestore?(actor: ConnectionHandlerInstance): void | Promise<void>`
+Called after waking from hibernation. Room re-joining is handled automatically by the SDK.
+
+#### `onDestroy?(ctx: ConnectionContext): void | Promise<void>`
+Called before the actor is destroyed and all storage is cleared. Use for cleanup (leaving rooms, notifying services).
 
 #### `state?: TState`
 Initial state for this connection.
@@ -171,9 +188,10 @@ import { createRoomHandler } from "verani";
 
 export const ChatRoom = createRoomHandler({
   name: "ChatRoom",
+  connectionBinding: "UserConnection",
 
   async onJoin(roomState, userId, metadata) {
-    console.log(`User ${userId} joined with metadata:`, metadata);
+    console.log(`User ${userId} joined`);
   },
 
   async onLeave(roomState, userId) {
@@ -191,7 +209,13 @@ Configuration for a RoomDO.
 **Properties:**
 
 #### `name?: string`
-Optional name for debugging.
+Optional name for debugging and Actor binding resolution.
+
+#### `connectionBinding?: string`
+Environment binding key for the ConnectionDO class. Required for broadcast message delivery.
+
+#### `maxDeliveryFailures?: number`
+Maximum consecutive delivery failures before a member is automatically removed. Default: `3`.
 
 #### `onInit?(roomState: Record<string, unknown>): void | Promise<void>`
 Called when RoomDO initializes or wakes from hibernation.
@@ -201,6 +225,9 @@ Called when a user joins this room.
 
 #### `onLeave?(roomState, userId): void | Promise<void>`
 Called when a user leaves this room.
+
+#### `onDestroy?(roomState: Record<string, unknown>): void | Promise<void>`
+Called before the actor is destroyed and all storage is cleared.
 
 ### RoomDO RPC Methods
 
@@ -232,23 +259,29 @@ const isMember = await roomStub.hasMember(userId);
 
 ## Wrangler Configuration (Per-Connection)
 
+Binding names **must match** the values you pass to `rooms`, `connectionBinding`, etc. in your definitions.
+
 ```jsonc
 {
   "durable_objects": {
     "bindings": [
       {
         "class_name": "UserConnection",
-        "name": "CONNECTION_DO"
+        "name": "UserConnection"
+      },
+      {
+        "class_name": "PresenceRoom",
+        "name": "PresenceRoom"
       },
       {
         "class_name": "ChatRoom",
-        "name": "ROOM_DO"
+        "name": "ChatRoom"
       }
     ]
   },
   "migrations": [
     {
-      "new_sqlite_classes": ["UserConnection", "ChatRoom"],
+      "new_sqlite_classes": ["UserConnection", "PresenceRoom", "ChatRoom"],
       "tag": "v1"
     }
   ]

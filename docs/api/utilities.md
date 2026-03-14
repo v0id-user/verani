@@ -109,17 +109,19 @@ import { clearPersistedState } from "verani";
 await clearPersistedState(actor);
 ```
 
-### `setPeristErrorHandler(actor, handler)`
+### `setPersistErrorHandler(actor, handler)`
 
 Set a callback for persistence failures.
 
 ```typescript
-import { setPeristErrorHandler } from "verani";
+import { setPersistErrorHandler } from "verani";
 
-setPeristErrorHandler(actor, (key, error) => {
+setPersistErrorHandler(actor, (key, error) => {
   console.error(`Failed to persist ${key}:`, error);
 });
 ```
+
+> **Note:** The old misspelled `setPeristErrorHandler` is still exported as a deprecated alias.
 
 ### `safeSerialize(value)`
 
@@ -156,6 +158,21 @@ import type { SafePersistOptions, PersistableActor } from "verani";
 
 - **`SafePersistOptions`** — `{ shallow?: boolean, throwOnError?: boolean }`
 - **`PersistableActor`** — Interface for actors that support persistence (requires `ctx.storage`)
+
+---
+
+## Debug
+
+### `enableDebug(enabled)`
+
+Enable or disable verbose debug logging. Disabled by default — a library should not log aggressively.
+
+```typescript
+import { enableDebug } from "verani";
+
+enableDebug(true); // Enables [Verani:*] debug output
+enableDebug(false); // Disables it
+```
 
 ---
 
