@@ -46,7 +46,8 @@ export type {
   ConnectionMeta,
   MessageFrame,
   BroadcastOptions,
-  RpcBroadcastOptions
+  RpcBroadcastOptions,
+  RoomEmitOptions
 } from "./actor/types";
 
 // Attachment utilities

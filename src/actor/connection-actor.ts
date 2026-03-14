@@ -5,6 +5,7 @@ import type {
 	ConnectionEmit,
 	AsyncEmitBuilder,
 	BroadcastOptions,
+	RoomEmitOptions,
 	RoomDOBinding,
 	ConnectionDOBinding,
 	WebSocketRawData
@@ -283,7 +284,7 @@ export function createConnectionHandler<
 				);
 			}
 
-			const bindingKey = definition.rooms[roomName];
+			const bindingKey = definition.rooms[roomName] ?? definition.rooms[roomName.split(":", 1)[0]];
 			if (!bindingKey) {
 				throw new Error(
 					`Cannot access room "${roomName}": not found in "rooms" config. ` +
@@ -346,8 +347,8 @@ export function createConnectionHandler<
 					return self.createUserEmitBuilder(target);
 				},
 
-				toRoom(roomName: string): AsyncEmitBuilder {
-					return self.createRoomEmitBuilder(roomName);
+				toRoom(roomName: string, options?: RoomEmitOptions): AsyncEmitBuilder {
+					return self.createRoomEmitBuilder(roomName, options);
 				},
 
 				toUser(userId: string): AsyncEmitBuilder {
@@ -359,16 +360,17 @@ export function createConnectionHandler<
 		/**
 		 * Create emit builder for room broadcast
 		 */
-		private createRoomEmitBuilder(roomName: string): AsyncEmitBuilder {
+		private createRoomEmitBuilder(roomName: string, options?: RoomEmitOptions): AsyncEmitBuilder {
 			const self = this;
 			return {
 				async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
 					try {
 						const RoomDO = self.getRoomBinding(roomName);
 						const roomStub = RoomDO.get(roomName) as RoomActorStub;
-						const opts: BroadcastOptions = {
-							exceptUserId: self[META]?.userId
-						};
+						const opts: BroadcastOptions | undefined =
+							options?.includeSelf || !self[META]?.userId
+								? undefined
+								: { exceptUserId: self[META].userId };
 						return await roomStub.broadcast(event, data, opts);
 					} catch {
 						return 0;

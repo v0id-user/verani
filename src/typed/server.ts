@@ -37,6 +37,7 @@ import type {
   ConnectionMeta,
   ConnectionEmit,
   AsyncEmitBuilder,
+  RoomEmitOptions,
 } from "../actor/types";
 import type { Contract } from "./contract";
 import type {
@@ -97,7 +98,7 @@ export interface TypedConnectionEmit<
    * Target a specific room for broadcasting.
    * @param roomName - Room name
    */
-  toRoom(roomName: string): TypedAsyncEmitBuilder<C, TMeta>;
+  toRoom(roomName: string, options?: RoomEmitOptions): TypedAsyncEmitBuilder<C, TMeta>;
 
   /**
    * Target a specific user for direct messaging.
@@ -193,6 +194,12 @@ export interface TypedConnectionConfig<
    */
   state?: TState;
 
+  /** Map room names or prefixes to Durable Object bindings */
+  rooms?: Record<string, string>;
+
+  /** Durable Object binding for this connection handler */
+  connectionBinding?: string;
+
   /**
    * Keys to persist to storage.
    */
@@ -285,8 +292,8 @@ function createTypedConnectionEmit<C extends Contract, TMeta extends ConnectionM
     } as TypedAsyncEmitBuilder<C, TMeta>;
   };
 
-  emit.toRoom = (roomName: string) => {
-    const builder = baseEmit.toRoom(roomName);
+  emit.toRoom = (roomName: string, options?: RoomEmitOptions) => {
+    const builder = baseEmit.toRoom(roomName, options);
     return {
       emit: (event: string, data: unknown) => builder.emit(event, data),
     } as TypedAsyncEmitBuilder<C, TMeta>;
@@ -372,6 +379,8 @@ export function createTypedConnection<
   const baseConnection = defineConnection<TMeta, E, TState>({
     name: config.name,
     websocketPath: config.websocketPath ?? "/ws",
+    rooms: config.rooms,
+    connectionBinding: config.connectionBinding,
     extractMeta: config.extractMeta,
     state: config.state,
     persistedKeys: config.persistedKeys,

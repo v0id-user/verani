@@ -62,6 +62,11 @@ export interface BroadcastOptions {
   clientIds?: string[];
 }
 
+export interface RoomEmitOptions {
+  /** Include the sender when broadcasting to a room */
+  includeSelf?: boolean;
+}
+
 /**
  * RPC-safe version of BroadcastOptions for use over RPC calls.
  * Excludes the `except` field since WebSocket cannot be serialized over RPC.
@@ -302,7 +307,7 @@ export interface ConnectionEmit<TMeta extends ConnectionMeta = ConnectionMeta, E
    * @param roomName - Room name
    * @returns Builder for broadcasting to the room via RPC
    */
-  toRoom(roomName: string): AsyncEmitBuilder;
+  toRoom(roomName: string, options?: RoomEmitOptions): AsyncEmitBuilder;
 
   /**
    * Target a specific user for direct messaging

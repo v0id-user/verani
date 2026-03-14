@@ -136,4 +136,5 @@ export { createConnectionHandler } from "../actor/connection-actor";
 export type {
   ConnectionMeta,
   ConnectionActorStub,
+  RoomEmitOptions,
 } from "../actor/types";

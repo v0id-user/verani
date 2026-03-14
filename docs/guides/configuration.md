@@ -127,6 +127,23 @@ defineConnection({
 
 When you call `ctx.actor.joinRoom("presence")`, Verani looks up `"PresenceRoom"` from this map and uses `env.PresenceRoom` to reach the RoomDO.
 
+You can also use namespace prefixes for dynamic room names. Verani checks for an exact room key first, then falls back to the prefix before `:`.
+
+```typescript
+defineConnection({
+  rooms: {
+    conversation: "ChatRoom",
+    "conversation:staff": "StaffRoom",
+  },
+});
+
+await ctx.actor.joinRoom("conversation:123");       // uses ChatRoom
+await ctx.actor.joinRoom("conversation:staff");     // uses StaffRoom (exact match wins)
+await ctx.emit.toRoom("conversation:456").emit("chat.message", data);
+```
+
+Use this pattern for room families like `conversation:123`, `game:abc`, or `document:xyz`.
+
 ### `connectionBinding` (both Connection and Room)
 
 Tells DOs how to find the ConnectionDO binding:
@@ -195,7 +212,7 @@ env.ChatRoom.get(id);
 - Fix: Missing export: `export { UserConnection };`
 
 **"RoomDO binding not found"**
-- Fix: `rooms` map in `defineConnection` doesn't include the room name, or the binding name doesn't match wrangler.jsonc
+- Fix: `rooms` map in `defineConnection` doesn't include the room name or namespace prefix, or the binding name doesn't match wrangler.jsonc
 
 **"Connection binding not found"**
 - Fix: `connectionBinding` doesn't match the binding name in wrangler.jsonc
