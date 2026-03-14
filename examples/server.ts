@@ -8,7 +8,7 @@
  */
 
 import { defineConnection, createConnectionHandler } from "../src/actor/connection-actor";
-import { createRoomHandler, type RoomActorStub } from "../src/actor/room-actor";
+import { createRoomHandler } from "../src/actor/room-actor";
 
 // ============================================================================
 // Configuration
@@ -37,28 +37,15 @@ export const CHAT_ROOM_NAME = "ChatRoom";
 export function extractUserId(request: Request): string {
 	const url = new URL(request.url);
 
-	// Try token parameter (format: user:userId)
 	const token = url.searchParams.get("token");
 	if (token) {
 		const parts = token.split(":");
 		if (parts.length === 2 && parts[0] === "user") {
-			const userId = parts[1];
-			console.log(`[extractUserId] Extracted userId from token: ${userId}`);
-			return userId;
+			return parts[1];
 		}
 	}
 
-	// Try direct userId parameter
-	const userId = url.searchParams.get("userId");
-	if (userId) {
-		console.log(`[extractUserId] Extracted userId from param: ${userId}`);
-		return userId;
-	}
-
-	// Fallback: generate a random userId
-	const randomId = crypto.randomUUID();
-	console.log(`[extractUserId] Generated random userId: ${randomId}`);
-	return randomId;
+	return url.searchParams.get("userId") ?? crypto.randomUUID();
 }
 
 // ============================================================================
@@ -82,6 +69,11 @@ interface UserConnectionMeta {
 const userConnectionDef = defineConnection<UserConnectionMeta>({
 	name: CONNECTION_NAME,
 	websocketPath: WEBSOCKET_PATH,
+	rooms: {
+		presence: PRESENCE_ROOM_NAME,
+		chat: CHAT_ROOM_NAME
+	},
+	connectionBinding: CONNECTION_NAME,
 
 	extractMeta(req) {
 		const url = new URL(req.url);
@@ -97,36 +89,20 @@ const userConnectionDef = defineConnection<UserConnectionMeta>({
 			}
 		}
 
-		const clientId = crypto.randomUUID();
-		const channels = ["default"];
-
-		console.log(`[${CONNECTION_NAME}] extractMeta:`, {
+		return {
 			userId,
-			clientId,
-			channels,
+			clientId: crypto.randomUUID(),
+			channels: ["default"],
 			username
-		});
-
-		return { userId, clientId, channels, username };
+		};
 	},
 
 	async onConnect(ctx) {
-		const { userId, username } = ctx.meta;
-		console.log(`[${CONNECTION_NAME}] onConnect: userId=${userId}, username=${username}`);
-
-		// Auto-join presence room
-		try {
-			await ctx.actor.joinRoom("presence", { username });
-			console.log(`[${CONNECTION_NAME}] User ${userId} joined presence room`);
-		} catch (error) {
-			console.error(`[${CONNECTION_NAME}] Failed to join presence room:`, error);
-		}
+		await ctx.actor.joinRoom("presence", { username: ctx.meta.username });
 	},
 
 	async onDisconnect(ctx) {
-		const { userId, username } = ctx.meta;
-		console.log(`[${CONNECTION_NAME}] onDisconnect: userId=${userId}, username=${username}`);
-		// Room leave is handled automatically
+		// Room leave is handled automatically by the destroy/disconnect lifecycle
 	}
 });
 
@@ -138,20 +114,9 @@ const userConnectionDef = defineConnection<UserConnectionMeta>({
  * Handle chat messages
  */
 userConnectionDef.on<{ text: string }>("chat", async (ctx, data) => {
-	const { userId, username } = ctx.meta;
-	const { text } = data;
-
-	console.log(`[${CONNECTION_NAME}] chat event:`, {
-		from: userId,
-		username,
-		text,
-		timestamp: Date.now()
-	});
-
-	// Broadcast to room via RPC
 	await ctx.emit.toRoom("chat").emit("chat:message", {
-		from: userId,
-		text,
+		from: ctx.meta.userId,
+		text: data.text,
 		timestamp: Date.now()
 	});
 });
@@ -160,27 +125,11 @@ userConnectionDef.on<{ text: string }>("chat", async (ctx, data) => {
  * Handle presence status updates
  */
 userConnectionDef.on<{ status: string }>("presence.status", async (ctx, data) => {
-	const { userId, username } = ctx.meta;
-	const { status } = data;
-
-	console.log(`[${CONNECTION_NAME}] presence.status event:`, {
-		userId,
-		username,
-		status,
+	await ctx.emit.toRoom("presence").emit("presence.status", {
+		userId: ctx.meta.userId,
+		status: data.status,
 		timestamp: Date.now()
 	});
-
-	// Update presence status in room
-	const actor = ctx.actor as unknown as { getRoomDO?: () => { get: (name: string) => RoomActorStub } };
-	const roomStub = actor.getRoomDO?.()?.get("presence");
-	if (roomStub) {
-		await roomStub.updateMemberMetadata(userId, { status });
-		await roomStub.broadcast("presence.status", {
-			userId,
-			status,
-			timestamp: Date.now()
-		});
-	}
 });
 
 // ============================================================================
@@ -200,21 +149,7 @@ export const UserConnection = createConnectionHandler(userConnectionDef);
  */
 export const PresenceRoom = createRoomHandler({
 	name: PRESENCE_ROOM_NAME,
-
-	async onJoin(roomState, userId, metadata) {
-		console.log(`[${PRESENCE_ROOM_NAME}] onJoin:`, {
-			userId,
-			metadata,
-			timestamp: Date.now()
-		});
-	},
-
-	async onLeave(roomState, userId) {
-		console.log(`[${PRESENCE_ROOM_NAME}] onLeave:`, {
-			userId,
-			timestamp: Date.now()
-		});
-	}
+	connectionBinding: CONNECTION_NAME
 });
 
 /**
@@ -223,21 +158,7 @@ export const PresenceRoom = createRoomHandler({
  */
 export const ChatRoom = createRoomHandler({
 	name: CHAT_ROOM_NAME,
-
-	async onJoin(roomState, userId, metadata) {
-		console.log(`[${CHAT_ROOM_NAME}] onJoin:`, {
-			userId,
-			metadata,
-			timestamp: Date.now()
-		});
-	},
-
-	async onLeave(roomState, userId) {
-		console.log(`[${CHAT_ROOM_NAME}] onLeave:`, {
-			userId,
-			timestamp: Date.now()
-		});
-	}
+	connectionBinding: CONNECTION_NAME
 });
 
 // ============================================================================
