@@ -4,26 +4,66 @@ How to configure Verani for Cloudflare Workers.
 
 ## The Three-Way Match
 
-These three must match:
+These three must match for every Durable Object:
 
-1. **Export name** in `src/index.ts`: `export const ChatRoom = ...`
-2. **Class name** in `wrangler.jsonc`: `"class_name": "ChatRoom"`
-3. **Migration** in `wrangler.jsonc`: `"new_sqlite_classes": ["ChatRoom"]`
+1. **Export name** in `src/index.ts`: `export const UserConnection = ...`
+2. **Class name** in `wrangler.jsonc`: `"class_name": "UserConnection"`
+3. **Migration** in `wrangler.jsonc`: `"new_sqlite_classes": ["UserConnection"]`
 
 ## Basic Setup
 
-### 1. Export Your Actor Class
+Verani uses a per-connection architecture: each user gets their own **ConnectionDO**, and separate **RoomDOs** handle coordination. Both need explicit binding configuration.
+
+### 1. Define Your Connection
+
+```typescript
+// src/actors/connection.ts
+import { defineConnection } from "verani";
+
+const connection = defineConnection({
+  name: "UserConnection",
+  websocketPath: "/ws",
+
+  // Map logical room names → wrangler.jsonc binding names
+  rooms: {
+    chat: "ChatRoom",
+  },
+
+  // Binding name for this connection DO (must match wrangler.jsonc)
+  connectionBinding: "UserConnection",
+
+  extractMeta(req) {
+    const url = new URL(req.url);
+    return {
+      userId: url.searchParams.get("userId") ?? crypto.randomUUID(),
+      clientId: crypto.randomUUID(),
+      channels: ["default"],
+    };
+  },
+
+  async onConnect(ctx) {
+    await ctx.actor.joinRoom("chat");
+    ctx.emit("welcome", { message: "Connected!" });
+  },
+});
+```
+
+### 2. Export Handlers
 
 ```typescript
 // src/index.ts
-import { createConnectionHandler } from "verani";
-import { chatRoom } from "./actors/chat.actor";
+import { createConnectionHandler, createRoomHandler } from "verani";
+import { connection } from "./actors/connection";
 
-const ChatRoom = createConnectionHandler(chatRoom);
-export { ChatRoom };
+export const UserConnection = createConnectionHandler(connection);
+
+export const ChatRoom = createRoomHandler({
+  name: "ChatRoom",
+  connectionBinding: "UserConnection",
+});
 ```
 
-### 2. Configure Wrangler
+### 3. Configure Wrangler
 
 ```jsonc
 // wrangler.jsonc
@@ -31,62 +71,101 @@ export { ChatRoom };
   "name": "my-app",
   "main": "src/index.ts",
   "compatibility_date": "2024-01-01",
-  
+
   "durable_objects": {
     "bindings": [
-      {
-        "class_name": "ChatRoom",  // Must match export name
-        "name": "CHAT"
-      }
+      { "class_name": "UserConnection", "name": "UserConnection" },
+      { "class_name": "ChatRoom", "name": "ChatRoom" }
     ]
   },
-  
+
   "migrations": [
     {
-      "new_sqlite_classes": ["ChatRoom"],  // Must match export name
+      "new_sqlite_classes": ["UserConnection", "ChatRoom"],
       "tag": "v1"
     }
   ]
 }
 ```
 
-### 3. Route WebSocket Connections
+### 4. Route WebSocket Connections
 
 ```typescript
 // src/index.ts
 export default {
-  async fetch(request: Request) {
+  async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
-    
+
     if (url.pathname.startsWith("/ws")) {
-      const stub = ChatRoom.get("chat-room");
+      const userId = url.searchParams.get("userId") ?? crypto.randomUUID();
+      const id = env.UserConnection.idFromName(userId);
+      const stub = env.UserConnection.get(id);
       return stub.fetch(request);
     }
-    
+
     return new Response("Not Found", { status: 404 });
   }
 };
+```
+
+## Binding Configuration
+
+Verani requires explicit binding names so ConnectionDOs and RoomDOs can find each other via RPC.
+
+### `rooms` (ConnectionDefinition)
+
+Maps logical room names to wrangler.jsonc binding names:
+
+```typescript
+defineConnection({
+  rooms: {
+    presence: "PresenceRoom",  // "presence" → env.PresenceRoom
+    chat: "ChatRoom",         // "chat" → env.ChatRoom
+  },
+});
+```
+
+When you call `ctx.actor.joinRoom("presence")`, Verani looks up `"PresenceRoom"` from this map and uses `env.PresenceRoom` to reach the RoomDO.
+
+### `connectionBinding` (both Connection and Room)
+
+Tells DOs how to find the ConnectionDO binding:
+
+```typescript
+// Connection side
+defineConnection({ connectionBinding: "UserConnection" });
+
+// Room side — needed so RoomDOs can deliver messages back to connections
+createRoomHandler({ connectionBinding: "UserConnection" });
 ```
 
 ## Multiple Rooms
 
 ```typescript
 // src/index.ts
-export const ChatRoom = createConnectionHandler(chatRoom);
-export const PresenceRoom = createConnectionHandler(presenceRoom);
+export const UserConnection = createConnectionHandler(connection);
+export const ChatRoom = createRoomHandler({
+  name: "ChatRoom",
+  connectionBinding: "UserConnection",
+});
+export const PresenceRoom = createRoomHandler({
+  name: "PresenceRoom",
+  connectionBinding: "UserConnection",
+});
 ```
 
 ```jsonc
 {
   "durable_objects": {
     "bindings": [
-      { "class_name": "ChatRoom", "name": "CHAT" },
-      { "class_name": "PresenceRoom", "name": "PRESENCE" }
+      { "class_name": "UserConnection", "name": "UserConnection" },
+      { "class_name": "ChatRoom", "name": "ChatRoom" },
+      { "class_name": "PresenceRoom", "name": "PresenceRoom" }
     ]
   },
   "migrations": [
     {
-      "new_sqlite_classes": ["ChatRoom", "PresenceRoom"],
+      "new_sqlite_classes": ["UserConnection", "ChatRoom", "PresenceRoom"],
       "tag": "v1"
     }
   ]
@@ -98,30 +177,28 @@ export const PresenceRoom = createConnectionHandler(presenceRoom);
 Choose which Actor instance handles requests by picking the Actor ID:
 
 ```typescript
-// Single room (all users share one Actor)
-ChatRoom.get("global-chat");
+// Per-user (recommended — each user gets their own ConnectionDO)
+const id = env.UserConnection.idFromName(userId);
+env.UserConnection.get(id);
 
-// Room-based (each room gets its own Actor)
-const roomId = url.searchParams.get("roomId");
-ChatRoom.get(`room:${roomId}`);
-
-// User-based (each user gets their own Actor)
-const userId = url.searchParams.get("userId");
-ChatRoom.get(`user:${userId}`);
+// Room-based (each room gets its own RoomDO)
+const id = env.ChatRoom.idFromName(`room:${roomId}`);
+env.ChatRoom.get(id);
 ```
-
-**Important**: Use the same Actor ID for WebSocket connections and RPC calls.
 
 ## Common Errors
 
 **"no such Durable Object class is exported"**
 - Fix: Export name doesn't match `class_name` in wrangler.jsonc
 
-**"Cannot find name 'ChatRoom'"**
-- Fix: Missing export: `export { ChatRoom };`
+**"Cannot find name 'UserConnection'"**
+- Fix: Missing export: `export { UserConnection };`
 
-**"Generic type 'Actor<E>' requires 1 type argument"**
-- Fix: Use `createConnectionHandler()` correctly
+**"RoomDO binding not found"**
+- Fix: `rooms` map in `defineConnection` doesn't include the room name, or the binding name doesn't match wrangler.jsonc
+
+**"Connection binding not found"**
+- Fix: `connectionBinding` doesn't match the binding name in wrangler.jsonc
 
 ## Related
 
