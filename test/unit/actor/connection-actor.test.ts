@@ -18,6 +18,8 @@ vi.mock('../../../src/actor/attachment', () => ({
 
 import { createConnectionHandler } from '../../../src/actor/connection-actor';
 
+const WEBSOCKET_OPEN = 1;
+
 function createMockStorage(initial: Record<string, unknown> = {}) {
 	const store = new Map<string, unknown>(Object.entries(initial));
 
@@ -51,7 +53,7 @@ function createMockContext() {
 
 function createMockSocket() {
 	return {
-		readyState: WebSocket.OPEN,
+		readyState: WEBSOCKET_OPEN,
 		close: vi.fn(),
 		send: vi.fn(),
 		deserializeAttachment: vi.fn(),
