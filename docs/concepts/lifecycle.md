@@ -35,6 +35,10 @@ sessions.delete(ws)
 onDisconnect(ctx)  → ctx.emit available
       ↓
 Actor may hibernate (state persists)
+      ↓
+Actor destroyed (evicted or explicit)
+      ↓
+onDestroy(ctx)  → cleanup, leave rooms, close sockets
 ```
 
 ## Lifecycle Hooks with Socket.io-like API
@@ -71,6 +75,31 @@ const connection = defineConnection({
     ctx.emit.toRoom("chat").emit("user.left", {
       userId: ctx.meta.userId
     });
+  }
+});
+```
+
+**onDestroy** - Called when the Actor is destroyed (evicted or explicitly):
+
+```typescript
+const connection = defineConnection({
+  onDestroy(ctx) {
+    // Cleanup: notify other services, flush analytics, etc.
+    // Room leave and WebSocket close are handled automatically
+  }
+});
+```
+
+ConnectionDOs automatically leave all rooms and close the WebSocket before calling `onDestroy`. Use this hook for external cleanup (analytics, third-party APIs, etc.).
+
+RoomDOs also support `onDestroy`:
+
+```typescript
+createRoomHandler({
+  name: "ChatRoom",
+  connectionBinding: "UserConnection",
+  onDestroy(ctx) {
+    // Room-level cleanup
   }
 });
 ```
@@ -130,6 +159,7 @@ const connection = defineConnection({
 3. State changes - Automatically persisted to storage
 4. Hibernation - State survives in storage
 5. Wake - State restored in `onInit()`
+6. `onDestroy()` - Final cleanup before Actor is evicted
 
 ## Related Documentation
 
