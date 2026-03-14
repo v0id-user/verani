@@ -82,12 +82,16 @@ describe('createTypedConnection', () => {
 		const conn = createTypedConnection(chatContract, {
 			name: 'test-chat',
 			websocketPath: '/ws/test',
+			rooms: { conversation: 'ChatRoom' },
+			connectionBinding: 'UserConnection',
 			extractMeta,
 		});
 
 		const def = conn.definition as any;
 		expect(def.name).toBe('test-chat');
 		expect(def.websocketPath).toBe('/ws/test');
+		expect(def.rooms).toEqual({ conversation: 'ChatRoom' });
+		expect(def.connectionBinding).toBe('UserConnection');
 		expect(def.extractMeta).toBe(extractMeta);
 	});
 
@@ -103,6 +107,33 @@ describe('createTypedConnection', () => {
 		const def = conn.definition as any;
 
 		expect(def.onConnect).toBeTypeOf('function');
+	});
+
+	it('forwards toRoom options through the typed emit wrapper', async () => {
+		const onConnect = vi.fn(async (ctx) => {
+			await ctx.emit.toRoom('conversation:123', { includeSelf: true }).emit('chat.message', {
+				from: 'u1',
+				text: 'hello',
+			});
+		});
+		const toRoom = vi.fn(() => ({ emit: vi.fn(async () => 1) }));
+		const conn = createTypedConnection(chatContract, { onConnect });
+		const def = conn.definition as any;
+
+		await def.onConnect({
+			actor: {},
+			ws: null,
+			meta: { userId: 'u1', clientId: 'c1', channels: ['default'] },
+			emit: {
+				emit: vi.fn(),
+				to: vi.fn(() => ({ emit: vi.fn() })),
+				toRoom,
+				toUser: vi.fn(() => ({ emit: vi.fn() })),
+			},
+			state: {},
+		});
+
+		expect(toRoom).toHaveBeenCalledWith('conversation:123', { includeSelf: true });
 	});
 
 	it('wraps onDisconnect with typed context', () => {
