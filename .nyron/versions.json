@@ -1,6 +1,16 @@
 {
   "createdAt": "2025-12-05T19:03:32.018Z",
   "packages": {
-    "verani": "0.10.1"
+    "verani": [
+      {
+        "version": "0.10.1",
+        "prefix": "verani",
+        "date": "2025-12-05T19:03:32.018Z"
+      },
+      {
+        "prefix": "verani",
+        "version": "0.11.0"
+      }
+    ]
   }
 }

@@ -1,98 +1,100 @@
 {
-	"name": "verani",
-	"version": "0.10.1",
-	"description": "A simple, focused realtime SDK for Cloudflare Actors with Socket.io-like semantics",
-	"license": "ISC",
-	"workspaces": ["site"],
-	"keywords": [
-		"cloudflare",
-		"actors",
-		"durable-objects",
-		"realtime",
-		"websocket",
-		"socket.io"
-	],
-	"main": "./dist/verani.cjs",
-	"module": "./dist/verani.mjs",
-	"types": "./dist/verani.d.cts",
-	"exports": {
-		".": {
-			"import": {
-				"types": "./dist/verani.d.mts",
-				"default": "./dist/verani.mjs"
-			},
-			"require": {
-				"types": "./dist/verani.d.cts",
-				"default": "./dist/verani.cjs"
-			}
-		},
-		"./client": {
-			"import": {
-				"types": "./dist/client.d.mts",
-				"default": "./dist/client.mjs"
-			},
-			"require": {
-				"types": "./dist/client.d.cts",
-				"default": "./dist/client.cjs"
-			}
-		},
-		"./typed": {
-			"import": {
-				"types": "./dist/typed.d.mts",
-				"default": "./dist/typed.mjs"
-			},
-			"require": {
-				"types": "./dist/typed.d.cts",
-				"default": "./dist/typed.cjs"
-			}
-		},
-		"./typed/client": {
-			"import": {
-				"types": "./dist/typed-client.d.mts",
-				"default": "./dist/typed-client.mjs"
-			},
-			"require": {
-				"types": "./dist/typed-client.d.cts",
-				"default": "./dist/typed-client.cjs"
-			}
-		},
-		"./typed/shared": {
-			"import": {
-				"types": "./dist/typed-shared.d.mts",
-				"default": "./dist/typed-shared.mjs"
-			},
-			"require": {
-				"types": "./dist/typed-shared.d.cts",
-				"default": "./dist/typed-shared.cjs"
-			}
-		}
-	},
-	"files": [
-		"dist",
-		"README.md",
-		"LICENSE"
-	],
-	"scripts": {
-		"build": "tsdown",
-		"prepublishOnly": "npm run build",
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
-		"test": "vitest",
-		"test:unit": "vitest run --config vitest.unit.config.mts",
-		"cf-typegen": "wrangler types"
-	},
-	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.8.19",
-		"@nyron/cli": "^0.7.8",
-		"esbuild-fix-imports-plugin": "^1.0.23",
-		"tsdown": "^0.16.7",
-		"typescript": "^5",
-		"vitest": "~3.2.0",
-		"wrangler": "4.51.0"
-	},
-	"peerDependencies": {
-		"typescript": "^5",
-		"@cloudflare/actors": "^0.0.1-beta.6"
-	}
+  "name": "verani",
+  "version": "0.11.0",
+  "description": "A simple, focused realtime SDK for Cloudflare Actors with Socket.io-like semantics",
+  "license": "ISC",
+  "workspaces": [
+    "site"
+  ],
+  "keywords": [
+    "cloudflare",
+    "actors",
+    "durable-objects",
+    "realtime",
+    "websocket",
+    "socket.io"
+  ],
+  "main": "./dist/verani.cjs",
+  "module": "./dist/verani.mjs",
+  "types": "./dist/verani.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/verani.d.mts",
+        "default": "./dist/verani.mjs"
+      },
+      "require": {
+        "types": "./dist/verani.d.cts",
+        "default": "./dist/verani.cjs"
+      }
+    },
+    "./client": {
+      "import": {
+        "types": "./dist/client.d.mts",
+        "default": "./dist/client.mjs"
+      },
+      "require": {
+        "types": "./dist/client.d.cts",
+        "default": "./dist/client.cjs"
+      }
+    },
+    "./typed": {
+      "import": {
+        "types": "./dist/typed.d.mts",
+        "default": "./dist/typed.mjs"
+      },
+      "require": {
+        "types": "./dist/typed.d.cts",
+        "default": "./dist/typed.cjs"
+      }
+    },
+    "./typed/client": {
+      "import": {
+        "types": "./dist/typed-client.d.mts",
+        "default": "./dist/typed-client.mjs"
+      },
+      "require": {
+        "types": "./dist/typed-client.d.cts",
+        "default": "./dist/typed-client.cjs"
+      }
+    },
+    "./typed/shared": {
+      "import": {
+        "types": "./dist/typed-shared.d.mts",
+        "default": "./dist/typed-shared.mjs"
+      },
+      "require": {
+        "types": "./dist/typed-shared.d.cts",
+        "default": "./dist/typed-shared.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "prepublishOnly": "npm run build",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "test": "vitest",
+    "test:unit": "vitest run --config vitest.unit.config.mts",
+    "cf-typegen": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.19",
+    "@nyron/cli": "^0.7.8",
+    "esbuild-fix-imports-plugin": "^1.0.23",
+    "tsdown": "^0.16.7",
+    "typescript": "^5",
+    "vitest": "~3.2.0",
+    "wrangler": "4.51.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5",
+    "@cloudflare/actors": "^0.0.1-beta.6"
+  }
 }
