@@ -391,6 +391,24 @@ export function createConnectionHandler<
 		}
 
 		/**
+		 * Lazily restore WebSocket after hibernation wake.
+		 * Raw namespace.get() bypasses Actor.get() → setName() → onInit(),
+		 * so this[WS] may be null even though a hibernated WebSocket exists.
+		 */
+		private restoreWebSocketIfNeeded(): void {
+			if (this[WS]) return;
+
+			const sockets = this.ctx.getWebSockets();
+			if (sockets.length > 0 && sockets[0].readyState === WebSocket.OPEN) {
+				this[WS] = sockets[0];
+				const meta = sockets[0].deserializeAttachment() as TMeta | undefined;
+				if (meta) {
+					this[META] = meta;
+				}
+			}
+		}
+
+		/**
 		 * Send a message to this connection's WebSocket
 		 */
 		private sendToWebSocket<TData = unknown>(event: string, data?: TData): boolean {
@@ -615,6 +633,7 @@ export function createConnectionHandler<
 		 * Called via RPC from RoomDO during broadcast
 		 */
 		async deliverMessage<TData = unknown>(event: string, data?: TData): Promise<boolean> {
+			this.restoreWebSocketIfNeeded();
 			return this.sendToWebSocket(event, data);
 		}
 
@@ -622,6 +641,7 @@ export function createConnectionHandler<
 		 * Deliver a system event (presence updates, room events, etc.)
 		 */
 		async deliverSystemEvent<TPayload = unknown>(type: string, payload?: TPayload): Promise<void> {
+			this.restoreWebSocketIfNeeded();
 			this.sendToWebSocket(`system:${type}`, payload);
 		}
 
