@@ -406,6 +406,37 @@ export function createConnectionHandler<
 					this[META] = meta;
 				}
 			}
+
+			if (definition.handlers && this.handlers.size === 0) {
+				for (const [event, handler] of definition.handlers.entries()) {
+					this.handlers.set(event, handler);
+				}
+			}
+		}
+
+		/**
+		 * Async full state restoration for WebSocket message path.
+		 * Restores rooms and persisted state that require storage access.
+		 */
+		private async restoreFullStateIfNeeded(): Promise<void> {
+			this.restoreWebSocketIfNeeded();
+
+			if (this[ROOMS].size === 0) {
+				const storedRooms = await this.ctx.storage.get<StoredRoom[]>("_connection_rooms");
+				if (storedRooms && Array.isArray(storedRooms)) {
+					this[ROOMS] = new Map(storedRooms.map(r => [r.roomName, r.metadata]));
+				}
+			}
+
+			if (definition.state && !this[PERSISTED_STATE]) {
+				const initializedState = await initializePersistedState(
+					this as unknown as PersistableActor,
+					definition.state,
+					definition.persistedKeys as string[] | undefined,
+					definition.persistOptions
+				);
+				this[PERSISTED_STATE] = initializedState;
+			}
 		}
 
 		/**
@@ -572,6 +603,12 @@ export function createConnectionHandler<
 		 * Handle WebSocket message
 		 */
 		protected async onWebSocketMessage(ws: WebSocket, raw: WebSocketRawData) {
+			// Restore state if woken from hibernation by a WebSocket message.
+			// Actor.get() → setName() → onInit() is NOT called in this path.
+			if (!this[META]) {
+				await this.restoreFullStateIfNeeded();
+			}
+
 			if (!this[META]) return;
 
 			try {
@@ -604,6 +641,8 @@ export function createConnectionHandler<
 		 * Handle WebSocket disconnect
 		 */
 		protected async onWebSocketDisconnect(ws: WebSocket) {
+			this.restoreWebSocketIfNeeded();
+
 			if (this[META] && definition.onDisconnect) {
 				try {
 					await definition.onDisconnect(this.createContext());
