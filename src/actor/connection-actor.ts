@@ -649,6 +649,7 @@ export function createConnectionHandler<
 		 * Get the userId this connection belongs to
 		 */
 		async getUserId(): Promise<string | null> {
+			this.restoreWebSocketIfNeeded();
 			return this[META]?.userId ?? null;
 		}
 
@@ -656,6 +657,7 @@ export function createConnectionHandler<
 		 * Check if this connection is active
 		 */
 		async isConnected(): Promise<boolean> {
+			this.restoreWebSocketIfNeeded();
 			return this[WS] !== null && this[WS].readyState === WebSocket.OPEN;
 		}
 
@@ -701,7 +703,7 @@ export function createConnectionHandler<
 			for (const [roomName, metadata] of this[ROOMS].entries()) {
 				try {
 					const RoomDO = this.getRoomBinding(roomName);
-					const roomStub = RoomDO.get(roomName) as RoomActorStub;
+					const roomStub = RoomDO.get(RoomDO.idFromName(roomName)) as RoomActorStub;
 					await roomStub.join(userId, metadata);
 				} catch {
 					failedRooms.push(roomName);
