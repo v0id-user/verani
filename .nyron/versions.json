@@ -42,6 +42,10 @@
       {
         "prefix": "verani",
         "version": "0.13.1"
+      },
+      {
+        "prefix": "verani",
+        "version": "0.13.2"
       }
     ]
   },
