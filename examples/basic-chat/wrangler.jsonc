@@ -1,0 +1,27 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "verani-basic-chat",
+	"main": "worker.ts",
+	"compatibility_date": "2025-11-26",
+	"observability": {
+		"enabled": true
+	},
+	"migrations": [
+		{
+			"new_sqlite_classes": ["UserConnection", "ChatRoom"],
+			"tag": "v1"
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"class_name": "UserConnection",
+				"name": "UserConnection"
+			},
+			{
+				"class_name": "ChatRoom",
+				"name": "ChatRoom"
+			}
+		]
+	}
+}
