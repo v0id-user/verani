@@ -159,8 +159,7 @@ export function createRoomHandler<E = unknown>(
 		 * Called when the DO initializes or wakes from hibernation
 		 */
 		protected async onInit() {
-			this.ensureReady();
-			await this.migrateFromKV();
+			await this.ensureReady();
 
 			if (definition.onInit) {
 				await definition.onInit(this.roomState);
@@ -168,15 +167,16 @@ export function createRoomHandler<E = unknown>(
 		}
 
 		/**
-		 * Ensure tables exist and members/state are loaded from SQL.
+		 * Ensure tables exist, migrate legacy data, and load state from SQL.
 		 * Called by onInit() when Actor.get() is used, or lazily by
 		 * RPC methods when woken via raw namespace.get() (which
 		 * bypasses Actor.get() → setName() → onInit()).
 		 */
-		private ensureReady(): void {
+		private async ensureReady(): Promise<void> {
 			if (this[INITIALIZED]) return;
 			this[INITIALIZED] = true;
 			this.ensureTables();
+			await this.migrateFromKV();
 			this.loadMembers();
 			this.loadRoomState();
 		}
@@ -256,7 +256,7 @@ export function createRoomHandler<E = unknown>(
 		 * Add a user to this room
 		 */
 		async join(userId: string, metadata: Record<string, unknown> = {}): Promise<void> {
-			this.ensureReady();
+			await this.ensureReady();
 			const joinedAt = Date.now();
 			const member: RoomMember = { userId, joinedAt, metadata };
 			const metadataJson = Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null;
@@ -274,7 +274,7 @@ export function createRoomHandler<E = unknown>(
 		 * Remove a user from this room
 		 */
 		async leave(userId: string): Promise<void> {
-			this.ensureReady();
+			await this.ensureReady();
 			if (!this[MEMBERS].has(userId)) return;
 
 			this[MEMBERS].delete(userId);
@@ -294,7 +294,7 @@ export function createRoomHandler<E = unknown>(
 		 * @returns Number of members the message was sent to
 		 */
 		async broadcast<TData = unknown>(event: string, data?: TData, opts?: BroadcastOptions): Promise<number> {
-			this.ensureReady();
+			await this.ensureReady();
 			const ConnectionDO = this.getConnectionBinding();
 
 			const eligible = Array.from(this[MEMBERS].entries()).filter(([userId]) => {
@@ -344,7 +344,7 @@ export function createRoomHandler<E = unknown>(
 		 * Get all current members of the room
 		 */
 		async getMembers(): Promise<RoomMember[]> {
-			this.ensureReady();
+			await this.ensureReady();
 			return Array.from(this[MEMBERS].values());
 		}
 
@@ -352,7 +352,7 @@ export function createRoomHandler<E = unknown>(
 		 * Get the count of members in the room
 		 */
 		async getMemberCount(): Promise<number> {
-			this.ensureReady();
+			await this.ensureReady();
 			return this[MEMBERS].size;
 		}
 
@@ -360,7 +360,7 @@ export function createRoomHandler<E = unknown>(
 		 * Check if a user is a member of this room
 		 */
 		async hasMember(userId: string): Promise<boolean> {
-			this.ensureReady();
+			await this.ensureReady();
 			return this[MEMBERS].has(userId);
 		}
 
@@ -368,7 +368,7 @@ export function createRoomHandler<E = unknown>(
 		 * Update metadata for a member
 		 */
 		async updateMemberMetadata(userId: string, metadata: Record<string, unknown>): Promise<void> {
-			this.ensureReady();
+			await this.ensureReady();
 			const member = this[MEMBERS].get(userId);
 			if (!member) return;
 
@@ -382,7 +382,7 @@ export function createRoomHandler<E = unknown>(
 		 * Get room state
 		 */
 		async getRoomState(): Promise<Record<string, unknown>> {
-			this.ensureReady();
+			await this.ensureReady();
 			return { ...this.roomState };
 		}
 
@@ -390,7 +390,7 @@ export function createRoomHandler<E = unknown>(
 		 * Set a room state value
 		 */
 		async setRoomState(key: string, value: unknown): Promise<void> {
-			this.ensureReady();
+			await this.ensureReady();
 			this.roomState[key] = value;
 			const valueJson = JSON.stringify(value);
 			this.sql`INSERT OR REPLACE INTO room_state (key, value) VALUES (${key}, ${valueJson})`;
