@@ -1,0 +1,29 @@
+{
+  "name": "verani-tanstack-chat",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "bun run build && wrangler deploy",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "^1.167.3",
+    "@tanstack/react-start": "^1.166.14",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "verani": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.13.7",
+    "@cloudflare/workers-types": "^4.20250313.0",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "^5",
+    "vite": "^7.3.1",
+    "wrangler": "^4.51.0"
+  }
+}

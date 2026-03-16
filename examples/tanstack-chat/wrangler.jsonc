@@ -1,0 +1,28 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "verani-tanstack-chat",
+	"main": "src/server.ts",
+	"compatibility_date": "2025-11-26",
+	"compatibility_flags": ["nodejs_compat"],
+	"observability": {
+		"enabled": true
+	},
+	"migrations": [
+		{
+			"new_sqlite_classes": ["UserConnection", "ChatRoom"],
+			"tag": "v1"
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"class_name": "UserConnection",
+				"name": "UserConnection"
+			},
+			{
+				"class_name": "ChatRoom",
+				"name": "ChatRoom"
+			}
+		]
+	}
+}
