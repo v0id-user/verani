@@ -53,7 +53,22 @@ Verani is a small, focused realtime SDK for Cloudflare Actors (Durable Objects) 
 ## Code Style
 
 - Avoid AI slop: no extra comments, defensive try/catch, or `as any` casts that are inconsistent with the file.
+- **Never use `any`.** Use `unknown`, proper generics, or type assertions with specific types instead.
 - Follow existing patterns; keep changes minimal and focused.
+
+## Cloudflare Workers / Durable Objects — Mandatory Rules
+
+**READ THE CLOUDFLARE DOCS. DO NOT INVENT APIs.**
+
+This project runs on Cloudflare Workers with Durable Objects. If you are unfamiliar with the Cloudflare Workers runtime, **stop and read the official documentation** before writing or modifying any code. Do not guess, hallucinate, or assume how Cloudflare APIs work based on other platforms.
+
+**Specific rules:**
+- **`DurableObjectNamespace.get()` requires a `DurableObjectId`, not a string.** Always call `ns.idFromName(name)` first, then pass the result to `ns.get(doId)`. Never pass a raw string to `.get()`. This is non-negotiable.
+- **Do not confuse `Actor.get()` with `DurableObjectNamespace.get()`.** The `@cloudflare/actors` `Actor.get(id: string)` static method handles `idFromName` internally. The raw `DurableObjectNamespace.get()` from `env` bindings does not.
+- **Do not add type overloads to "fix" type errors.** If the type checker rejects your code, the code is wrong — not the types. Never add permissive overloads (like `get(id: string)`) to silence errors.
+- **Never silently swallow errors with empty `catch` blocks.** Especially in message delivery paths. If you catch, log or re-throw. A `catch { return 0 }` in a delivery path makes bugs invisible and undebuggable.
+- **Tests must validate the actual Cloudflare API contract.** Mock bindings must include all methods used at runtime (`get`, `idFromName`, etc.). If your mocks accept raw strings where the real API requires `DurableObjectId`, your tests are worthless — they'll pass while production is broken.
+- **Do not use `WebSocket.OPEN` or other globals from the Workers runtime in unit tests** that run outside workerd. Use local constants.
 
 ## Commit Conventions
 
