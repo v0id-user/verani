@@ -364,17 +364,13 @@ export function createConnectionHandler<
 			const self = this;
 			return {
 				async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
-					try {
-						const RoomDO = self.getRoomBinding(roomName);
-						const roomStub = RoomDO.get(roomName) as RoomActorStub;
-						const opts: BroadcastOptions | undefined =
-							options?.includeSelf || !self[META]?.userId
-								? undefined
-								: { exceptUserId: self[META].userId };
-						return await roomStub.broadcast(event, data, opts);
-					} catch {
-						return 0;
-					}
+					const RoomDO = self.getRoomBinding(roomName);
+					const roomStub = RoomDO.get(RoomDO.idFromName(roomName)) as RoomActorStub;
+					const opts: BroadcastOptions | undefined =
+						options?.includeSelf || !self[META]?.userId
+							? undefined
+							: { exceptUserId: self[META].userId };
+					return await roomStub.broadcast(event, data, opts);
 				}
 			};
 		}
@@ -386,14 +382,10 @@ export function createConnectionHandler<
 			const self = this;
 			return {
 				async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
-					try {
-						const ConnectionDO = self.getConnectionBinding();
-						const userStub = ConnectionDO.get(userId) as ConnectionActorStub;
-						const success = await userStub.deliverMessage(event, data);
-						return success ? 1 : 0;
-					} catch {
-						return 0;
-					}
+					const ConnectionDO = self.getConnectionBinding();
+					const userStub = ConnectionDO.get(ConnectionDO.idFromName(userId)) as ConnectionActorStub;
+					const success = await userStub.deliverMessage(event, data);
+					return success ? 1 : 0;
 				}
 			};
 		}
@@ -657,7 +649,7 @@ export function createConnectionHandler<
 			}
 
 			const RoomDO = this.getRoomBinding(roomName);
-			const roomStub = RoomDO.get(roomName) as RoomActorStub;
+			const roomStub = RoomDO.get(RoomDO.idFromName(roomName)) as RoomActorStub;
 			await roomStub.join(this[META].userId, metadata);
 
 			this[ROOMS].set(roomName, metadata);
@@ -711,7 +703,7 @@ export function createConnectionHandler<
 			if (!this[META]) return;
 
 			const RoomDO = this.getRoomBinding(roomName);
-			const roomStub = RoomDO.get(roomName) as RoomActorStub;
+			const roomStub = RoomDO.get(RoomDO.idFromName(roomName)) as RoomActorStub;
 			await roomStub.leave(this[META].userId);
 		}
 

@@ -15,7 +15,6 @@ export type { ConnectionMeta, MessageFrame, WebSocketRawData };
  */
 export interface DurableObjectBinding<TStub> {
   get(id: DurableObjectId): TStub;
-  get(id: string): TStub;
   idFromName(name: string): DurableObjectId;
   idFromString(hexId: string): DurableObjectId;
   newUniqueId(): DurableObjectId;

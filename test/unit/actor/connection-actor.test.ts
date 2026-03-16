@@ -20,6 +20,18 @@ import { createConnectionHandler } from '../../../src/actor/connection-actor';
 
 const WEBSOCKET_OPEN = 1;
 
+interface TestActor {
+	onInit(): Promise<void>;
+	onWebSocketConnect(ws: WebSocket, req: Request): Promise<void>;
+	joinRoom(name: string, meta?: Record<string, unknown>): Promise<void>;
+	createContext(): {
+		emit: {
+			toRoom(name: string, opts?: { includeSelf?: boolean }): { emit(event: string, data?: unknown): Promise<number> };
+			toUser(userId: string): { emit(event: string, data?: unknown): Promise<number> };
+		};
+	};
+}
+
 function createMockStorage(initial: Record<string, unknown> = {}) {
 	const store = new Map<string, unknown>(Object.entries(initial));
 
@@ -56,6 +68,7 @@ function createMockSocket() {
 		readyState: WEBSOCKET_OPEN,
 		close: vi.fn(),
 		send: vi.fn(),
+		serializeAttachment: vi.fn(),
 		deserializeAttachment: vi.fn(),
 	} as unknown as WebSocket;
 }
@@ -71,6 +84,17 @@ function createMockRoomStub() {
 	};
 }
 
+function createMockDOId(name: string): DurableObjectId {
+	return { name, toString: () => `mock-id:${name}` } as unknown as DurableObjectId;
+}
+
+function createMockRoomBinding(stub: ReturnType<typeof createMockRoomStub>) {
+	return {
+		get: vi.fn(() => stub),
+		idFromName: vi.fn((name: string) => createMockDOId(name)),
+	};
+}
+
 describe('createConnectionHandler room bindings', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -78,9 +102,7 @@ describe('createConnectionHandler room bindings', () => {
 
 	it('resolves room bindings by namespace prefix for dynamic room names', async () => {
 		const roomStub = createMockRoomStub();
-		const chatRoomBinding = {
-			get: vi.fn(() => roomStub),
-		};
+		const chatRoomBinding = createMockRoomBinding(roomStub);
 		const Connection = createConnectionHandler({
 			rooms: { conversation: 'ChatRoom' },
 			extractMeta: () => ({
@@ -90,13 +112,14 @@ describe('createConnectionHandler room bindings', () => {
 			}),
 		});
 		const ctx = createMockContext();
-		const actor = new Connection(ctx as never, { ChatRoom: chatRoomBinding } as never) as any;
+		const actor = new Connection(ctx as never, { ChatRoom: chatRoomBinding } as never) as unknown as TestActor;
 
 		await actor.onInit();
 		await actor.onWebSocketConnect(createMockSocket(), new Request('https://example.com/ws'));
 		await actor.joinRoom('conversation:123', { role: 'member' });
 
-		expect(chatRoomBinding.get).toHaveBeenCalledWith('conversation:123');
+		expect(chatRoomBinding.idFromName).toHaveBeenCalledWith('conversation:123');
+		expect(chatRoomBinding.get).toHaveBeenCalledWith(expect.objectContaining({ name: 'conversation:123' }));
 		expect(roomStub.join).toHaveBeenCalledWith('user-1', { role: 'member' });
 		expect(ctx.storage.put).toHaveBeenCalledWith('_connection_rooms', [
 			{ roomName: 'conversation:123', metadata: { role: 'member' } },
@@ -106,12 +129,8 @@ describe('createConnectionHandler room bindings', () => {
 	it('prefers exact room bindings over namespace matches', async () => {
 		const exactRoomStub = createMockRoomStub();
 		const namespaceRoomStub = createMockRoomStub();
-		const specialRoomBinding = {
-			get: vi.fn(() => exactRoomStub),
-		};
-		const chatRoomBinding = {
-			get: vi.fn(() => namespaceRoomStub),
-		};
+		const specialRoomBinding = createMockRoomBinding(exactRoomStub);
+		const chatRoomBinding = createMockRoomBinding(namespaceRoomStub);
 		const Connection = createConnectionHandler({
 			rooms: {
 				conversation: 'ChatRoom',
@@ -126,22 +145,21 @@ describe('createConnectionHandler room bindings', () => {
 		const actor = new Connection(createMockContext() as never, {
 			ChatRoom: chatRoomBinding,
 			SpecialRoom: specialRoomBinding,
-		} as never) as any;
+		} as never) as unknown as TestActor;
 
 		await actor.onInit();
 		await actor.onWebSocketConnect(createMockSocket(), new Request('https://example.com/ws'));
 		await actor.joinRoom('conversation:123');
 
-		expect(specialRoomBinding.get).toHaveBeenCalledWith('conversation:123');
+		expect(specialRoomBinding.idFromName).toHaveBeenCalledWith('conversation:123');
+		expect(specialRoomBinding.get).toHaveBeenCalledWith(expect.objectContaining({ name: 'conversation:123' }));
 		expect(chatRoomBinding.get).not.toHaveBeenCalled();
 		expect(exactRoomStub.join).toHaveBeenCalledWith('user-1', undefined);
 	});
 
 	it('lets toRoom include the sender when requested', async () => {
 		const roomStub = createMockRoomStub();
-		const chatRoomBinding = {
-			get: vi.fn(() => roomStub),
-		};
+		const chatRoomBinding = createMockRoomBinding(roomStub);
 		const Connection = createConnectionHandler({
 			rooms: { conversation: 'ChatRoom' },
 			extractMeta: () => ({
@@ -150,13 +168,15 @@ describe('createConnectionHandler room bindings', () => {
 				channels: ['default'],
 			}),
 		});
-		const actor = new Connection(createMockContext() as never, { ChatRoom: chatRoomBinding } as never) as any;
+		const actor = new Connection(createMockContext() as never, { ChatRoom: chatRoomBinding } as never) as unknown as TestActor;
 
 		await actor.onInit();
 		await actor.onWebSocketConnect(createMockSocket(), new Request('https://example.com/ws'));
 
 		const emit = actor.createContext().emit;
 		await emit.toRoom('conversation:123').emit('chat.message', { text: 'hello' });
+
+		expect(chatRoomBinding.idFromName).toHaveBeenCalledWith('conversation:123');
 		expect(roomStub.broadcast).toHaveBeenLastCalledWith(
 			'chat.message',
 			{ text: 'hello' },

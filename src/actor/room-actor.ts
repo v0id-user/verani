@@ -285,7 +285,7 @@ export function createRoomHandler<E = unknown>(
 			const results = await Promise.all(
 				eligible.map(async ([userId]): Promise<{ userId: string; ok: boolean; error?: Error }> => {
 					try {
-						const connectionStub = ConnectionDO.get(userId);
+						const connectionStub = ConnectionDO.get(ConnectionDO.idFromName(userId));
 						await connectionStub.deliverMessage(event, data);
 						return { userId, ok: true };
 					} catch (error) {
