@@ -4,7 +4,8 @@
   "description": "A simple, focused realtime SDK for Cloudflare Actors with Socket.io-like semantics",
   "license": "ISC",
   "workspaces": [
-    "site"
+    "site",
+    "examples/tanstack-chat"
   ],
   "keywords": [
     "cloudflare",
@@ -82,7 +83,9 @@
     "start": "wrangler dev",
     "test": "vitest",
     "test:unit": "vitest run --config vitest.unit.config.mts",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "example:basic-chat": "cd examples/basic-chat && wrangler dev",
+    "example:tanstack-chat": "cd examples/tanstack-chat && bun run dev"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.19",
