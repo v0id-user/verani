@@ -26,7 +26,7 @@ interface TestActor {
 	joinRoom(name: string, meta?: Record<string, unknown>): Promise<void>;
 	createContext(): {
 		emit: {
-			toRoom(name: string, opts?: { includeSelf?: boolean }): { emit(event: string, data?: unknown): Promise<number> };
+			toRoom(name: string, opts?: { excludeSelf?: boolean; includeSelf?: boolean }): { emit(event: string, data?: unknown): Promise<number> };
 			toUser(userId: string): { emit(event: string, data?: unknown): Promise<number> };
 		};
 	};
@@ -157,7 +157,7 @@ describe('createConnectionHandler room bindings', () => {
 		expect(exactRoomStub.join).toHaveBeenCalledWith('user-1', undefined);
 	});
 
-	it('lets toRoom include the sender when requested', async () => {
+	it('includes the sender in room broadcast by default', async () => {
 		const roomStub = createMockRoomStub();
 		const chatRoomBinding = createMockRoomBinding(roomStub);
 		const Connection = createConnectionHandler({
@@ -180,14 +180,14 @@ describe('createConnectionHandler room bindings', () => {
 		expect(roomStub.broadcast).toHaveBeenLastCalledWith(
 			'chat.message',
 			{ text: 'hello' },
-			{ exceptUserId: 'user-1' },
+			undefined,
 		);
 
-		await emit.toRoom('conversation:123', { includeSelf: true }).emit('chat.message', { text: 'hello' });
+		await emit.toRoom('conversation:123', { excludeSelf: true }).emit('chat.message', { text: 'hello' });
 		expect(roomStub.broadcast).toHaveBeenLastCalledWith(
 			'chat.message',
 			{ text: 'hello' },
-			undefined,
+			{ exceptUserId: 'user-1' },
 		);
 	});
 });

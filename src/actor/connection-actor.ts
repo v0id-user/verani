@@ -371,10 +371,12 @@ export function createConnectionHandler<
 				async emit<TData = unknown>(event: string, data?: TData): Promise<number> {
 					const RoomDO = self.getRoomBinding(roomName);
 					const roomStub = RoomDO.get(RoomDO.idFromName(roomName)) as RoomActorStub;
-					const opts: BroadcastOptions | undefined =
-						options?.includeSelf || !self[META]?.userId
-							? undefined
-							: { exceptUserId: self[META].userId };
+					const shouldExclude = options?.excludeSelf
+					?? (options?.includeSelf !== undefined ? !options.includeSelf : false);
+				const opts: BroadcastOptions | undefined =
+						shouldExclude && self[META]?.userId
+							? { exceptUserId: self[META].userId }
+							: undefined;
 					return await roomStub.broadcast(event, data, opts);
 				}
 			};

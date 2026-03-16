@@ -62,7 +62,9 @@ export interface BroadcastOptions {
 }
 
 export interface RoomEmitOptions {
-  /** Include the sender when broadcasting to a room */
+  /** Exclude the sender from the room broadcast (default: false) */
+  excludeSelf?: boolean;
+  /** @deprecated Use excludeSelf instead. Previously the default was to exclude; now the default is to include. */
   includeSelf?: boolean;
 }
 
