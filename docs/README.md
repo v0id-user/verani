@@ -2,6 +2,11 @@
 
 Complete documentation for Verani, a realtime framework for Cloudflare Workers.
 
+## Tutorials
+
+- [Build a Real-Time Chat App](./tutorial/build-a-chat-app.md) - From zero to deployed chat app
+- [Persisted State & Storage](./tutorial/persisted-state.md) - Store data that survives hibernation
+
 ## Getting Started
 
 - [Installation](./getting-started/installation.md) - Prerequisites and installation
