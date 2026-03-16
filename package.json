@@ -85,7 +85,7 @@
     "test:unit": "vitest run --config vitest.unit.config.mts",
     "cf-typegen": "wrangler types",
     "example:basic-chat": "cd examples/basic-chat && wrangler dev",
-    "example:tanstack-chat": "cd examples/tanstack-chat && bun run dev"
+    "example:tanstack-chat": "cd examples/tanstack-chat && npm run dev"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.19",
