@@ -1,0 +1,63 @@
+---
+description: Cloudflare Durable Object API contract — DO NOT violate these rules
+globs: src/actor/**/*.ts, test/unit/actor/**/*.ts
+alwaysApply: true
+---
+
+# Cloudflare Durable Objects — API Contract (NON-NEGOTIABLE)
+
+You MUST follow these rules exactly. Violations have caused production-breaking bugs that were invisible due to silent error swallowing. If you are unsure how a Cloudflare API works, stop and read the official Cloudflare documentation. Do not guess, infer, or hallucinate API behavior.
+
+## `DurableObjectNamespace.get()` requires a `DurableObjectId`
+
+**NEVER pass a raw string to `DurableObjectNamespace.get()`.** Always convert first:
+
+```typescript
+// CORRECT
+const ns = this.env.MyDO as DurableObjectNamespace;
+const id = ns.idFromName(name);
+const stub = ns.get(id);
+
+// WRONG — this silently fails or targets the wrong DO
+const stub = ns.get(name); // string is NOT a DurableObjectId
+```
+
+The `@cloudflare/actors` `Actor.get(id: string)` static method handles this internally. The raw `DurableObjectNamespace` from env bindings does NOT.
+
+## Never add permissive type overloads to silence errors
+
+If TypeScript rejects `ns.get(someString)`, the code is wrong — not the types. Do not add `get(id: string)` overloads to `DurableObjectBinding`. Fix the call site to use `idFromName()`.
+
+## Never silently swallow errors
+
+```typescript
+// FORBIDDEN in delivery paths
+try { ... } catch { return 0; }
+
+// If you catch, propagate or log meaningfully
+```
+
+Empty catch blocks in message delivery make bugs invisible. The `toUser()` and `toRoom()` bugs went undetected because errors were silently caught and converted to `0`.
+
+## Test mocks must match the real API
+
+Mock DO bindings MUST include `idFromName`. Tests MUST verify `idFromName` is called with the correct name AND that `.get()` receives the resulting ID — not a raw string.
+
+```typescript
+// CORRECT mock
+const binding = {
+  get: vi.fn(() => stub),
+  idFromName: vi.fn((name) => createMockDOId(name)),
+};
+
+// WRONG — hides the idFromName requirement
+const binding = { get: vi.fn(() => stub) };
+```
+
+## No Workers runtime globals in unit tests
+
+`WebSocket.OPEN`, `WebSocket.CLOSED`, etc. are only available inside the workerd runtime. Unit tests running in Node/Bun must define local constants.
+
+## Never use `any`
+
+Use `unknown`, proper generics, or type assertions with specific interfaces. In tests, define a `TestActor` interface to access internal methods instead of casting to `any`.
