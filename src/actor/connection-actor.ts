@@ -244,6 +244,11 @@ export function createConnectionHandler<
 		[PERSISTED_STATE]: Record<string, unknown> = definition.state ? { ...definition.state } : {};
 
 		/**
+		 * Guard against concurrent initialization from onInit() and lazy restore
+		 */
+		private _initPromise: Promise<void> | null = null;
+
+		/**
 		 * Event handlers (socket.io-like)
 		 */
 		private handlers = new Map<string, (ctx: ConnectionContext<TMeta, E, TState>, data: unknown) => void | Promise<void>>();
@@ -419,6 +424,12 @@ export function createConnectionHandler<
 		 * Restores rooms and persisted state that require storage access.
 		 */
 		private async restoreFullStateIfNeeded(): Promise<void> {
+			// If onInit() is already running, wait for it instead of racing
+			if (this._initPromise) {
+				await this._initPromise;
+				return;
+			}
+
 			this.restoreWebSocketIfNeeded();
 
 			if (this[ROOMS].size === 0) {
@@ -428,7 +439,14 @@ export function createConnectionHandler<
 				}
 			}
 
-			if (definition.state && !this[PERSISTED_STATE]) {
+			if (definition.state && !this[STATE_READY]) {
+				if (definition.onPersistError) {
+					setPeristErrorHandler(
+						this as unknown as PersistableActor,
+						definition.onPersistError
+					);
+				}
+
 				const initializedState = await initializePersistedState(
 					this as unknown as PersistableActor,
 					definition.state,
@@ -462,10 +480,14 @@ export function createConnectionHandler<
 		 * Create context for lifecycle hooks
 		 */
 		private createContext(): ConnectionContext<TMeta, E, TState> {
+			if (!this[META]) {
+				throw new Error("Cannot create context: connection metadata not available");
+			}
+
 			return {
 				actor: this,
 				ws: this[WS],
-				meta: this[META]!,
+				meta: this[META],
 				emit: this.createEmit(),
 				state: this.connectionState as TState
 			};
@@ -479,6 +501,11 @@ export function createConnectionHandler<
 		 * Called when DO initializes or wakes from hibernation
 		 */
 		protected async onInit() {
+			this._initPromise = this._doInit();
+			await this._initPromise;
+		}
+
+		private async _doInit() {
 			// Initialize persisted state if defined
 			if (definition.state) {
 				if (definition.onPersistError) {
@@ -520,18 +547,18 @@ export function createConnectionHandler<
 					const meta = ws.deserializeAttachment() as TMeta | undefined;
 					if (meta) {
 						this[META] = meta;
-
-						// Auto-rejoin all rooms after hibernation
-						await this.rejoinRoomsAfterHibernation();
-
-						// Call user-defined hook (optional, for custom logic)
-						if (definition.onHibernationRestore) {
-							await definition.onHibernationRestore(this);
-						}
 					}
 				}
 			}
 
+			// Always rejoin rooms after hibernation (even if attachment was lost)
+			if (this[META] && this[ROOMS].size > 0) {
+				await this.rejoinRoomsAfterHibernation();
+			}
+
+			if (this[META] && definition.onHibernationRestore) {
+				await definition.onHibernationRestore(this);
+			}
 		}
 
 		/**
