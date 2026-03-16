@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "./versions.schema.json",
+  "title": "Nyron version history state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "createdAt",
+    "packages"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "./versions.schema.json"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "packages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "prefix",
+            "version"
+          ],
+          "properties": {
+            "prefix": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "lastPublished": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    }
+  }
+}

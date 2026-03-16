@@ -2,9 +2,10 @@
   "packages": [
     {
       "prefix": "verani",
-      "version": "0.12.2"
+      "version": "0.12.3"
     }
   ],
   "createdAt": "2025-12-05T19:03:32.017Z",
-  "latestTag": "nyron-release@2026-03-15@11-21-27.099"
+  "latestTag": "nyron-release@2026-03-15@11-21-43.647",
+  "$schema": "./meta.schema.json"
 }

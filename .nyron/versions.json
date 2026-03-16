@@ -26,7 +26,12 @@
       {
         "prefix": "verani",
         "version": "0.12.2"
+      },
+      {
+        "prefix": "verani",
+        "version": "0.12.3"
       }
     ]
-  }
+  },
+  "$schema": "./versions.schema.json"
 }

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "./meta.schema.json",
+  "title": "Nyron meta state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "packages",
+    "createdAt"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "./meta.schema.json"
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "prefix",
+          "version"
+        ],
+        "properties": {
+          "prefix": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "latestTag": {
+      "type": "string",
+      "pattern": "^nyron-release@"
+    }
+  }
+}
